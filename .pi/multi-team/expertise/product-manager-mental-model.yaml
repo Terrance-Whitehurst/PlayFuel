@@ -1,0 +1,120 @@
+project: PlayFuel (Junior Tennis Tournament Assistant)
+last_updated: "2026-04-26"
+
+positioning:
+  one_sentence: "iPhone app for junior tennis parents — schedule-aware, weather-aware, food-aware tournament-day planner."
+  core_principle: "Rules engine first. LLM as explanation layer only. Never let the LLM invent the plan."
+  first_milestone: "Parent creates tournament with 9AM + 1PM matches in Dallas (88F/humid) and gets a weather-aware, food-aware, scenario-based plan that feels like a coach gave it to them."
+
+phase_0_deliverables:
+  status: complete
+  files_created:
+    - path: .pi/multi-team/expertise/PRD.md
+      summary: "MVP PRD — positioning, users, core principle, demo scenario, build phases, privacy posture"
+    - path: .pi/multi-team/expertise/USER_STORIES.md
+      summary: "9 user stories (US-01 to US-09) with Given/When/Then acceptance criteria tied to spec data model and API"
+    - path: .pi/multi-team/expertise/MVP_SCOPE.md
+      summary: "Explicit in-scope (Phase 0-6 checklist) and out-of-scope list with deferrals table"
+    - path: .pi/multi-team/expertise/SAFETY_DISCLAIMERS.md
+      summary: "Verbatim disclaimer, hard-coded emergency text, prohibited phrases, safer language substitutions, LLM prompt requirements"
+    - path: .pi/multi-team/expertise/SCENARIO_ACCEPTANCE.md
+      summary: "QA acceptance criteria for all 5 eval scenarios with must-include/must-not-include tied to rules engine logic"
+
+open_questions_flagged:
+  - id: OQ-01
+    doc: PRD.md
+    issue: "App name not finalized — 8 candidates in spec §2, no decision recorded"
+    blocking: false
+    owner: Planning Lead
+  - id: OQ-02
+    doc: PRD.md
+    issue: "Weather API not chosen (WeatherKit vs OpenWeather)"
+    blocking: Phase 4
+    owner: Engineering Lead
+  - id: OQ-03
+    doc: PRD.md
+    issue: "Places API not chosen (Google vs Yelp)"
+    blocking: Phase 5
+    owner: Engineering Lead
+  - id: OQ-04
+    doc: PRD.md
+    issue: "LLM provider not confirmed"
+    blocking: Phase 6
+    owner: AI Agent
+  - id: OQ-05
+    doc: PRD.md / MVP_SCOPE.md
+    issue: "Match duration defaults (75/120/180) — configurable in profile? hardcoded? Not assigned to a phase."
+    blocking: Phase 3
+    owner: Planning Lead
+  - id: OQ-06
+    doc: PRD.md
+    issue: "COPPA review needed for users under 13 — must be pre-launch blocker"
+    blocking: true (pre-launch)
+    owner: Legal / Founder
+  - id: OQ-07
+    doc: USER_STORIES.md
+    issue: "Multiple player profiles per user — free tier = 1, paid = multiple? Phase 2 must scope this."
+    blocking: Phase 2
+    owner: Planning Lead
+  - id: OQ-08
+    doc: USER_STORIES.md
+    issue: "Plan regeneration UX — warning before overwriting? versioning visible to user?"
+    blocking: Phase 3
+    owner: UX Researcher
+  - id: OQ-09
+    doc: USER_STORIES.md
+    issue: "Offline access for saved plans — unspecified, but tournament venues may have poor connectivity"
+    blocking: false
+    owner: Engineering Lead
+  - id: OQ-10
+    doc: MVP_SCOPE.md
+    issue: "Feedback screen scope — plan_feedback endpoint in §12 MVP API list, but §23 assigns to Phase 7. Conflict."
+    blocking: Phase 6
+    owner: Planning Lead
+  - id: OQ-11
+    doc: SAFETY_DISCLAIMERS.md
+    issue: "Legal review of emergency heat illness wording explicitly flagged in spec §18 — pre-launch blocker"
+    blocking: true (pre-launch)
+    owner: Legal / Founder
+  - id: OQ-12
+    doc: SAFETY_DISCLAIMERS.md
+    issue: "LLM output filtering — prompt-only guardrails or programmatic filter? AI Agent to decide in Phase 6."
+    blocking: Phase 6
+    owner: AI Agent
+  - id: OQ-13
+    doc: SCENARIO_ACCEPTANCE.md
+    issue: "Pseudocode gap boundary at 150min conflicts with §16 prose '90-150 min = quick pickup'. Is < 150 exclusive or inclusive?"
+    blocking: Phase 3
+    owner: Backend Dev
+  - id: OQ-14
+    doc: SCENARIO_ACCEPTANCE.md
+    issue: "Negative gap (match overrun) not handled in pseudocode §19 — backend must define behavior"
+    blocking: Phase 3
+    owner: Backend Dev
+  - id: OQ-15
+    doc: SCENARIO_ACCEPTANCE.md
+    issue: "Rain delay + uncertain schedule: estimated_next_match_time=null returns wrong parent pickup advice. May need schedule_confidence field."
+    blocking: Phase 4
+    owner: Backend Dev / Planning Lead
+  - id: OQ-16
+    doc: SCENARIO_ACCEPTANCE.md
+    issue: "very_hot flag (≥90F) defined in §17 but no specific adjustments listed beyond 'hot' adjustments"
+    blocking: Phase 4
+    owner: Backend Dev
+
+prioritization_rationale:
+  say_no_to:
+    - "Menu scraping — fragile, legal risk, maintenance sink. Templates cover 80% of value."
+    - "Coach dashboard — real users are parents first. Coach tier is post-MVP."
+    - "Fine-tuning / on-device LLM — engineering cost far exceeds Phase 0-6 value."
+    - "Social / rankings — not the product. Distraction."
+  say_yes_to:
+    - "Scenario cards — the emotional core of the product. Parent sees long-match scenario and knows to send someone for food early. This is the aha moment."
+    - "Weather adjustment — high impact, low engineering cost once weather API is wired up."
+    - "Bag-food fallback — handles the zero-nearby-options edge case with zero extra cost."
+
+observations:
+  - date: "2026-04-26"
+    note: "Spec is unusually complete and specific — rules, pseudocode, schema, and prompts all present. Phase 0 job was distillation and gap-flagging, not design."
+  - date: "2026-04-26"
+    note: "Most critical open questions are boundary conditions in the rules engine (OQ-13, OQ-14, OQ-15) — these will create bugs if unresolved before Phase 3 backend build."

@@ -1,0 +1,31 @@
+---
+orchestrator:
+  name: Orchestrator
+  path: .pi/multi-team/agents/orchestrator.md
+  color: "#72f1b8"
+
+paths:
+  agents: .pi/multi-team/agents/
+  sessions: .pi/multi-team/sessions/
+
+shared_context:
+  - README.md
+  - CLAUDE.md
+
+teams:
+  - team-name: Engineering
+    team-color: "#ff6e96"
+    consult-when: Builds what Planning has scoped. Owns architecture, implementation, code changes, API design, database schema, and infrastructure.
+    lead:
+      name: Engineering Lead
+      path: .pi/multi-team/agents/engineering-lead.md
+      color: "#ff6e96"
+    members:
+      - name: Frontend Dev
+        path: .pi/multi-team/agents/frontend-dev.md
+        color: "#36f9f6"
+        consult-when: UI components, layouts, client-side state, browser APIs, CSS
+      - name: Backend Dev
+        path: .pi/multi-team/agents/backend-dev.md
+        color: "#ff7edb"
+        consult-when: APIs, databases, infrastructure, background jobs, third-party integrations
