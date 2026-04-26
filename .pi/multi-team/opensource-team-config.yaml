@@ -1,0 +1,78 @@
+---
+# Open-source / multi-provider team config for testing context window detection.
+# Each agent uses a different model via config-level model override.
+# The model: field in YAML takes precedence over the frontmatter model in the .md file.
+
+orchestrator:
+  name: Orchestrator
+  path: .pi/multi-team/agents/orchestrator.md
+  color: "#72f1b8"
+
+paths:
+  agents: .pi/multi-team/agents/
+  sessions: .pi/multi-team/sessions/
+
+shared_context:
+  - README.md
+  - CLAUDE.md
+
+teams:
+  - team-name: Planning
+    team-color: "#fede5d"
+    consult-when: Decides what to build and why. Owns product direction, feature scoping, requirements, prioritization, user research, and UX strategy.
+    lead:
+      name: Planning Lead
+      path: .pi/multi-team/agents/planning-lead.md
+      color: "#fede5d"
+      model: openrouter/qwen/qwen3.5-397b-a17b
+    members:
+      - name: Product Manager
+        path: .pi/multi-team/agents/product-manager.md
+        color: "#f0c674"
+        model: openrouter/moonshotai/kimi-k2.5
+        consult-when: Requirements, feature prioritization, user stories, acceptance criteria
+      - name: UX Researcher
+        path: .pi/multi-team/agents/ux-researcher.md
+        color: "#b893ce"
+        model: openrouter/qwen/qwen3.5-122b-a10b
+        consult-when: User behavior, personas, journey mapping, usability, friction points
+
+  - team-name: Engineering
+    team-color: "#ff6e96"
+    consult-when: Builds what Planning has scoped. Owns architecture, implementation, code changes, API design, database schema, and infrastructure.
+    lead:
+      name: Engineering Lead
+      path: .pi/multi-team/agents/engineering-lead.md
+      color: "#ff6e96"
+      model: openrouter/google/gemini-3-flash-preview
+    members:
+      - name: Frontend Dev
+        path: .pi/multi-team/agents/frontend-dev.md
+        color: "#36f9f6"
+        model: openrouter/openai/gpt-5.4
+        consult-when: UI components, layouts, client-side state, browser APIs, CSS
+      - name: Backend Dev
+        path: .pi/multi-team/agents/backend-dev.md
+        color: "#ff7edb"
+        model: openrouter/openai/gpt-5.4-mini
+        consult-when: APIs, databases, infrastructure, background jobs, third-party integrations
+
+  - team-name: Validation
+    team-color: "#ff9e64"
+    consult-when: Validates what Engineering built. Owns testing, security review, quality assurance, and compliance.
+    lead:
+      name: Validation Lead
+      path: .pi/multi-team/agents/validation-lead.md
+      color: "#ff9e64"
+      model: openrouter/google/gemini-3-flash-preview
+    members:
+      - name: QA Engineer
+        path: .pi/multi-team/agents/qa-engineer.md
+        color: "#7dcfff"
+        model: openrouter/minimax/minimax-m2.7
+        consult-when: Test cases, regression testing, automation, bug reproduction
+      - name: Security Reviewer
+        path: .pi/multi-team/agents/security-reviewer.md
+        color: "#f7768e"
+        model: openrouter/xiaomi/mimo-v2-pro
+        consult-when: Threat modeling, authentication, authorization, data protection, OWASP
