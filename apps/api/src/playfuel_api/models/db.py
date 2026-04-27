@@ -1,0 +1,121 @@
+"""
+Pydantic mirrors of public.* Postgres tables.
+
+Column names and types must reconcile with db/supabase/migrations/0002_tables.sql.
+These are used to deserialise Supabase PostgREST responses in route handlers.
+"""
+from __future__ import annotations
+
+from datetime import date, datetime
+from typing import Any, Optional
+from uuid import UUID
+
+from pydantic import BaseModel
+
+from playfuel_api.models.enums import (
+    FoodBucket,
+    GapStatus,
+    PickupBucket,
+    ScenarioKind,
+    ScheduleConfidence,
+    WeatherCondition,
+)
+
+
+class UserRow(BaseModel):
+    id: UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlayerProfileRow(BaseModel):
+    id: UUID
+    user_id: UUID
+    display_name: str
+    birth_year: Optional[int] = None
+    age_bracket: Optional[str] = None
+    dietary_notes: Optional[str] = None
+    hydration_notes: Optional[str] = None
+    injury_notes: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class TournamentRow(BaseModel):
+    id: UUID
+    user_id: UUID
+    name: str
+    venue_name: Optional[str] = None
+    venue_address: Optional[str] = None
+    venue_city: Optional[str] = None
+    venue_region: Optional[str] = None
+    venue_postal: Optional[str] = None
+    venue_lat: Optional[float] = None
+    venue_lng: Optional[float] = None
+    start_date: date
+    end_date: Optional[date] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class MatchRow(BaseModel):
+    id: UUID
+    tournament_id: UUID
+    scheduled_start: datetime
+    estimated_duration_minutes: Optional[int] = None
+    actual_end_at: Optional[datetime] = None
+    surface: Optional[str] = None
+    format: Optional[str] = None
+    age_bracket: Optional[str] = None
+    display_order: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class WeatherSnapshotRow(BaseModel):
+    id: UUID
+    tournament_id: UUID
+    temp_f: float
+    humidity_pct: float
+    wind_mph: Optional[float] = None
+    precipitation_probability: Optional[float] = None
+    condition: WeatherCondition
+    flag_hot: bool
+    flag_very_hot: bool
+    flag_humid: bool
+    flag_cold: bool
+    flag_windy: bool
+    flag_rain_risk: bool
+    flag_extreme_heat_risk: bool
+    fetched_at: datetime
+    provider: str
+    created_at: datetime
+    updated_at: datetime
+
+
+class MatchScenarioRow(BaseModel):
+    id: UUID
+    match_id: UUID
+    scenario_kind: ScenarioKind
+    duration_minutes: int
+    estimated_end_at: datetime
+    gap_minutes: Optional[int] = None
+    gap_status: GapStatus
+    food_bucket: Optional[FoodBucket] = None
+    pickup_bucket: Optional[PickupBucket] = None
+    rewarm_up_minutes: Optional[int] = None
+    overrun_warning: Optional[dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlanRow(BaseModel):
+    id: UUID
+    tournament_id: UUID
+    plan_json: dict[str, Any]
+    llm_summary: Optional[str] = None
+    rules_constants_version: str
+    warnings: list[str]
+    schedule_confidence: ScheduleConfidence
+    created_at: datetime
+    updated_at: datetime

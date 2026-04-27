@@ -7,7 +7,7 @@ positioning:
   first_milestone: "Parent creates tournament with 9AM + 1PM matches in Dallas (88F/humid) and gets a weather-aware, food-aware, scenario-based plan that feels like a coach gave it to them."
 
 phase_0_deliverables:
-  status: complete
+  status: complete (all tasks done)
   files_created:
     - path: .pi/multi-team/expertise/PRD.md
       summary: "MVP PRD — positioning, users, core principle, demo scenario, build phases, privacy posture"
@@ -19,6 +19,8 @@ phase_0_deliverables:
       summary: "Verbatim disclaimer, hard-coded emergency text, prohibited phrases, safer language substitutions, LLM prompt requirements"
     - path: .pi/multi-team/expertise/SCENARIO_ACCEPTANCE.md
       summary: "QA acceptance criteria for all 5 eval scenarios with must-include/must-not-include tied to rules engine logic"
+    - path: .pi/multi-team/expertise/RULES_CONSTANTS_V1.md
+      summary: "Deterministic rules constants v1.0.0 — scenario durations, gap buckets, hydration cadence, weather flags, food taxonomy, negative-gap contract, hard-coded strings, open questions, versioning"
 
 open_questions_flagged:
   - id: OQ-01
@@ -118,3 +120,7 @@ observations:
     note: "Spec is unusually complete and specific — rules, pseudocode, schema, and prompts all present. Phase 0 job was distillation and gap-flagging, not design."
   - date: "2026-04-26"
     note: "Most critical open questions are boundary conditions in the rules engine (OQ-13, OQ-14, OQ-15) — these will create bugs if unresolved before Phase 3 backend build."
+  - date: "2026-04-26"
+    note: "OQ-13 and OQ-14 now resolved by Engineering1. Key change: Normal scenario (gap=120) maps to quick_pickup bucket [90,150), NOT light_meal. This is a breaking change from pre-v1 ambiguity. Captured in RULES_CONSTANTS_V1.md §B.4 worked example note."
+  - date: "2026-04-26"
+    note: "Phase 0 complete. RULES_CONSTANTS_V1.md written. 9 open questions remain (OQ-A through OQ-G plus legal blockers OQ-06 and OQ-11). OQ-C (pre-match offsets) blocks Phase 3 — needs Planning Lead confirmation before Engineering1 builds the plan engine."

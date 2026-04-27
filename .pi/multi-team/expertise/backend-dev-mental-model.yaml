@@ -1,0 +1,82 @@
+role: Backend Dev (Engineering3 team)
+session: mog052owzfj7
+last_updated: "2026-04-26"
+
+task_completed:
+  id: "Phase 2 Task #4"
+  description: "Supabase schema migrations + RLS + Sign in with Apple"
+  deliverable_root: "db/supabase/"
+
+schema_decisions:
+  rls_pattern: "(select auth.uid()) subquery everywhere — query planner caching per Supabase official guidance"
+  cascade_policy: "All FKs cascade on DELETE for one-shot account deletion (PRD §11)"
+  updated_at: "Shared set_updated_at() function; one BEFORE UPDATE trigger per table"
+  auth_trigger: "handle_new_user() SECURITY DEFINER with set search_path = public, auth"
+  jsonb_docs: "comment on column for every JSONB column citing RULES_CONSTANTS_V1 section"
+
+oq_g_resolution:
+  field: "plans.schedule_confidence"
+  enum: "[high, medium, low]"
+  rule: |
+    Derived by FastAPI layer before INSERT (NOT a DB trigger):
+      low    if any scenario.gap_status IN ('overrun', 'no_next_match')
+      medium if any scenario.gap_status = 'tight'
+      high   otherwise (default)
+
+enums_defined:
+  - scenario_kind: [short, normal, long]
+  - gap_status: [ok, tight, overrun, no_next_match]
+  - schedule_confidence: [high, medium, low]
+  - food_bucket: [bag_only, portable, quick_pickup, light_meal]
+  - pickup_bucket: [bring_portable, pickup_during_match, wait_until_end]
+  - weather_condition: [clear, cloudy, rain, storm, snow]
+
+tables:
+  - users              # thin shadow of auth.users; id = auth.uid()
+  - player_profiles    # user_id FK; birth_year not exact birthdate
+  - tournaments        # user_id FK; venue lat/lng for weather+places API
+  - matches            # tournament_id FK; display_order for gap calculation
+  - match_scenarios    # match_id FK; gap_status, food_bucket, pickup_bucket, overrun_warning JSONB
+  - weather_snapshots  # tournament_id FK; derived flags stored denormalised
+  - food_options       # tournament_id FK; recommended_order JSONB, template_id
+  - plans              # tournament_id FK; plan_json+llm_summary separate; rules_constants_version stored
+  - feedback           # plan_id FK; 2-hop ownership: feedback→plans→tournaments
+
+rls_stats:
+  tables: 9
+  policies_per_table: 4
+  total_policies: 36
+  direct_ownership_tables: [users, player_profiles, tournaments]
+  one_hop_tables: [matches, weather_snapshots, food_options, plans]
+  two_hop_tables: [match_scenarios, feedback]
+
+seed_fixed_uuids:
+  demo_user: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+  dallas_tournament: "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+  match_1_9am: "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+  match_2_1pm: "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+  weather_snapshot: "e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+
+validation:
+  method: "Manual review (no supabase CLI or psql available on this machine)"
+  checks_run:
+    - "36 policies confirmed (9 tables × 4)"
+    - "9 updated_at triggers confirmed"
+    - "8 FK indexes confirmed"
+    - "6 enums in 0001 all referenced in 0002"
+    - "Seed flags match RULES_CONSTANTS_V1 §E thresholds (88°F hot=T, very_hot=F, 72% humid=T)"
+
+new_oqs:
+  - id: "OQ-H"
+    question: "weather_condition enum — does it need 'partly_cloudy', 'fog', or 'haze'?"
+    blocks_phase: "Phase 4"
+    owner: "Engineering3 / Product"
+
+deviations_from_spec:
+  - "Added venue_lat/venue_lng to tournaments (not in orchestrator table spec, but required by USER_STORIES US-03 and weather/places API phases)"
+  - "weather_snapshots: added flag_cold, flag_windy, flag_rain_risk flags (all defined in RULES_CONSTANTS_V1 §E.1 — consistent addition)"
+
+engineering1_coordination:
+  note: "Engineering1 FastAPI backend should use service role key for server-side Supabase calls"
+  schedule_confidence_rule: "FastAPI derives before INSERT — not a DB trigger"
+  column_names: "match_scenarios fields match RULES_CONSTANTS_V1 §G shapes exactly"

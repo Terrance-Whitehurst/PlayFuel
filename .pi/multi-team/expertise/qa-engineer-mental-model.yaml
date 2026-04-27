@@ -1,0 +1,178 @@
+session: mogfjh9hslqr
+date: "2026-04-26"
+
+project_context:
+  name: PlayFuel
+  stack: FastAPI (Python 3.11+), Pydantic v2, supabase-py, PyJWT, pytest
+  api_root: apps/api/src/playfuel_api/
+  rules_version: "1.0.0"
+
+domain_restrictions:
+  write: .pi/multi-team/ only
+  read: apps/, .pi/multi-team/, project root
+  note: "QA Engineer CANNOT write to apps/. Must stage files in session dir and
+         flag for Engineering/Lead to place them on disk."
+
+task5_qa_pass:
+  session: mogfjh9hslqr
+  status: COMPLETE (QA pass) / BLOCKED (file write)
+  missing_file_staged_at: ".pi/multi-team/sessions/mogfjh9hslqr/test_routes_smoke_READY_TO_WRITE.py"
+  write_blocker: "QA domain is read-only on apps/; staged for Engineering to write"
+
+invariant_matrix:
+  - id: 1
+    name: camelCase API output
+    status: PASS
+    evidence: "routes/plans.py: response_model_by_alias=True on @router.post('/{tid}/plans/generate');
+               plan_dict = plan.model_dump(by_alias=True, mode='json') before INSERT"
+  - id: 2
+    name: test_gap_120_is_quick_pickup exists
+    status: PASS
+    evidence: "tests/test_buckets.py: function test_gap_120_is_quick_pickup() asserts
+               food_bucket_for(120)==FoodBucket.quick_pickup AND pickup_bucket_for(120)==PickupBucket.wait_until_end"
+  - id: 3
+    name: half-open intervals correct
+    status: PASS
+    evidence: "rules/buckets.py: all comparisons use strict < (not <=);
+               FOOD_BUCKET_BOUNDARIES=[45,90,150], PICKUP_BUCKET_BOUNDARIES=[60,120] confirmed in constants.py"
+  - id: 4
+    name: gap_status semantics
+    status: PASS
+    evidence: "rules/scenarios.py: if gap_minutes < 0 → overrun; GapStatus.tight if gap_minutes < TIGHT_GAP_THRESHOLD_MIN (30) else GapStatus.ok;
+               no_next_match at top of _make_scenario when next_match is None"
+  - id: 5
+    name: overrun clamps
+    status: PASS
+    evidence: "rules/scenarios.py overrun branch: food=FoodBucket.bag_only, pickup=PickupBucket.bring_portable,
+               rewarm_up=None, HTTP 200 always (generate_plan returns GeneratePlanResponse)"
+  - id: 6
+    name: extreme_heat_risk formula
+    status: PASS
+    evidence: "rules/weather.py line: flag_extreme_heat_risk: bool = flag_very_hot or (flag_hot and flag_humid)"
+  - id: 7
+    name: RLS-only ownership
+    status: PASS
+    evidence: "grep found zero eq('user_id',...) in routes/; only eq('id', str(user_id)) in /v1/me
+               (fetching user's own row, not an ownership filter on a resource).
+               db.py: client.postgrest.auth(creds.credentials) ✅"
+  - id: 8
+    name: DRAFT OQ flags preserved
+    status: PASS
+    evidence: "constants.py: [DRAFT — OQ-E] on TIGHT_GAP_THRESHOLD_MIN, [DRAFT — OQ-C] on REWARM_UP_OFFSET_MIN/DURATION_MIN;
+               hard_coded_strings.py: OQ-11 PRE-LAUNCH BLOCKER on HEAT_EMERGENCY_TEXT;
+               scenarios.py: TIGHT_GAP_THRESHOLD_MIN = 30 [DRAFT — OQ-E] in comment;
+               plan.py: ⚠️ HEAT_EMERGENCY_TEXT is DRAFT — OQ-11 pre-launch blocker.
+               OQ-A not found in any file (may have been in a different foundation file not shipped)."
+  - id: 9
+    name: scenario 5 xfail
+    status: PASS
+    evidence: "tests/test_scenarios.py: @pytest.mark.xfail(reason='OQ-F deferred to Phase 4')
+               on test_scenario_5_rain_delay_engine_path()"
+  - id: 10
+    name: no LLM imports
+    status: PASS
+    evidence: "grep for openai/anthropic/litellm across apps/api/src/ → zero matches"
+  - id: 11
+    name: no prohibited phrases
+    status: PASS
+    evidence: "grep for all 8 prohibited phrases across apps/api/src/ → zero matches;
+               hard_coded_strings.py text reviewed manually — no causal claims"
+  - id: 12
+    name: reuses existing models
+    status: PASS
+    evidence: "scenarios.py: from playfuel_api.models.api import FoodStrategy,OverrunWarning,PickupStrategy,RewarmUp,ScenarioPlan;
+               plan.py: from playfuel_api.models.api import Plan, ScenarioPlan;
+               routes/plans.py: from playfuel_api.models.api import GeneratePlanResponse; no parallel defs"
+
+findings:
+  - category: BRIEF_DEFECT
+    severity: medium
+    title: "Brief specifies 401 for no-token path, actual behaviour is 403"
+    detail: "FastAPI's HTTPBearer(auto_error=True) raises HTTP 403 (not 401) when no
+             Authorization header is present. 401 is raised only by verify_supabase_jwt
+             when a token IS present but invalid/expired. The smoke test function was
+             renamed test_protected_route_without_token_returns_403 and asserts 403.
+             The brief's expected status code should be corrected to 403."
+
+  - category: SECURITY
+    severity: low
+    title: "jwt.InvalidTokenError detail reflected in 401 response body"
+    detail: "auth.py: detail=f'Invalid token: {exc}' reflects the pyjwt exception
+             message into the API response. May leak token structure hints to attackers
+             probing with malformed tokens. Recommend: replace with generic 'Invalid token'
+             without the exception detail."
+    file: "apps/api/src/playfuel_api/auth.py"
+
+  - category: UNUSED_IMPORT
+    severity: low
+    title: "PlayerProfileRow imported but unused in player_profiles.py"
+    detail: "routes/player_profiles.py imports PlayerProfileRow from playfuel_api.models.db
+             but none of the route handlers use it. Handlers return dict[str,Any] from
+             Supabase directly. No runtime impact; lint warning only."
+    file: "apps/api/src/playfuel_api/routes/player_profiles.py"
+
+  - category: TEST_GAP
+    severity: medium
+    title: "no_next_match path (§G.5) has no dedicated test"
+    detail: "All 5 SCENARIO_ACCEPTANCE cases supply a next_match. The no_next_match
+             branch in _make_scenario (§G.5) — food_strategy=None, pickup bucket=None,
+             gap_minutes=None, gap_status=no_next_match — is not exercised by any test
+             in test_scenarios.py."
+
+  - category: TEST_GAP
+    severity: low
+    title: "build_plan_envelope heat_emergency_text path untested"
+    detail: "plan.py: the branch that sets heat_emergency_text when
+             weather_flags['flag_extreme_heat_risk'] is True is not covered by any test.
+             Only unit-testable path not reached by existing suite."
+
+  - category: TEST_GAP
+    severity: low
+    title: "derive_schedule_confidence not unit-tested directly"
+    detail: "plan.py: derive_schedule_confidence() is only exercised indirectly via
+             generate_plan route. No standalone unit test for low/medium/high branches."
+
+  - category: TEST_GAP
+    severity: low
+    title: "rewarm_up boundary (gap=59 vs gap=60) not explicitly tested"
+    detail: "REWARM_UP_MIN_GAP=60 means rewarm_up is non-null only when gap >= 60.
+             No test directly asserts rewarm_up=None for gap=59 and non-None for gap=60
+             in isolation (covered implicitly in scenario acceptance but not as a named
+             boundary test)."
+
+  - category: REGRESSION_CHECK
+    severity: info
+    title: "No regressions found vs foundation files"
+    detail: "All new files import from playfuel_api.rules.constants, playfuel_api.models.api,
+             playfuel_api.models.enums — no shadowing, no circular imports detected by read.
+             Foundation files (constants.py, hard_coded_strings.py, models/api.py, etc.)
+             appear untouched."
+
+new_oqs:
+  - id: "OQ-QA-1"
+    title: "HTTPBearer returns 403 not 401 for missing auth header — brief specifies 401"
+    status: open
+    priority: medium
+    detail: "The TaskSpec and smoke test brief both say 'protected route w/o token → 401'.
+             Actual: FastAPI HTTPBearer(auto_error=True) returns 403. Options:
+             (a) Accept 403 as correct, update brief/docs;
+             (b) Switch to HTTPBearer(auto_error=False) + custom dep that raises 401.
+             Current test_routes_smoke.py asserts 403 (matching implementation)."
+
+  - id: "OQ-QA-2"
+    title: "PlayerProfileRow import unused in player_profiles.py — cleanup needed?"
+    status: open
+    priority: low
+    detail: "Unused import raises linting warnings. Recommend removing before Phase 3."
+
+test_coverage_patterns:
+  bucket_tests: 13 cases (8 food + 4 pickup + 1 named regression)
+  weather_tests: 6 parametrized cases (2 extreme_heat paths, 1 cold, 1 rain, 1 hot-only, 1 none)
+  scenario_tests: 4 acceptance cases fully passing + 1 xfail (rain delay OQ-F)
+  routes_smoke: 3 cases (healthz 200, no-token 403, mocked-auth 200)
+  known_gaps:
+    - no_next_match path
+    - build_plan_envelope heat text
+    - derive_schedule_confidence unit tests
+    - rewarm_up gap boundary isolation
+    - verify_supabase_jwt negative paths (expired, missing sub, invalid UUID sub)

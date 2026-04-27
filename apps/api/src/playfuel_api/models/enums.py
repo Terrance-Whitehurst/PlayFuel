@@ -1,0 +1,54 @@
+"""
+Postgres enum mirrors for PlayFuel.
+
+IMPORTANT: Every string value here must match the corresponding Postgres enum
+value in db/supabase/migrations/0001_extensions_and_enums.sql byte-for-byte.
+Any change here requires a Postgres migration AND a RULES_CONSTANTS_VERSION bump.
+"""
+from enum import StrEnum
+
+
+class ScenarioKind(StrEnum):
+    """match_scenarios.scenario_kind — RULES_CONSTANTS_V1.md §A."""
+    short = "short"
+    normal = "normal"
+    long = "long"
+
+
+class GapStatus(StrEnum):
+    """match_scenarios.gap_status — RULES_CONSTANTS_V1.md §G.1."""
+    ok = "ok"
+    tight = "tight"
+    overrun = "overrun"
+    no_next_match = "no_next_match"
+
+
+class ScheduleConfidence(StrEnum):
+    """plans.schedule_confidence — derived by FastAPI before INSERT (resolves OQ-G)."""
+    high = "high"
+    medium = "medium"
+    low = "low"
+
+
+class FoodBucket(StrEnum):
+    """match_scenarios.food_bucket — RULES_CONSTANTS_V1.md §B.2."""
+    bag_only = "bag_only"
+    portable = "portable"
+    quick_pickup = "quick_pickup"
+    light_meal = "light_meal"
+
+
+class PickupBucket(StrEnum):
+    """match_scenarios.pickup_bucket — RULES_CONSTANTS_V1.md §B.3."""
+    bring_portable = "bring_portable"
+    pickup_during_match = "pickup_during_match"
+    wait_until_end = "wait_until_end"
+
+
+class WeatherCondition(StrEnum):
+    """weather_snapshots.condition — Engineering3 proposal; OQ-H tracks extensions."""
+    clear = "clear"
+    cloudy = "cloudy"
+    rain = "rain"
+    storm = "storm"
+    snow = "snow"

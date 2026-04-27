@@ -1,0 +1,410 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		00858D2D2AAAB084FAE5B6F1 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6A58B35CC45E975FBC588 /* TimelineView.swift */; };
+		1C14B6E345DEBE8847E9C5B8 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAA6A3A9295F34782002C64 /* SignInView.swift */; };
+		2819CB8C07935F8521876AB7 /* FoodOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A8963D6167FAD62CA951AE /* FoodOption.swift */; };
+		3E6C828C968501222BF5227C /* Match.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEF49588955B05641B5EE27 /* Match.swift */; };
+		5C3C77FEAE066B90F5AB2AAB /* PlayFuelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE76F905584434E9D20721B7 /* PlayFuelApp.swift */; };
+		6115DE510C6D96BC011BF18C /* Plan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B0D0628C8AC1E5CB21A121 /* Plan.swift */; };
+		7E3B9CBD99D512F8AD4C03F8 /* HardCodedStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */; };
+		87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */; };
+		A40238D231C23EA61E02A1D5 /* Tournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79888F3E040BD239741B1D5 /* Tournament.swift */; };
+		AD64452F4938CC50EAFAB031 /* WeatherSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */; };
+		ADF44C64562D35C64E107F79 /* TimelineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796A0EDD57748854929E6897 /* TimelineEvent.swift */; };
+		B612304F8385D746BAB63507 /* ScenarioPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */; };
+		BAE452A692D9D36BF40BA429 /* DisclaimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B07537E35072C03DA3414D /* DisclaimerView.swift */; };
+		BF90BA9A227446C650B84BBC /* EmergencyBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */; };
+		D3E6C151169F080F6D22709E /* FoodCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733A9D96157E16CBB306C4EC /* FoodCardView.swift */; };
+		E02994AE32CE3A6CB4DFCD83 /* FakeData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1765305F0E1FFE9661C32E /* FakeData.swift */; };
+		E18EBD023A7B6F06606D1C78 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE33ACDB9D45D319F859366D /* AppState.swift */; };
+		ED783DB00779757DDC31488C /* WeatherCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6F52B449265DCBA14E961E95 /* WeatherCardView.swift */; };
+		F595DE549B9CF77D38C5A898 /* TournamentDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */; };
+		FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AE19CFED4698BCC9E569E /* TournamentListView.swift */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXFileReference section */
+		0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherSnapshot.swift; sourceTree = "<group>"; };
+		136FAA9B0E2AACEC604CF6F4 /* PlayFuel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PlayFuel.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		14F6A58B35CC45E975FBC588 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
+		2FEF49588955B05641B5EE27 /* Match.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Match.swift; sourceTree = "<group>"; };
+		3911B023F7463D889B4ADB37 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioPlan.swift; sourceTree = "<group>"; };
+		5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardCodedStrings.swift; sourceTree = "<group>"; };
+		63A8963D6167FAD62CA951AE /* FoodOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodOption.swift; sourceTree = "<group>"; };
+		6F52B449265DCBA14E961E95 /* WeatherCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherCardView.swift; sourceTree = "<group>"; };
+		733A9D96157E16CBB306C4EC /* FoodCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodCardView.swift; sourceTree = "<group>"; };
+		796A0EDD57748854929E6897 /* TimelineEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineEvent.swift; sourceTree = "<group>"; };
+		7E1765305F0E1FFE9661C32E /* FakeData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FakeData.swift; sourceTree = "<group>"; };
+		85B0D0628C8AC1E5CB21A121 /* Plan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plan.swift; sourceTree = "<group>"; };
+		97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyBanner.swift; sourceTree = "<group>"; };
+		A30AE19CFED4698BCC9E569E /* TournamentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentListView.swift; sourceTree = "<group>"; };
+		A7B07537E35072C03DA3414D /* DisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisclaimerView.swift; sourceTree = "<group>"; };
+		AE76F905584434E9D20721B7 /* PlayFuelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayFuelApp.swift; sourceTree = "<group>"; };
+		C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioCardView.swift; sourceTree = "<group>"; };
+		D79888F3E040BD239741B1D5 /* Tournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tournament.swift; sourceTree = "<group>"; };
+		DE33ACDB9D45D319F859366D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
+		E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentDashboardView.swift; sourceTree = "<group>"; };
+		FFAA6A3A9295F34782002C64 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXGroup section */
+		07B6CF12B6034FE7869456D0 /* State */ = {
+			isa = PBXGroup;
+			children = (
+				DE33ACDB9D45D319F859366D /* AppState.swift */,
+			);
+			path = State;
+			sourceTree = "<group>";
+		};
+		29D82C8CB2C4286FD1804FE2 = {
+			isa = PBXGroup;
+			children = (
+				78A4651B7978DCDFB55745FA /* Sources */,
+				5D4377B3D0AA929C970F19F5 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		5D4377B3D0AA929C970F19F5 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				136FAA9B0E2AACEC604CF6F4 /* PlayFuel.app */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		78A4651B7978DCDFB55745FA /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				BFF2B7FC8A1524A0AAB79621 /* PlayFuel */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		89B7753550A993180C723D3F /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				63A8963D6167FAD62CA951AE /* FoodOption.swift */,
+				2FEF49588955B05641B5EE27 /* Match.swift */,
+				85B0D0628C8AC1E5CB21A121 /* Plan.swift */,
+				438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */,
+				796A0EDD57748854929E6897 /* TimelineEvent.swift */,
+				D79888F3E040BD239741B1D5 /* Tournament.swift */,
+				0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		BC5A968F7E2A2EAB0E1E7401 /* Data */ = {
+			isa = PBXGroup;
+			children = (
+				7E1765305F0E1FFE9661C32E /* FakeData.swift */,
+				5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */,
+			);
+			path = Data;
+			sourceTree = "<group>";
+		};
+		BFF2B7FC8A1524A0AAB79621 /* PlayFuel */ = {
+			isa = PBXGroup;
+			children = (
+				3911B023F7463D889B4ADB37 /* Info.plist */,
+				AE76F905584434E9D20721B7 /* PlayFuelApp.swift */,
+				BC5A968F7E2A2EAB0E1E7401 /* Data */,
+				89B7753550A993180C723D3F /* Models */,
+				07B6CF12B6034FE7869456D0 /* State */,
+				FC03F95BFCD60E783DEA636C /* Views */,
+			);
+			path = PlayFuel;
+			sourceTree = "<group>";
+		};
+		FC03F95BFCD60E783DEA636C /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				A7B07537E35072C03DA3414D /* DisclaimerView.swift */,
+				97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */,
+				733A9D96157E16CBB306C4EC /* FoodCardView.swift */,
+				C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */,
+				FFAA6A3A9295F34782002C64 /* SignInView.swift */,
+				14F6A58B35CC45E975FBC588 /* TimelineView.swift */,
+				E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */,
+				A30AE19CFED4698BCC9E569E /* TournamentListView.swift */,
+				6F52B449265DCBA14E961E95 /* WeatherCardView.swift */,
+			);
+			path = Views;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F1CFB326231E4D915F036712 /* PlayFuel */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3F3284AB944F57467EADBAC7 /* Build configuration list for PBXNativeTarget "PlayFuel" */;
+			buildPhases = (
+				B63D3A3FE1D888AB9FE409DA /* Sources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = PlayFuel;
+			packageProductDependencies = (
+			);
+			productName = PlayFuel;
+			productReference = 136FAA9B0E2AACEC604CF6F4 /* PlayFuel.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		A4CA6B3942C96457AAA450D9 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				LastUpgradeCheck = 1430;
+				TargetAttributes = {
+					F1CFB326231E4D915F036712 = {
+						DevelopmentTeam = "";
+						ProvisioningStyle = Automatic;
+					};
+				};
+			};
+			buildConfigurationList = F4DD673A4B0C89B921059979 /* Build configuration list for PBXProject "PlayFuel" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = 29D82C8CB2C4286FD1804FE2;
+			minimizedProjectReferenceProxies = 1;
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 5D4377B3D0AA929C970F19F5 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F1CFB326231E4D915F036712 /* PlayFuel */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXSourcesBuildPhase section */
+		B63D3A3FE1D888AB9FE409DA /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				E18EBD023A7B6F06606D1C78 /* AppState.swift in Sources */,
+				BAE452A692D9D36BF40BA429 /* DisclaimerView.swift in Sources */,
+				BF90BA9A227446C650B84BBC /* EmergencyBanner.swift in Sources */,
+				E02994AE32CE3A6CB4DFCD83 /* FakeData.swift in Sources */,
+				D3E6C151169F080F6D22709E /* FoodCardView.swift in Sources */,
+				2819CB8C07935F8521876AB7 /* FoodOption.swift in Sources */,
+				7E3B9CBD99D512F8AD4C03F8 /* HardCodedStrings.swift in Sources */,
+				3E6C828C968501222BF5227C /* Match.swift in Sources */,
+				6115DE510C6D96BC011BF18C /* Plan.swift in Sources */,
+				5C3C77FEAE066B90F5AB2AAB /* PlayFuelApp.swift in Sources */,
+				87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */,
+				B612304F8385D746BAB63507 /* ScenarioPlan.swift in Sources */,
+				1C14B6E345DEBE8847E9C5B8 /* SignInView.swift in Sources */,
+				ADF44C64562D35C64E107F79 /* TimelineEvent.swift in Sources */,
+				00858D2D2AAAB084FAE5B6F1 /* TimelineView.swift in Sources */,
+				A40238D231C23EA61E02A1D5 /* Tournament.swift in Sources */,
+				F595DE549B9CF77D38C5A898 /* TournamentDashboardView.swift in Sources */,
+				FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */,
+				ED783DB00779757DDC31488C /* WeatherCardView.swift in Sources */,
+				AD64452F4938CC50EAFAB031 /* WeatherSnapshot.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin XCBuildConfiguration section */
+		19DA76B84CB4F7D86B1F59AE /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/PlayFuel/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.playfuel.PlayFuel;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		294037A637B447DE8E194CDA /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = "";
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Release;
+		};
+		6851037EA10EC8853B946D50 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = Sources/PlayFuel/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.playfuel.PlayFuel;
+				SDKROOT = iphoneos;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		F9B15677228D23F66138CE35 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = "";
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"$(inherited)",
+					"DEBUG=1",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3F3284AB944F57467EADBAC7 /* Build configuration list for PBXNativeTarget "PlayFuel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				6851037EA10EC8853B946D50 /* Debug */,
+				19DA76B84CB4F7D86B1F59AE /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		F4DD673A4B0C89B921059979 /* Build configuration list for PBXProject "PlayFuel" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F9B15677228D23F66138CE35 /* Debug */,
+				294037A637B447DE8E194CDA /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = A4CA6B3942C96457AAA450D9 /* Project object */;
+}
