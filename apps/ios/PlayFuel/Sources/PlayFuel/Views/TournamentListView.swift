@@ -8,6 +8,7 @@ import SwiftUI
 struct TournamentListView: View {
 
     @EnvironmentObject var appState: AppState
+    @State private var showingCreateTournament = false
 
     var body: some View {
         Group {
@@ -33,12 +34,23 @@ struct TournamentListView: View {
             TournamentDashboardView(tournament: tournament)
         }
         .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
+            ToolbarItem(placement: .topBarLeading) {
                 Button("Sign Out", role: .destructive) {
                     appState.signOut()
                 }
                 .font(.caption)
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showingCreateTournament = true
+                } label: {
+                    Image(systemName: "plus")
+                }
+            }
+        }
+        .sheet(isPresented: $showingCreateTournament) {
+            TournamentCreateView()
+                .environmentObject(appState)
         }
         .task {
             // Load on first appear only — .loaded state is cached for the session.
@@ -67,7 +79,7 @@ struct TournamentListView: View {
             Text("No tournaments yet")
                 .font(.headline)
 
-            Text("Add a tournament via the Supabase Console or seed data to test the live API path. In-app creation arrives in a later task.")
+            Text("Tap + to add your first tournament.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

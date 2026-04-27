@@ -17,6 +17,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from supabase import Client
 
@@ -37,6 +38,9 @@ class MatchCreate(BaseModel):
     format: Optional[str] = None
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
+    round_label: Optional[str] = None
+    opponent_label: Optional[str] = None
+    court_label: Optional[str] = None
 
 
 class MatchUpdate(BaseModel):
@@ -47,6 +51,9 @@ class MatchUpdate(BaseModel):
     format: Optional[str] = None
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
+    round_label: Optional[str] = None
+    opponent_label: Optional[str] = None
+    court_label: Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -141,12 +148,14 @@ def update_match(
 
 
 @router.delete("/{tid}/matches/{mid}", status_code=status.HTTP_204_NO_CONTENT,
+               response_class=Response,
                summary="Delete match")
 def delete_match(
     tid: UUID,
     mid: UUID,
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
-) -> None:
+) -> Response:
     """Delete a match. RLS enforces ownership."""
     client.table(_TABLE).delete().eq("id", str(mid)).eq("tournament_id", str(tid)).execute()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

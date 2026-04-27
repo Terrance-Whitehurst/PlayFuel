@@ -21,7 +21,7 @@ architecture:
   pattern: SwiftUI + NavigationStack, EnvironmentObject for AppState
   data_flow: FakeData.swift → Models → Views (all fake, no networking)
   phase3_swap: Delete FakeData.swift, replace FakeData.plan()/match()/tournaments with API calls. Zero view changes needed.
-  auth: Fake in Phase 1 (tap gesture flips AppState.isAuthenticated). Phase 2: real Supabase/Apple token exchange.
+  auth: "Fake in Phase 1 (tap gesture flips AppState.isAuthenticated). Phase 2: real Supabase/Apple token exchange."
 
 dallas_demo:
   gap_math_verified:
@@ -36,6 +36,17 @@ safety_compliance:
   disclaimer_placement: "SignInView (link) + TournamentDashboardView (footer) + DisclaimerView (full screen)"
   emergency_banner: "EmergencyBanner.swift renders when plan.weather.extremeHeatRisk"
   prohibited_phrases: "None present — verified by grep"
+
+xcode_project:
+  bundle_id: com.playfuel.ios
+  entitlements: Resources/PlayFuel.entitlements
+  info_plist: Resources/Info.plist
+  assets: Resources/Assets.xcassets
+  icon_png: Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png
+  icon_color: "#227F52 (PlayFuel green, placeholder)"
+  xcodegen_spec: project.yml
+  xcodeproj_generated: true
+  note: "XcodeGen at /opt/homebrew/bin/xcodegen ran in Session 3. Re-run after any project.yml change."
 
 open_questions_noted:
   - OQ-11: "§B heat emergency text v1.1 LANDED (2026-04-27). Pending legal sign-off (OQ-06). HardCodedStrings.swift updated verbatim."
@@ -59,3 +70,10 @@ patterns_learned:
   - "UnevenRoundedRectangle is iOS 17+ only — safe here but document if targeting older OS"
   - "TimelineEventKind switch exhaustiveness: TimelineView.swift has TWO exhaustive switches (kindIcon + kindColor). Adding new enum cases requires updating both. No default: clause — compile breaks immediately on missing cases."
   - "Enum sync discipline: TimelineEventKind raw values are camelCase strings; Python backend uses identical strings in playfuel_api/models/enums.py. Any new case must be added to BOTH simultaneously."
+  - "Stored-property defaults vs synthesized memberwise init: in some Swift/macOS toolchain combos, struct properties with `= default` confuse the synthesized init for Codable structs. Safe pattern: NEVER use stored-property defaults on Codable structs. Instead: omit defaults, pass explicit values at every call site. FakeData.swift is the canonical source of fake defaults."
+  - "macOS-unavailable modifiers: `.keyboardType` is iOS-only. Any UIKit-backed modifier in shared SwiftUI code must be wrapped in `#if os(iOS) ... #endif` to pass macOS static analysis (which runs even though the package targets iOS 17)."
+  - "FakeData isDraft flag: Chipotle (fast_casual_bowl) isDraft=false; Jimmy John's (sandwich_shop) and Central Market (grocery_prepared) isDraft=true (OQ-B pending). FakeData provider='fake' distinguishes from live API providers 'google'/'mock'."
+  - "Color(.systemBackground) and Color(.systemGroupedBackground) require `#if os(iOS)` guards in PlanSummaryCard.swift because Color(UIKitName:) can't be resolved without contextual type on macOS toolchain. Existing views (FoodCardView, WeatherCardView) also have this same error — it's a project-wide pre-existing pattern."
+  - "Domain models that become stored properties of Codable parent structs must themselves conform to Codable. PlanExplanation.swift required Codable added in Session 4 because Plan: Codable contains `let llmSummary: PlanExplanation?`. Check parent's Codable conformance when adding new model properties."
+  - "PlanExplanationDTO uses camelDecoder (.iso8601 dateDecodingStrategy) so `generatedAt: Date` decodes directly from the ISO 8601 datetime string the Python backend produces via Pydantic. No custom CodingKeys or init needed."
+  - "Session 4 lesson: PlanCoreDTO has a custom init(from:) — new optional fields must be added to (a) the stored property list, (b) CodingKeys enum, (c) the custom init via decodeIfPresent, AND (d) toModel(). All four sites must be updated or the field will silently decode as nil."

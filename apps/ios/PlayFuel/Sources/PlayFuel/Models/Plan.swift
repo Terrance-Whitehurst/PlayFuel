@@ -33,4 +33,19 @@ struct Plan: Codable, Identifiable {
 
     /// Chronological day timeline from wake-up through recovery.
     let timeline: [TimelineEvent]
+
+    // MARK: - Phase 5 additions (Task #8)
+
+    /// True when ALL scenarios use `bag_only` food strategy so no restaurant options
+    /// were fetched. The food card should render the bag-food fallback UI.
+    /// UI banner for this flag is deferred — data wiring only in Phase 5.
+    let bagFallbackOnly: Bool
+
+    // MARK: - Phase 6 additions (Task #9)
+
+    /// LLM- or TemplateProvider-generated parent-friendly explanation.
+    /// Nil for plans generated before migration 0006_plan_llm_summary.sql.
+    /// NO stored-property default — all call sites must pass explicitly
+    /// (see Session 2 lesson: stored-property defaults break synthesised memberwise init).
+    let llmSummary: PlanExplanation?
 }

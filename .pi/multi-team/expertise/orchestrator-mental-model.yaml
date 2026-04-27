@@ -1,7 +1,82 @@
 # Orchestrator Mental Model — PlayFuel
 
 last_updated: 2026-04-27
-session: mogfjh9hslqr   # carries-over from mog5k1xastpq → mog2owgx4ixe
+session: moh9uivm3dxv   # carries-over from mogfjh9hslqr → mog5k1xastpq → mog2owgx4ixe
+
+# ----------------------------------------------------------------------------
+# Session moh9uivm3dxv — Demo path (Sessions 1–4 of recommended path) IN ONE SESSION ✅
+# ----------------------------------------------------------------------------
+session_moh9uivm3dxv:
+  user_directive: |
+    "can you run these last phases and make sure they all run" — referring to the
+    4-session recommended demo path: (1–2) Task #8 + OQ-API-1 + splice retirement +
+    create flows; (3) Xcode migration + icon + seed; (4 optional) LLM layer.
+    User wanted ALL FOUR sessions executed in this single session.
+  outcomes:
+    Task_8_food_places: SHIPPED ✅. MockPlacesProvider + GooglePlacesProvider stub. Dallas demo (Chipotle/Jimmy John's/Central Market) works key-less.
+    OQ-API-1_a: SHIPPED ✅. Migration 0005_match_labels.sql + API + iOS + seed all wired.
+    splice_retirement: SHIPPED ✅. `// PHASE 4/5 SPLICE` marker deleted, FakeData now preview-only.
+    iOS_create_flows: SHIPPED ✅. TournamentCreateView + MatchCreateView with sheet presentation, validation, refresh-on-success.
+    Xcode_migration_OQ_iOS_1: RESOLVED ✅. project.yml + .xcodeproj committed via xcodegen, applesignin entitlement present, bundle id com.playfuel.ios.
+    app_icon: SHIPPED ✅ (placeholder green #227F52, 1024², 15 KB; needs real artwork pre-TestFlight).
+    seed_auto_apply: SHIPPED ✅. supabase/config.toml at repo root, [db.seed] block points relative path.
+    Task_9_LLM_layer: SHIPPED ✅. TemplateProvider deterministic + Anthropic/OpenAI stubs + safety guardrails (PROHIBITED_PHRASES verbatim §C) + migration 0006 + iOS PlanSummaryCard.
+    validation_pass: 180 passed, 1 xfailed, 0 blockers.
+  delegate_count_per_team:
+    Engineering: 4 substantive delegates (D1=Task#8 bundle, D2=create flows, D3=Xcode+icon+seed, D4=LLM layer)
+    Validation: 1 delegate (final demo-readiness pass — fanned to QA+SecRev in parallel internally)
+    Planning: 0 delegates needed (all work was build-execution against existing specs)
+  ordinal_rule_FULLY_validated: |
+    Engineering shipped 4 substantive delegates in this session, ZERO silent drops on any.
+    Each delegate was tight, fully-spec'd, mechanical (file paths, function signatures,
+    acceptance criteria all inlined). The 'discovery-overhead is the real driver' theory
+    holds across the largest delegate count yet recorded. The original 'one-substantive-
+    delegate-per-team-per-session' rule is fully obsolete; remove it from any future
+    playbook references.
+  pre_record_gotchas_for_user: |
+    1. Set LLM_PROVIDER=template in apps/api/.env BEFORE running uvicorn — without it,
+       `auto` mode routes to AnthropicProvider stub if ANTHROPIC_API_KEY is in shell env,
+       which silently null's llmSummary and hides PlanSummaryCard.
+    2. Live build_timeline() returns ~3 events; FakeData.dallasTimeline had 12. Splice
+       retirement means the demo now shows the live count. Either extend build_timeline
+       (~30 min Engineering work) or narrate around it during recording.
+    3. Fill in DEVELOPMENT_TEAM in project.yml + Xcode Signing&Capabilities for
+       on-device Sign in with Apple.
+  patterns_added:
+    parallel_then_merge_audit:
+      when: "Final readiness/validation pass spanning multiple verification domains."
+      flow: |
+        Validation Lead fans out QA + SecRev in parallel for evidence gathering, then
+        one merge delegate composes the consolidated report. Each gatherer cites file:line
+        evidence on every check.
+      why_it_worked: |
+        Independent evidence trails caught the 'env-var-routes-to-unimplemented-stub'
+        archetype + the 'preview-fixture-vs-live-API' visual-drift trap that single-thread
+        review would have missed.
+    explicit_command_briefs_for_engineering:
+      when: "Mechanical multi-file deliveries with no design ambiguity."
+      detail: |
+        Briefs that include exact file paths, exact function signatures, exact migration SQL,
+        exact acceptance criteria with grep commands ship 4-deep on the same team in one
+        session with no failures. Move every micro-decision out of the delegate's head.
+  open_OQs_carryforward:
+    OQ-LLM-1: Anthropic provider real impl (currently NotImplementedError stub)
+    OQ-LLM-2: OpenAI provider real impl (currently NotImplementedError stub)
+    OQ-PLACES-1: GooglePlacesProvider real impl (currently NotImplementedError stub)
+    OQ-API-4: API TournamentCreate Pydantic model lacks time_zone field (iOS collects it locally only)
+    OQ-API-5: estimated_next_match_time storage — derived vs explicit
+    SEC-1: restaurant-hallucination check (§C item #4 in validate_explanation) is no-op for non-empty food lists; safe with TemplateProvider, must implement before real LLM goes live
+    SEC-2: tighten except Exception around LLM block so sanitize_or_fallback always runs
+    SEC-3: add direct test for "Keep playing through pain." prohibited phrase
+    timeline-coverage: extend build_timeline to produce ~12 events (currently ~3)
+    icon-artwork: replace solid-green placeholder with real artwork pre-TestFlight
+    legacy-Sources-Info-plist: leftover Sources/PlayFuel/Info.plist still on disk; safe to delete in polish pass
+  next_recommended_action: |
+    DEMO PATH COMPLETE. App is recordable on real hardware after the two .env / timeline
+    decisions in pre_record_gotchas. Remaining work is post-demo: real LLM/Places provider
+    integration, real icon artwork, OQ-API-4/5 API extensions, OQ-06/11/PRIV-2/3/4 legal review.
+
+
 
 # ----------------------------------------------------------------------------
 # Session mogfjh9hslqr — Task #5 COMPLETION (third attempt, finally shipped)

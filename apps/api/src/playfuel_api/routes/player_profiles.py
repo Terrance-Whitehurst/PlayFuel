@@ -17,6 +17,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from supabase import Client
 
@@ -111,11 +112,13 @@ def update_player_profile(
 
 
 @router.delete("/{profile_id}", status_code=status.HTTP_204_NO_CONTENT,
+               response_class=Response,
                summary="Delete player profile")
 def delete_player_profile(
     profile_id: UUID,
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
-) -> None:
+) -> Response:
     """Delete a player profile. RLS enforces ownership."""
     client.table(_TABLE).delete().eq("id", str(profile_id)).execute()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)

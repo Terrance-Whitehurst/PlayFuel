@@ -1,0 +1,153 @@
+security_reviewer_mental_model:
+
+  project: PlayFuel
+  last_updated: "2026-04-27"
+  session: moh9uivm3dxv
+
+  # ── Auth & Trust Boundaries ──────────────────────────────────────────────
+  auth:
+    mechanism: supabase_jwt
+    dependency: verify_supabase_jwt (FastAPI Depends)
+    client: authed_client — anon_key init + user JWT override via postgrest.auth()
+    service_role_key:
+      loaded_in: settings.supabase_service_role_key
+      used_in: "NOT used in any route handler. MVP prohibition documented in db.py."
+      risk: "Held in Settings singleton in memory. Route path is clean."
+    coverage:
+      plans: all 3 endpoints ✅
+      matches: all 5 endpoints ✅
+      tournaments: all 6 endpoints ✅
+      player_profiles: all 5 endpoints ✅
+    rls:
+      enforced_by: postgres row level security (Supabase)
+      pattern: "auth.uid() = user_id (direct) or EXISTS subquery one-hop via tournament_id"
+      files:
+        - db/supabase/migrations/0003_rls.sql
+      tables_covered:
+        - users, player_profiles, tournaments, matches, match_scenarios
+        - weather_snapshots, food_options, plans, feedback
+      note: "Column additions (0005, 0006) inherit table RLS automatically in PostgreSQL."
+
+  # ── API Key Posture ───────────────────────────────────────────────────────
+  api_keys:
+    pattern: pydantic-settings BaseSettings (env_file=".env")
+    keys:
+      - google_places_api_key (settings.py)
+      - anthropic_api_key (settings.py)
+      - openai_api_key (settings.py)
+      - supabase_service_role_key (settings.py)
+    verified:
+      no_hardcoded_values: true
+      no_key_logging: true  # grep confirms zero log statements with key values
+      env_example_placeholders_only: true
+
+  # ── Safety & Disclaimer Architecture ─────────────────────────────────────
+  disclaimers:
+    source_of_truth: ".pi/multi-team/expertise/SAFETY_DISCLAIMERS.md"
+    constants_file: "apps/api/src/playfuel_api/rules/hard_coded_strings.py"
+    constants:
+      USER_DISCLAIMER: "§A verbatim — loaded from hard_coded_strings; tested in test_llm_safety.py"
+      HEAT_EMERGENCY_TEXT: "§B v1.1 candidate — OQ-06 pending legal review (pre-App Store blocker)"
+    chain:
+      - hard_coded_strings.py → PlanExplanationInput (no transform)
+      - PlanExplanationInput → TemplateProvider._build_safety_note() (f-string join only)
+      - safety_note → sanitize_or_fallback() (no mutation)
+      - safety_note → iOS PlanSummaryCard Text() (plain render, no transform)
+    chain_status: VERIFIED verbatim end-to-end (session moh9uivm3dxv)
+
+  # ── LLM Safety Guardrails ─────────────────────────────────────────────────
+  llm_safety:
+    file: apps/api/src/playfuel_api/services/llm_safety.py
+    prohibited_phrases:
+      count: 14
+      verbatim_section_c: 8  # all present, verified
+      derived_patterns: 6
+    checks_in_validate_explanation:
+      1: prohibited phrase (case-insensitive substring scan)
+      2: user_disclaimer verbatim in safety_note
+      3: heat_emergency_text verbatim when extreme_heat_risk
+      4: restaurant hallucination — PARTIALLY IMPLEMENTED (see findings SEC-1)
+      5: non-canonical duration (only 75/120/180 adjacent to "min")
+    sanitize_or_fallback:
+      behavior: "falls back to TemplateProvider on any violation; never raises"
+      concern_sec2: "except Exception in routes/plans.py wraps entire LLM block including sanitize_or_fallback — bypassed on provider error"
+
+  # ── Findings Tracker ─────────────────────────────────────────────────────
+  findings:
+    - id: SEC-1
+      severity: medium
+      status: open
+      description: "Restaurant hallucination check disabled when food_recommendations non-empty (pass branch)"
+      file: "apps/api/src/playfuel_api/services/llm_safety.py:75-84"
+      blocker_for_demo: false
+      blocker_for_production_llm: true
+
+    - id: SEC-2
+      severity: medium
+      status: open
+      description: "except Exception in routes/plans.py wraps sanitize_or_fallback; bypassed on provider error → llmSummary=None"
+      file: "apps/api/src/playfuel_api/routes/plans.py:195-209"
+      blocker_for_demo: false
+      blocker_for_production_llm: true
+
+    - id: SEC-3
+      severity: medium
+      status: open
+      description: "No direct test for 'Keep playing through pain.' phrase in test_llm_safety.py"
+      file: "apps/api/src/playfuel_api/tests/test_llm_safety.py"
+      blocker_for_demo: false
+      fix: "add test_prohibited_phrase_keep_playing()"
+
+    - id: SEC-4
+      severity: low
+      status: open (pre-existing OQ-06)
+      description: "HEAT_EMERGENCY_TEXT is v1.1 candidate pending attorney review"
+      file: "apps/api/src/playfuel_api/rules/hard_coded_strings.py:25-28"
+      blocker_for_demo: false
+      blocker_for_app_store: true
+
+    - id: SEC-5
+      severity: low
+      status: informational
+      description: "supabase_service_role_key held in Settings singleton in memory; not used in request path"
+      file: "apps/api/src/playfuel_api/settings.py:10"
+      blocker_for_demo: false
+
+  # ── Observations ──────────────────────────────────────────────────────────
+  observations:
+    - date: "2026-04-27"
+      note: >
+        Sessions 1-4 shipped clean. Auth posture held through all 4 phases —
+        no regression to service-role bypass, no new unauthenticated endpoints.
+        The LLM safety architecture (Protocol + TemplateProvider + sanitize_or_fallback)
+        is well-structured but the restaurant hallucination check is a stub.
+        This is acceptable for demo (TemplateProvider never invents names) but
+        must be implemented before AnthropicProvider/OpenAIProvider go live.
+    - date: "2026-04-27"
+      note: >
+        pydantic-settings pattern for API keys is correct. All keys loaded from env,
+        none hardcoded, none logged. .env.example has only placeholders.
+    - date: "2026-04-27"
+      note: >
+        RLS architecture (column additions inherit table-level policies) is sound.
+        0005 and 0006 are pure ADD COLUMN — no weakening of existing policies.
+
+  # ── Files Audited (session moh9uivm3dxv) ─────────────────────────────────
+  audited_files:
+    - apps/api/src/playfuel_api/rules/hard_coded_strings.py
+    - apps/api/src/playfuel_api/services/llm.py
+    - apps/api/src/playfuel_api/services/llm_safety.py
+    - apps/api/src/playfuel_api/services/places.py
+    - apps/api/src/playfuel_api/routes/plans.py
+    - apps/api/src/playfuel_api/routes/matches.py
+    - apps/api/src/playfuel_api/routes/tournaments.py (grep only)
+    - apps/api/src/playfuel_api/routes/player_profiles.py (grep only)
+    - apps/api/src/playfuel_api/settings.py
+    - apps/api/.env.example
+    - apps/api/src/playfuel_api/db.py
+    - apps/api/src/playfuel_api/tests/test_llm_safety.py
+    - db/supabase/migrations/0003_rls.sql
+    - db/supabase/migrations/0005_match_labels.sql
+    - db/supabase/migrations/0006_plan_llm_summary.sql
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/PlanSummaryCard.swift
+    - ".pi/multi-team/expertise/SAFETY_DISCLAIMERS.md"

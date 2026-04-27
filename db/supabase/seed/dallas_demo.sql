@@ -121,7 +121,9 @@ insert into public.matches (
   surface,
   format,
   age_bracket,
-  display_order
+  display_order,
+  round_label,
+  court_label
 )
 values (
   'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
@@ -132,7 +134,9 @@ values (
   'hard',
   'singles',
   '14U',
-  1
+  1,
+  'R16',       -- round label: Round of 16
+  'Court 7'    -- court label
 )
 on conflict (id) do nothing;
 
@@ -150,7 +154,8 @@ insert into public.matches (
   surface,
   format,
   age_bracket,
-  display_order
+  display_order,
+  round_label
 )
 values (
   'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
@@ -161,7 +166,8 @@ values (
   'hard',
   'singles',
   '14U',
-  2
+  2,
+  'QF'         -- round label: Quarterfinal
 )
 on conflict (id) do nothing;
 

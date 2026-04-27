@@ -30,8 +30,12 @@ from playfuel_api.auth import verify_supabase_jwt
 from playfuel_api.db import authed_client
 from playfuel_api.models.api import GeneratePlanResponse, WeatherBlock
 from playfuel_api.models.db import MatchRow, WeatherSnapshotRow
+from playfuel_api.rules.food import assemble_food_options
 from playfuel_api.rules.plan import build_plan_envelope, build_timeline
 from playfuel_api.rules.scenarios import generate_match_scenarios
+from playfuel_api.services.llm import build_explanation_input, get_llm_provider
+from playfuel_api.services.llm_safety import sanitize_or_fallback
+from playfuel_api.services.places import find_nearby_food
 from playfuel_api.settings import get_settings
 from playfuel_api.weather import get_or_fetch_weather
 from playfuel_api.weather.service import WeatherService
@@ -79,16 +83,17 @@ async def generate_plan(
     match = match_rows[0]
     next_match = match_rows[1] if len(match_rows) > 1 else None
 
-    # 2. Load tournament venue coords for weather fetch.
+    # 2. Load tournament venue coords + name for weather fetch and LLM input.
     tournament_result = (
         client.table("tournaments")
-        .select("venue_lat, venue_lng")
+        .select("venue_lat, venue_lng, venue_name")
         .eq("id", str(tid))
         .limit(1)
         .execute()
     )
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
+    venue_name: str = ""
     if tournament_result.data:
         raw_lat = tournament_result.data[0].get("venue_lat")
         raw_lng = tournament_result.data[0].get("venue_lng")
@@ -96,6 +101,7 @@ async def generate_plan(
             venue_lat = float(raw_lat)
         if raw_lng is not None:
             venue_lng = float(raw_lng)
+        venue_name = tournament_result.data[0].get("venue_name") or ""
 
     # 3. Read-through weather cache (returns None if no coords or fetch fails).
     #    WeatherService is created per-request; aclose() in finally ensures cleanup.
@@ -154,21 +160,64 @@ async def generate_plan(
     # 6. Build timeline from all match rows + scenarios.
     timeline = build_timeline(match_rows, scenarios)
 
-    # 7. Assemble plan envelope (Phase 4: weather_block + timeline added).
+    # 7. Phase 5: food / places lookup (non-critical — never raises).
+    raw_places = find_nearby_food(
+        venue_lat if venue_lat is not None else 0.0,
+        venue_lng if venue_lng is not None else 0.0,
+    ) if (venue_lat is not None and venue_lng is not None) else []
+
+    # Collect unique food buckets from all scenarios.
+    food_buckets: list[str] = sorted({
+        s.food_strategy.bucket.value
+        for s in scenarios
+        if s.food_strategy is not None
+    })
+    food_options, bag_fallback_only = assemble_food_options(raw_places, food_buckets)
+
+    # 8. Assemble plan envelope (Phase 4: weather_block + timeline; Phase 5: food).
     plan = build_plan_envelope(
         tid,
         scenarios,
         weather_flags=weather_flags,
         weather_block=weather_block,
         timeline=timeline,
+        food_options=food_options,
+        bag_fallback_only=bag_fallback_only,
     )
 
-    # 8. Persist — camelCase JSONB per iOS contract (models/api.py alias_generator=to_camel).
+    # 9. LLM explanation layer (Phase 6 / Task #9) — TemplateProvider by default.
+    #    Never raises: sanitize_or_fallback() falls back to TemplateProvider on any violation.
+    try:
+        exp_input = build_explanation_input(
+            plan=plan,
+            match=match,
+            next_match=next_match,
+            snapshot=snapshot,
+            food_options_list=food_options,
+            venue_name=venue_name,
+        )
+        raw_explanation = get_llm_provider().explain_plan(exp_input)
+        explanation = sanitize_or_fallback(raw_explanation, exp_input)
+        plan.llm_summary = explanation
+    except Exception:  # noqa: BLE001
+        # LLM is non-critical — never fail the plan on explanation errors.
+        import logging
+        logging.getLogger(__name__).warning(
+            "LLM explanation failed; plan will be returned without llmSummary.",
+            exc_info=True,
+        )
+
+    # 10. Persist — camelCase JSONB per iOS contract (models/api.py alias_generator=to_camel).
     plan_dict = plan.model_dump(by_alias=True, mode="json")
+    llm_summary_dict = (
+        plan.llm_summary.model_dump(by_alias=True, mode="json")
+        if plan.llm_summary is not None else None
+    )
     client.table(_PLANS_TABLE).insert({
         "id": str(plan.plan_id),
         "tournament_id": str(plan.tournament_id),
         "plan_json": plan_dict,
+        "llm_summary": llm_summary_dict,
         "rules_constants_version": plan.rules_constants_version,
         "warnings": plan.warnings,
         "schedule_confidence": plan.schedule_confidence.value,

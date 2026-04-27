@@ -85,6 +85,11 @@ struct MatchDTO: Decodable {
     let displayOrder: Int?
     let createdAt: Date?
     let updatedAt: Date?
+
+    // OQ-API-1(a) label fields — migration 0005. Decoded via .convertFromSnakeCase.
+    let roundLabel: String?    // round_label → roundLabel
+    let opponentLabel: String? // opponent_label → opponentLabel
+    let courtLabel: String?    // court_label → courtLabel
 }
 
 // MARK: - POST /v1/tournaments/{tid}/plans/generate
@@ -98,11 +103,8 @@ struct GeneratePlanResponseDTO: Decodable {
 /// Core plan fields returned by the rules engine.
 /// All keys are camelCase in the API response (Pydantic alias_generator=to_camel).
 ///
-/// Fields the iOS Plan model needs but the API does NOT return in Phase 3:
-///   weather    — Phase 4 (Task #7 weather integration)
-///   foodOptions — Phase 5 (Task #8 food/places integration)
-///   timeline   — Phase 5
-/// Repository.assembleHybridPlan splices those from FakeData until the phases land.
+/// Phase 5 (Task #8): now includes weather, foodOptions, timeline, bagFallbackOnly
+/// directly from the API — FakeData splice retired.
 struct PlanCoreDTO: Decodable {
     let planId: UUID                   // serialized as UUID string by Pydantic; JSONDecoder parses it
     let tournamentId: UUID
@@ -112,27 +114,234 @@ struct PlanCoreDTO: Decodable {
     let heatEmergencyText: String?
     let warnings: [String]
     let scenarioPlans: [ScenarioPlanDTO]
+    // Phase 4/5 additions
+    let weather: WeatherBlockDTO?       // nil when no venue coords or provider error
+    let foodOptions: [FoodOptionDTO]?   // nil when all scenarios are bag_only
+    let timeline: [TimelineEventDTO]    // empty list when engine produces none
+    let bagFallbackOnly: Bool           // true when all scenarios use bag_only bucket
+    let llmSummary: PlanExplanationDTO? // nil for pre-Phase-6 plans or when provider unavailable
 
     enum CodingKeys: String, CodingKey {
         case planId, tournamentId, generatedAt, rulesConstantsVersion
         case scheduleConfidence, heatEmergencyText, warnings, scenarioPlans
+        case weather, foodOptions, timeline, bagFallbackOnly, llmSummary
     }
 
-    // Custom init because `generatedAt` may arrive as a Date in iso8601 format
-    // or already as a String. We normalise to String either way.
+    // Custom init: normalise generatedAt to String; use decodeIfPresent for
+    // optional/defaulted fields so older API versions don't break decoding.
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
-        self.planId             = try c.decode(UUID.self,   forKey: .planId)
-        self.tournamentId       = try c.decode(UUID.self,   forKey: .tournamentId)
+        self.planId                = try c.decode(UUID.self,   forKey: .planId)
+        self.tournamentId          = try c.decode(UUID.self,   forKey: .tournamentId)
         self.rulesConstantsVersion = try c.decode(String.self, forKey: .rulesConstantsVersion)
-        self.scheduleConfidence = try c.decodeIfPresent(String.self, forKey: .scheduleConfidence)
-        self.heatEmergencyText  = try c.decodeIfPresent(String.self, forKey: .heatEmergencyText)
-        self.warnings           = try c.decodeIfPresent([String].self, forKey: .warnings) ?? []
-        self.scenarioPlans      = try c.decode([ScenarioPlanDTO].self, forKey: .scenarioPlans)
-
+        self.scheduleConfidence    = try c.decodeIfPresent(String.self, forKey: .scheduleConfidence)
+        self.heatEmergencyText     = try c.decodeIfPresent(String.self, forKey: .heatEmergencyText)
+        self.warnings              = try c.decodeIfPresent([String].self, forKey: .warnings) ?? []
+        self.scenarioPlans         = try c.decode([ScenarioPlanDTO].self, forKey: .scenarioPlans)
+        // Phase 4/5
+        self.weather               = try c.decodeIfPresent(WeatherBlockDTO.self,    forKey: .weather)
+        self.foodOptions           = try c.decodeIfPresent([FoodOptionDTO].self,    forKey: .foodOptions)
+        self.timeline              = try c.decodeIfPresent([TimelineEventDTO].self, forKey: .timeline) ?? []
+        self.bagFallbackOnly       = try c.decodeIfPresent(Bool.self, forKey: .bagFallbackOnly) ?? false
+        self.llmSummary            = try c.decodeIfPresent(PlanExplanationDTO.self, forKey: .llmSummary)
         // `generated_at` is a Python `datetime` → Pydantic serialises as ISO 8601 string in JSON.
-        // Decode as String directly (the camelDecoder .iso8601 strategy affects Date, not String).
         self.generatedAt = try c.decode(String.self, forKey: .generatedAt)
+    }
+
+    /// Map wire-format DTO → canonical iOS Plan domain model.
+    func toModel() -> Plan {
+        Plan(
+            id: planId,
+            planId: planId.uuidString,
+            tournamentId: tournamentId,
+            generatedAt: generatedAt,
+            warnings: warnings,
+            scenarioPlans: scenarioPlans.map { $0.toModel() },
+            weather: weather?.toModel() ?? _weatherUnavailable,
+            foodOptions: (foodOptions ?? []).map { $0.toModel() },
+            timeline: timeline.map { $0.toModel() },
+            bagFallbackOnly: bagFallbackOnly,
+            llmSummary: llmSummary?.toModel()
+        )
+    }
+}
+
+// MARK: - Sentinel: weather unavailable
+//
+// Used when the API returns null for `weather` (no venue coordinates, provider
+// error). Renders as 0°F / 0% humidity / no flags — EmergencyBanner will NOT
+// fire. A future OQ should surface a "weather unavailable" state in the UI.
+private let _weatherUnavailable = WeatherSnapshot(
+    tempF: 0, humidity: 0, windMph: 0, precipProb: 0, uvIndex: nil, flags: []
+)
+
+// MARK: - Phase 4/5 DTOs
+
+// MARK: WeatherBlockDTO
+//
+// Decoded from the `weather` field of PlanCoreDTO. Maps to iOS `WeatherSnapshot`.
+// Note: the API WeatherBlock does not surface `windMph`, `precipProb`, or `uvIndex`
+// as scalar values — only boolean flags. iOS domain model defaults those to 0.0/nil.
+// NEW-OQ-W1: consider adding wind_mph / precip_prob / uv_index to the API WeatherBlock
+// so WeatherCardView can display accurate values from the real provider.
+struct WeatherBlockDTO: Decodable {
+    let tempF: Double
+    let humidityPct: Double
+    let condition: String      // decoded as String to tolerate unknown enum additions
+    let flagHot: Bool
+    let flagVeryHot: Bool
+    let flagHumid: Bool
+    let flagCold: Bool
+    let flagWindy: Bool
+    let flagRainRisk: Bool
+    let flagExtremeHeatRisk: Bool
+    let isStale: Bool
+    let fetchedAt: String      // ISO 8601 datetime string
+    let provider: String
+
+    /// Map API WeatherBlock → iOS WeatherSnapshot.
+    /// Boolean flags are reconstructed into the [WeatherFlag] array.
+    /// windMph / precipProb / uvIndex are not available from the API at this time.
+    func toModel() -> WeatherSnapshot {
+        var flags: [WeatherFlag] = []
+        if flagVeryHot { flags.append(.very_hot) }
+        if flagHot && !flagVeryHot { flags.append(.hot) }  // hot is mutually exclusive with very_hot in UI
+        if flagHumid    { flags.append(.humid) }
+        if flagCold     { flags.append(.cold) }
+        if flagWindy    { flags.append(.windy) }
+        if flagRainRisk { flags.append(.rain_risk) }
+        return WeatherSnapshot(
+            tempF: tempF,
+            humidity: humidityPct,
+            windMph: 0.0,      // NEW-OQ-W1: not yet surfaced by API WeatherBlock
+            precipProb: 0.0,   // NEW-OQ-W1: not yet surfaced by API WeatherBlock
+            uvIndex: nil,      // NEW-OQ-W1: not yet surfaced by API WeatherBlock
+            flags: flags
+        )
+    }
+}
+
+// MARK: FoodOptionDTO
+//
+// Decoded from each element of PlanCoreDTO.foodOptions (camelCase wire format).
+// Maps to iOS `FoodOption` domain model.
+struct FoodOptionDTO: Decodable {
+    let name: String
+    let category: String
+    let driveTimeMinutes: Int?   // nullable on the API side (mock provider may omit)
+    let recommendedOrder: String
+    let isDraft: Bool
+    let distanceMeters: Int?
+    let placeId: String?
+    let provider: String
+
+    /// Map API FoodOption → iOS FoodOption domain model.
+    /// A fresh `UUID()` is injected for SwiftUI list identity (no server-side ID).
+    func toModel() -> FoodOption {
+        FoodOption(
+            id: UUID(),
+            name: name,
+            category: category,
+            driveTimeMin: driveTimeMinutes ?? 0,
+            recommendedOrder: recommendedOrder,
+            isDraft: isDraft,
+            distanceMeters: distanceMeters,
+            placeId: placeId,
+            provider: provider
+        )
+    }
+}
+
+// MARK: TimelineEventDTO
+//
+// Decoded from each element of PlanCoreDTO.timeline (camelCase wire format).
+// Maps to iOS `TimelineEvent` domain model.
+struct TimelineEventDTO: Decodable {
+    let id: String               // UUID v4 string; fresh per request
+    let time: String             // ISO 8601 timestamp
+    let title: String
+    let detail: String
+    let kind: TimelineEventKind  // decoded with fallback to .gap for unknown values
+
+    enum CodingKeys: String, CodingKey {
+        case id, time, title, detail, kind
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id     = try c.decode(String.self, forKey: .id)
+        time   = try c.decode(String.self, forKey: .time)
+        title  = try c.decode(String.self, forKey: .title)
+        detail = try c.decode(String.self, forKey: .detail)
+        // Decode kind as String with fallback so unknown future event kinds
+        // don't crash iOS — they render as .gap visually.
+        let kindRaw = try c.decode(String.self, forKey: .kind)
+        kind = TimelineEventKind(rawValue: kindRaw) ?? .gap
+    }
+
+    /// Map API TimelineEventOut → iOS TimelineEvent domain model.
+    func toModel() -> TimelineEvent {
+        TimelineEvent(
+            id: UUID(uuidString: id) ?? UUID(),
+            time: time,
+            title: title,
+            detail: detail,
+            kind: kind
+        )
+    }
+}
+
+// MARK: - Request body structs
+//
+// Encodable-only (never decoded). Repository's postEncoder uses .convertToSnakeCase
+// so Swift camelCase property names map to the API's snake_case request fields.
+
+/// Request body for POST /v1/tournaments.
+/// NOTE: `time_zone` is collected by the iOS form but is NOT in the API's TournamentCreate
+/// Pydantic model (migration pending). Omitted here — the iOS form retains it for future use.
+struct TournamentCreateRequest: Encodable {
+    let name: String
+    let venueName: String       // → venue_name
+    let venueLat: Double        // → venue_lat
+    let venueLng: Double        // → venue_lng
+    let startDate: String       // → start_date ("yyyy-MM-dd" string; API type is `date`)
+    let endDate: String         // → end_date
+}
+
+/// Request body for POST /v1/tournaments/{tid}/matches.
+/// NOTE: `estimated_next_match_time` is NOT a DB column — it is derived from the match list
+/// (next match's scheduledStart). The iOS form collects it for UX but it is not sent to the API.
+struct MatchCreateRequest: Encodable {
+    let scheduledStart: Date            // → scheduled_start (ISO 8601 datetime)
+    let estimatedDurationMinutes: Int?  // → estimated_duration_minutes
+    let roundLabel: String?             // → round_label
+    let opponentLabel: String?          // → opponent_label
+    let courtLabel: String?             // → court_label
+    let displayOrder: Int?              // → display_order
+}
+
+// MARK: - MatchDTO.toModel()
+
+extension MatchDTO {
+    /// Map API MatchDTO → iOS Match domain model.
+    /// `scheduledTime` is a display string formatted in the device's local timezone.
+    /// `estimatedNextMatchTime` is nil — it is derived from multi-row match context,
+    /// not stored in the DB. Views that need it must compute it from the ordered match list.
+    func toModel() -> Match {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "h:mm a"
+        fmt.amSymbol = "AM"
+        fmt.pmSymbol = "PM"
+        return Match(
+            id: id,
+            tournamentId: tournamentId,
+            scheduledTime: fmt.string(from: scheduledStart),
+            estimatedNextMatchTime: nil,
+            round: roundLabel,
+            opponent: opponentLabel,
+            court: courtLabel
+            // roundLabel / opponentLabel / courtLabel use their `= nil` stored-property defaults
+        )
     }
 }
 
@@ -173,6 +382,43 @@ struct ScenarioPlanDTO: Decodable {
             rewarmUp: rewarmUp,
             overrunWarning: overrunWarning,
             warnings: warnings
+        )
+    }
+}
+
+// MARK: - Phase 6 / Task #9 — PlanExplanationDTO
+//
+// Decoded from the `llmSummary` field of PlanCoreDTO (camelCase wire format,
+// no key conversion — same camelDecoder as the rest of the Plan envelope).
+// Maps to the iOS `PlanExplanation` domain model.
+//
+// Safety: the backend `sanitize_or_fallback()` guarantees that:
+//   - No prohibited phrase (SAFETY_DISCLAIMERS §C) appears in any field.
+//   - `safetyNote` contains the §A disclaimer verbatim.
+//   - When extreme_heat_risk, `safetyNote` is prepended with §B text verbatim.
+//   - No restaurant name appears that wasn't in the structured `food_recommendations` input.
+
+struct PlanExplanationDTO: Codable, Hashable {
+    let summary: String
+    let scenarioExplanations: [String: String]
+    let weatherNote: String?
+    let foodNote: String?
+    let safetyNote: String
+    let provider: String
+    let model: String?
+    let generatedAt: Date   // decoded via camelDecoder's .iso8601 dateDecodingStrategy
+
+    /// Map API PlanExplanation → iOS PlanExplanation domain model.
+    func toModel() -> PlanExplanation {
+        PlanExplanation(
+            summary: summary,
+            scenarioExplanations: scenarioExplanations,
+            weatherNote: weatherNote,
+            foodNote: foodNote,
+            safetyNote: safetyNote,
+            provider: provider,
+            model: model,
+            generatedAt: generatedAt
         )
     }
 }

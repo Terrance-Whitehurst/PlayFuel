@@ -87,19 +87,9 @@ supabase start
 supabase db reset
 ```
 
-`supabase db reset` runs all four migrations in order:
-
-1. `0001_extensions_and_enums.sql`
-2. `0002_tables.sql`
-3. `0003_rls.sql`
-4. `0004_auth_trigger.sql`
-
-Load the Dallas demo seed manually:
-
-```bash
-psql "$(supabase status --output json | jq -r '.DB_URL')" \
-  -f db/supabase/seed/dallas_demo.sql
-```
+`supabase db reset` runs all migrations in order and **auto-applies the Dallas demo
+seed** (`db/supabase/seed/dallas_demo.sql`) via `supabase/config.toml` — no manual
+`psql` step required.
 
 Full setup (Sign in with Apple provider config, env vars): see `db/supabase/README.md`.
 

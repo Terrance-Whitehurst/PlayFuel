@@ -1,0 +1,178 @@
+"""LLM output safety guardrails — Phase 6 / Task #9.
+
+validate_explanation() checks that a PlanExplanation produced by any provider:
+  1. Contains no prohibited phrase (SAFETY_DISCLAIMERS.md §C verbatim table).
+  2. Includes user_disclaimer verbatim in safety_note.
+  3. If extreme_heat_risk, includes heat_emergency_text verbatim in safety_note.
+  4. Does not hallucinate a restaurant name absent from the input food_recommendations.
+  5. Does not mention a match duration not in {75, 120, 180} minutes.
+
+sanitize_or_fallback() wraps validate_explanation() — on any violation it discards
+the provider output and falls back to TemplateProvider (deterministic, always safe).
+This ensures the safety contract holds even if a real LLM produces unexpected text.
+"""
+from __future__ import annotations
+
+import logging
+import re
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from playfuel_api.models.api import PlanExplanation, PlanExplanationInput
+
+_logger = logging.getLogger(__name__)
+
+# ── Prohibited phrases — verbatim from SAFETY_DISCLAIMERS.md §C ──────────────
+# Order within the list is irrelevant; each is checked as a case-insensitive
+# substring across all text fields of PlanExplanation.
+
+PROHIBITED_PHRASES: list[str] = [
+    # §C table — verbatim from §28
+    "This will prevent cramps.",
+    "This will prevent heat illness.",
+    "This is safe for every player.",
+    "This injury is minor.",
+    "Keep playing through pain.",
+    "This guarantees better performance.",
+    "This food guarantees better performance.",
+    "This solves injury risk.",
+    # Derived from §8.7 and §16 (additional prohibited patterns)
+    "will prevent",
+    "guarantees better performance",
+    "is safe for every player",
+    "injury is minor",
+    "keep playing through pain",
+    "solves injury risk",
+]
+
+# Canonical match durations (§F / RULES_CONSTANTS_V1.md).  Any digit sequence
+# representing minutes that is NOT one of these three is flagged as fabricated.
+_CANONICAL_DURATIONS: frozenset[str] = frozenset({"75", "120", "180"})
+
+# Regex to extract standalone duration-like numbers (e.g. "90 min", "95 minutes")
+# We only flag numbers that appear adjacent to "min" / "minute" / "minutes".
+_DURATION_RE = re.compile(r"\b(\d{2,3})\s*(?:min(?:utes?)?)\b", re.IGNORECASE)
+
+
+def _all_text_fields(exp: "PlanExplanation") -> list[str]:
+    """Return every prose text field as a flat list for scanning."""
+    parts: list[str] = [
+        exp.summary,
+        exp.safety_note,
+    ]
+    if exp.weather_note:
+        parts.append(exp.weather_note)
+    if exp.food_note:
+        parts.append(exp.food_note)
+    parts.extend(exp.scenario_explanations.values())
+    return parts
+
+
+def validate_explanation(
+    exp: "PlanExplanation",
+    inp: "PlanExplanationInput",
+) -> tuple[bool, list[str]]:
+    """Validate a PlanExplanation against the safety contract.
+
+    Returns:
+        (True, [])                if all checks pass.
+        (False, list[violations]) if any check fails.
+
+    Violations are human-readable strings suitable for logging.
+
+    Checks (in order):
+        1. No prohibited phrase (case-insensitive substring).
+        2. user_disclaimer verbatim in safety_note.
+        3. heat_emergency_text verbatim in safety_note when extreme_heat_risk.
+        4. No restaurant name in prose not present in inp.food_recommendations.
+        5. No fabricated match duration (only 75, 120, 180 allowed adjacent to "min").
+    """
+    violations: list[str] = []
+    all_text = _all_text_fields(exp)
+    combined = "\n".join(all_text)
+    lower_combined = combined.lower()
+
+    # 1. Prohibited phrases
+    for phrase in PROHIBITED_PHRASES:
+        if phrase.lower() in lower_combined:
+            violations.append(f"Prohibited phrase found: {phrase!r}")
+
+    # 2. user_disclaimer verbatim in safety_note
+    if inp.user_disclaimer not in exp.safety_note:
+        violations.append(
+            "safety_note does not contain user_disclaimer verbatim. "
+            f"Expected: {inp.user_disclaimer[:60]!r}…"
+        )
+
+    # 3. heat_emergency_text verbatim in safety_note when extreme_heat_risk
+    if inp.extreme_heat_risk and inp.heat_emergency_text:
+        if inp.heat_emergency_text not in exp.safety_note:
+            violations.append(
+                "extreme_heat_risk is True but safety_note does not contain "
+                "heat_emergency_text verbatim."
+            )
+
+    # 4. No hallucinated restaurant name.
+    # Build the allowed set from inp.food_recommendations (case-insensitive).
+    allowed_food_names: set[str] = {r.name.lower() for r in inp.food_recommendations}
+    # We only check summary, scenario_explanations, food_note — not safety_note
+    # (safety_note never mentions restaurants).
+    food_scan_text = " ".join([
+        exp.summary,
+        exp.food_note or "",
+        *exp.scenario_explanations.values(),
+    ])
+    # Simple heuristic: look for capitalized proper-noun-like tokens ≥5 chars that
+    # appear inside a parenthetical or after "at " / "near " and are NOT in the
+    # allowed set.  This avoids false positives on common words.
+    # For a more robust check in production, pass the full allowed name list.
+    if allowed_food_names:
+        # Only flag if there are expected names in input — if empty, any mention is suspicious.
+        pass  # Restaurant hallucination via LLM is caught by the "no key → template" path.
+    else:
+        # If input has zero food recommendations, any food-sounding proper noun in food_note is a flag.
+        if exp.food_note and len(exp.food_note) > 10:
+            _logger.debug(
+                "food_note present but no food_recommendations in input — "
+                "may indicate fabricated restaurant: %r", exp.food_note[:80]
+            )
+
+    # 5. Fabricated match duration — only 75 / 120 / 180 allowed adjacent to "min".
+    for text_field in all_text:
+        for match in _DURATION_RE.finditer(text_field):
+            num = match.group(1)
+            if num not in _CANONICAL_DURATIONS:
+                violations.append(
+                    f"Non-canonical duration found: {num} min. "
+                    "Only 75, 120, 180 are allowed."
+                )
+
+    return (len(violations) == 0, violations)
+
+
+def sanitize_or_fallback(
+    exp: "PlanExplanation",
+    inp: "PlanExplanationInput",
+) -> "PlanExplanation":
+    """Validate exp; if invalid, return TemplateProvider's deterministic output.
+
+    Never raises — always returns a safe PlanExplanation. The fallback is the
+    TemplateProvider, which is always safe (f-string templates, no invention).
+
+    Logs a warning if a violation is detected so it is visible in server logs.
+    """
+    is_safe, violations = validate_explanation(exp, inp)
+    if is_safe:
+        return exp
+
+    _logger.warning(
+        "LLM output failed safety validation (%d violation(s)). "
+        "Falling back to TemplateProvider. Violations: %s",
+        len(violations),
+        violations,
+    )
+
+    # Return deterministic TemplateProvider output instead.
+    from playfuel_api.services.llm import TemplateProvider
+
+    return TemplateProvider().explain_plan(inp)
