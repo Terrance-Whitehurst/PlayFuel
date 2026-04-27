@@ -1,19 +1,30 @@
 import SwiftUI
 
-/// US-03 — Tournament list.
+/// US-03 — Tournament list, live data via Repository.
 ///
-/// Shows 1–3 hardcoded tournaments from FakeData. Tap → TournamentDashboardView.
-/// Phase 2+: load from `GET /tournaments` (user's own tournaments via RLS).
+/// Task #6: loads from GET /v1/tournaments (RLS-filtered, user's own tournaments).
+/// Renders based on LoadState — idle/loading → ProgressView, failed → error + retry,
+/// loaded → list of rows. Empty state explains that tournaments must exist server-side.
 struct TournamentListView: View {
 
     @EnvironmentObject var appState: AppState
 
-    private let tournaments = FakeData.tournaments
-
     var body: some View {
-        List(tournaments) { tournament in
-            NavigationLink(value: tournament) {
-                TournamentRowView(tournament: tournament)
+        Group {
+            switch appState.tournaments {
+            case .idle, .loading:
+                ProgressView("Loading tournaments…")
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            case .failed(let message):
+                errorView(message)
+
+            case .loaded(let tournaments):
+                if tournaments.isEmpty {
+                    emptyView
+                } else {
+                    list(tournaments: tournaments)
+                }
             }
         }
         .navigationTitle("My Tournaments")
@@ -29,6 +40,63 @@ struct TournamentListView: View {
                 .font(.caption)
             }
         }
+        .task {
+            // Load on first appear only — .loaded state is cached for the session.
+            if case .idle = appState.tournaments {
+                await appState.loadTournaments()
+            }
+        }
+    }
+
+    // MARK: - Subviews
+
+    private func list(tournaments: [Tournament]) -> some View {
+        List(tournaments) { tournament in
+            NavigationLink(value: tournament) {
+                TournamentRowView(tournament: tournament)
+            }
+        }
+    }
+
+    private var emptyView: some View {
+        VStack(spacing: 12) {
+            Image(systemName: "calendar.badge.plus")
+                .font(.system(size: 48))
+                .foregroundStyle(.secondary)
+
+            Text("No tournaments yet")
+                .font(.headline)
+
+            Text("Add a tournament via the Supabase Console or seed data to test the live API path. In-app creation arrives in a later task.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 40)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func errorView(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(.orange)
+
+            Text("Couldn't load tournaments")
+                .font(.headline)
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Button("Retry") {
+                Task { await appState.loadTournaments() }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 
@@ -55,17 +123,6 @@ private struct TournamentRowView: View {
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
-
-            // Badge: "Plan Ready" if a plan exists; "No plan yet" for stubs
-            let hasPlan = FakeData.plan(for: tournament.id) != nil
-            HStack(spacing: 4) {
-                Image(systemName: hasPlan ? "checkmark.circle.fill" : "clock.circle")
-                    .font(.caption2)
-                Text(hasPlan ? "Plan Ready" : "No plan yet")
-                    .font(.caption2.weight(.medium))
-            }
-            .foregroundStyle(hasPlan ? .green : .secondary)
-            .padding(.top, 2)
         }
         .padding(.vertical, 4)
     }
@@ -79,8 +136,14 @@ private struct TournamentRowView: View {
 }
 
 #Preview {
-    NavigationStack {
+    // Preview uses FakeData via a stub AppState; previews don't hit the network.
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    state.tournaments = .loaded(FakeData.tournaments)
+    return NavigationStack {
         TournamentListView()
     }
-    .environmentObject(AppState())
+    .environmentObject(state)
 }

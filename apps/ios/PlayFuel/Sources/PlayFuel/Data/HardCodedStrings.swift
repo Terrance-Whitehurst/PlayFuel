@@ -16,11 +16,12 @@ enum HardCodedStrings {
     """
 
     // MARK: - §B: Heat Emergency Guidance
-    // Source: SAFETY_DISCLAIMERS.md §B (verbatim)
-    // ⚠️ DRAFT — OQ-11: Wording is pending attorney review before App Store submission.
-    //    DO NOT treat this wording as legally cleared. Pre-launch blocker.
+    // Source: SAFETY_DISCLAIMERS.md §B v1.1 (revised 2026-04-27 per OQ-11 / TRIAGE_2026-04-27.md)
+    // ⚠️ Pending legal sign-off (OQ-06). Do not treat wording as legally cleared
+    //    before App Store submission. Surface ONLY through this constant.
+    // v1.1 wording from SAFETY_DISCLAIMERS.md §B; pending legal sign-off (OQ-06)
     static let heatEmergencyText = """
-    If the player feels faint, confused, has chest pain, stops sweating in extreme heat, has severe cramps, vomits repeatedly, or shows signs of heat illness, stop play and seek medical help immediately.
+    If your player feels faint or confused, has chest pain, stops sweating in extreme heat, has severe cramps, vomits repeatedly, or shows signs of heat illness: stop play and seek medical help. Call 911 (or your local emergency number) in an emergency.
     """
 
     // MARK: - §H.1: Overrun Message

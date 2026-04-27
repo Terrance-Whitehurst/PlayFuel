@@ -1,5 +1,5 @@
 role: Frontend Dev 3 (Engineering3)
-last_updated: "2026-04-26"
+last_updated: "2026-04-27"
 
 task_history:
   - task: "#3 SwiftUI static prototype (rerouted from Engineering2)"
@@ -38,9 +38,11 @@ safety_compliance:
   prohibited_phrases: "None present — verified by grep"
 
 open_questions_noted:
-  - OQ-11: "§B heat emergency text is DRAFT — pre-launch blocker. Flagged in EmergencyBanner + DisclaimerView."
+  - OQ-11: "§B heat emergency text v1.1 LANDED (2026-04-27). Pending legal sign-off (OQ-06). HardCodedStrings.swift updated verbatim."
+  - OQ-TRIAGE-1: "TimelineEventKind extended with gap/foodWindow/pickup/matchEnd (Phase 4 additions). Python backend enum must stay in sync."
   - OQ-C: "Timeline offsets (wake T-3h, etc.) are Engineering1 proposals, flagged [DRAFT] in timeline event detail text"
   - OQ-B: "sandwich_shop, grocery_prepared restaurant order templates are [DRAFT]. Flagged in FakeData.swift comments."
+  - OQ-iOS-1: "SPM Package cannot declare applesignin entitlement. Real SIWA on device requires .xcodeproj + Apple Developer team. Schedule migration before TestFlight."
   - NEW-1: "SignInWithAppleButton tap gesture intercept may show brief system sheet before dismissing. Consider plain Button for Phase 1 demos."
   - NEW-2: "ScenarioCardView width hardcoded at 300pt. iPad future scope."
 
@@ -55,3 +57,5 @@ patterns_learned:
   - "FakeData UUID determinism: use fixed UUID strings (AAAA0001-...) so Phase 3 integration tests can reference known IDs"
   - "SwiftUI Package iOS 17+: executableTarget with @main App protocol works cleanly"
   - "UnevenRoundedRectangle is iOS 17+ only — safe here but document if targeting older OS"
+  - "TimelineEventKind switch exhaustiveness: TimelineView.swift has TWO exhaustive switches (kindIcon + kindColor). Adding new enum cases requires updating both. No default: clause — compile breaks immediately on missing cases."
+  - "Enum sync discipline: TimelineEventKind raw values are camelCase strings; Python backend uses identical strings in playfuel_api/models/enums.py. Any new case must be added to BOTH simultaneously."

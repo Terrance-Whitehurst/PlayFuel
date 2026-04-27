@@ -4,17 +4,22 @@
 
 domain_routing:
   - id: qa_engineer_cannot_write_to_apps
-    observed: 2026-04-26 / session mogfjh9hslqr
+    observed: 2026-04-26 / session mogfjh9hslqr (re-confirmed 2026-04-27 same session)
     detail: |
-      QA Engineer's domain is read-only on `apps/`. When orchestrator routes a
-      "write a test file" task to Validation, QA staged the authored file in the
-      session dir and flagged the blocker — final write must be done by Backend
-      Dev (Engineering's domain).
+      QA Engineer's domain is read-only on `apps/`. Re-confirmed Task #13:
+      first write attempt to apps/api/src/playfuel_api/tests/ returned
+      'Domain: write denied'. Restriction is stable across the session — not
+      a transient.
     playbook: |
-      Before accepting "write a file under apps/" tasks, confirm the path falls
-      in a Member's write domain. If not, either (a) push back to orchestrator
-      to re-route, or (b) accept and stage in session dir with a write-action
-      handoff. Option (b) wastes a turn — push back is preferred.
+      Default to staging in `.pi/multi-team/sessions/<session>/staged_validation/`
+      mirroring the target tree under apps/. Inform Orchestrator the staging
+      path so they can fire an Engineering scribe delegate. Do NOT waste a
+      direct-write attempt in future sessions unless Orchestrator explicitly
+      says domain rules changed.
+    related_pattern: |
+      Pre-author the README append as a separate file (e.g. README_APPEND.md)
+      so the scribe pass is purely additive (one Edit, append-only) instead of
+      requiring the scriber to construct prose.
 
 invariant_check_patterns:
   - id: read_dont_trust

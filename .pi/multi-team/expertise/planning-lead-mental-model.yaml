@@ -1,5 +1,13 @@
 # Planning Lead — Mental Model
 
+## 2026-04-27 — Quad triage (TRIAGE_2026-04-27.md + SAFETY_DISCLAIMERS v1.1)
+
+- Pre-decided 4 OQs (API-1, API-2, iOS-1, OQ-11) and delegated PM to scribe both files in a single delegate. 319 lines + 123 lines, zero iteration.
+- **PM caught a real inconsistency I missed.** My OQ-API-2 timeline JSON spec used `label`/`category`/`matchId` and 4 category values that had no `TimelineEventKind` enum equivalent. iOS uses `title`/`detail`/`kind`/`id`. PM read `TimelineEvent.swift` (which I'd skipped because I assumed it was "obvious") and corrected the spec in-doc, surfacing OQ-TRIAGE-1.
+- **Lesson:** when authoring a JSON spec that maps to existing client models, ALWAYS include EVERY referenced model file in the read list — not just the headline ones. I had `Match.swift` and `Plan.swift` listed but skipped `TimelineEvent.swift`. PM didn't skip.
+- **Pattern that works:** PM verifies before scribing → surfaces inconsistencies as OQs → corrects in-doc rather than re-round-tripping to Lead. Saves a delegate cycle and keeps authorship integrity.
+- Decisions locked: bundle ID `com.playfuel.ios`; SPM stays through Tasks #7/#8/#13 then migrate pre-TestFlight; widen plan response field-by-field as backend sources land (weather+timeline in #7, food in #8); §B v1.1 adds 911 escalation, parent-addressing voice, still tagged for OQ-06 legal review.
+
 ## 2026-04-26 — Task #12 PRIVACY_V1.md shipped
 
 - Doc at `.pi/multi-team/expertise/PRIVACY_V1.md` — 43.7KB, 595 lines, 12 sections.

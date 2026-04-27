@@ -2,65 +2,44 @@ import SwiftUI
 
 /// US-05 — Tournament dashboard (plan hub).
 ///
-/// Top-to-bottom layout:
+/// Task #6: plan is generated on-demand via POST /v1/tournaments/{tid}/plans/generate.
+/// Weather / food / timeline are FakeData splices until Phase 4 (Task #7) and
+/// Phase 5 (Task #8) replace them with real API data.
+///
+/// Layout (when plan is loaded):
 ///   1. EmergencyBanner (if weather.extremeHeatRisk)
 ///   2. WeatherCardView
-///   3. Match info strip
-///   4. Horizontal scroll of ScenarioCardViews (short / normal / long)
-///   5. FoodCardView
-///   6. "Full Timeline" button → TimelineView
-///   7. Footer: Disclaimer link (§A placement)
+///   3. Horizontal scroll of ScenarioCardViews (short / normal / long)
+///   4. FoodCardView (if foodOptions is non-empty)
+///   5. "Full Timeline" button (if timeline is non-empty)
+///   6. Footer disclaimer link (§A placement)
 ///
-/// Stub state: tournaments without a plan show a "No plan available" message.
+/// MatchInfoStrip is removed in Task #6 — Match data is not fetched in the read-
+/// only wiring task. It will return when the match-create flow ships.
 struct TournamentDashboardView: View {
 
     let tournament: Tournament
 
+    @EnvironmentObject var appState: AppState
     @State private var showingDisclaimer = false
-    @State private var showingTimeline = false
-
-    private var plan: Plan? { FakeData.plan(for: tournament.id) }
-    private var match: Match? { FakeData.match(for: tournament.id) }
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
+                switch appState.currentPlan {
+                case .idle:
+                    generateButton
 
-                if let plan = plan {
-                    // §B Emergency banner — renders when extreme_heat_risk = true
-                    if plan.weather.extremeHeatRisk {
-                        EmergencyBanner()
-                    }
+                case .loading:
+                    ProgressView("Generating plan…")
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 60)
 
-                    // Match info strip
-                    if let match = match {
-                        MatchInfoStrip(match: match)
-                    }
+                case .failed(let message):
+                    errorView(message)
 
-                    // US-07 Weather card
-                    WeatherCardView(weather: plan.weather)
-
-                    // US-06 Scenario cards — horizontal scroll
-                    scenariosSection(plan: plan)
-
-                    // US-08 Food card
-                    FoodCardView(foodOptions: plan.foodOptions)
-
-                    // Full Timeline button
-                    NavigationLink {
-                        TimelineView(tournament: tournament, timeline: plan.timeline)
-                    } label: {
-                        Label("Full Day Timeline", systemImage: "calendar.badge.clock")
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.borderedProminent)
-                    .padding(.horizontal, 16)
-
-                    // §A Footer disclaimer link
-                    footerDisclaimer
-
-                } else {
-                    stubNoPlan
+                case .loaded(let plan):
+                    planContent(plan: plan)
                 }
             }
             .padding(.vertical, 16)
@@ -71,6 +50,97 @@ struct TournamentDashboardView: View {
         .sheet(isPresented: $showingDisclaimer) {
             DisclaimerView()
         }
+        .task {
+            // Reset plan state on each dashboard appearance so a stale plan from a
+            // different tournament is never shown. User taps "Generate Plan" to load.
+            appState.currentPlan = .idle
+        }
+    }
+
+    // MARK: - Plan Content
+
+    @ViewBuilder
+    private func planContent(plan: Plan) -> some View {
+        // §B Emergency banner — renders when extreme_heat_risk = true
+        if plan.weather.extremeHeatRisk {
+            EmergencyBanner()
+        }
+
+        // US-07 Weather card
+        WeatherCardView(weather: plan.weather)
+
+        // US-06 Scenario cards — horizontal scroll
+        scenariosSection(plan: plan)
+
+        // US-08 Food card (only when food options are available)
+        if !plan.foodOptions.isEmpty {
+            FoodCardView(foodOptions: plan.foodOptions)
+        }
+
+        // Full Timeline navigation (only when timeline is available)
+        if !plan.timeline.isEmpty {
+            NavigationLink {
+                TimelineView(tournament: tournament, timeline: plan.timeline)
+            } label: {
+                Label("Full Day Timeline", systemImage: "calendar.badge.clock")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .padding(.horizontal, 16)
+        }
+
+        // §A Footer disclaimer link
+        footerDisclaimer
+    }
+
+    // MARK: - Idle State — Generate Button
+
+    private var generateButton: some View {
+        VStack(spacing: 16) {
+            Image(systemName: "sparkles")
+                .font(.system(size: 48))
+                .foregroundStyle(.green)
+
+            Text("Generate today's plan")
+                .font(.headline)
+
+            Text("The rules engine builds your match scenarios from scheduled start times and weather. Weather and food options use demo data until Phase 4/5.")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 32)
+
+            Button("Generate Plan") {
+                Task { await appState.generatePlan(for: tournament.id) }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.vertical, 60)
+    }
+
+    // MARK: - Error State
+
+    private func errorView(_ message: String) -> some View {
+        VStack(spacing: 12) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 40))
+                .foregroundStyle(.orange)
+
+            Text("Couldn't generate plan")
+                .font(.headline)
+
+            Text(message)
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .padding(.horizontal, 24)
+
+            Button("Retry") {
+                Task { await appState.generatePlan(for: tournament.id) }
+            }
+            .buttonStyle(.borderedProminent)
+        }
+        .padding(.vertical, 60)
     }
 
     // MARK: - Scenarios Section
@@ -115,76 +185,16 @@ struct TournamentDashboardView: View {
         .padding(.horizontal, 16)
         .padding(.bottom, 8)
     }
-
-    // MARK: - Stub state (Austin / Houston — no plan yet)
-
-    private var stubNoPlan: some View {
-        VStack(spacing: 16) {
-            Image(systemName: "calendar.badge.plus")
-                .font(.system(size: 48))
-                .foregroundStyle(.secondary)
-
-            Text("No plan generated yet")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-
-            Text("Add a match time to generate a tournament-day plan.\n(Stub tournament — Phase 3 will wire to FastAPI.)")
-                .font(.caption)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .padding(.horizontal, 40)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 60)
-    }
-}
-
-// MARK: - Match Info Strip
-
-private struct MatchInfoStrip: View {
-    let match: Match
-
-    var body: some View {
-        HStack(spacing: 16) {
-            infoItem(icon: "clock.fill", label: "Match 1", value: match.scheduledTime)
-
-            Divider().frame(height: 36)
-
-            if let next = match.estimatedNextMatchTime {
-                infoItem(icon: "clock.arrow.circlepath", label: "Est. Match 2", value: next)
-                Divider().frame(height: 36)
-            }
-
-            if let court = match.court {
-                infoItem(icon: "mappin.circle.fill", label: "Court", value: court)
-            }
-        }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 12)
-        .background(Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 12))
-        .padding(.horizontal, 16)
-    }
-
-    private func infoItem(icon: String, label: String, value: String) -> some View {
-        VStack(spacing: 2) {
-            HStack(spacing: 4) {
-                Image(systemName: icon)
-                    .font(.caption2)
-                Text(label)
-                    .font(.caption2)
-            }
-            .foregroundStyle(.secondary)
-
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-        }
-    }
 }
 
 #Preview {
-    NavigationStack {
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    state.currentPlan = .loaded(FakeData.dallasPlan)
+    return NavigationStack {
         TournamentDashboardView(tournament: FakeData.dallasTournament)
     }
-    .environmentObject(AppState())
+    .environmentObject(state)
 }

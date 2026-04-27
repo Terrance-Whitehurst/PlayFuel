@@ -11,6 +11,11 @@ enum TimelineEventKind: String, Codable, CaseIterable {
     case match          // Tennis ball
     case recovery       // Heart
     case hydration      // Drop
+    // Phase 4 additions — OQ-TRIAGE-1 (matches backend playfuel_api/models/enums.py)
+    case gap            // Inter-match gap window
+    case foodWindow     // Food/snack window
+    case pickup         // Parent pickup window
+    case matchEnd       // Estimated match end
 }
 
 // MARK: - TimelineEvent

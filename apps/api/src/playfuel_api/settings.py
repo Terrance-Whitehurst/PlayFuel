@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     api_port: int = 8000
     cors_origins: list[str] = ["*"]
 
+    # Weather provider (Phase 4) — Open-Meteo is keyless and free.
+    weather_provider: str = "open-meteo"
+    open_meteo_base_url: str = "https://api.open-meteo.com"
+    weather_cache_ttl_sec: int = 1800
+
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
 
 

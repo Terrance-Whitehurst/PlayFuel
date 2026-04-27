@@ -1,3 +1,19 @@
+// ──────────────────────────────────────────────────────────────────────────
+// FakeData (Preview-only as of Task #6 — iOS ↔ API wiring)
+//
+// Production data flow (Task #6+):
+//   SignInView → AuthService → APIClient → Repository → AppState → Views
+//
+// This file remains the single source of truth for SwiftUI #Preview blocks
+// because previews cannot make network calls. It is also spliced into the
+// hybrid Plan envelope by Repository.assembleHybridPlan for `weather`,
+// `foodOptions`, and `timeline` until Phase 4 (Task #7 weather) and Phase 5
+// (Task #8 food/places) replace those splices with real API data.
+//
+// Keep the shape in sync with the API response (camelCase fields, mirrors
+// backend §G ScenarioPlan). Do not change any verbatim disclaimer or
+// heat-emergency text without updating HardCodedStrings.swift first.
+// ──────────────────────────────────────────────────────────────────────────
 import Foundation
 
 // MARK: - FakeData

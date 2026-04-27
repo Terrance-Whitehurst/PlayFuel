@@ -35,6 +35,8 @@ from playfuel_api.models.enums import (
     PickupBucket,
     ScenarioKind,
     ScheduleConfidence,
+    TimelineEventKind,
+    WeatherCondition,
 )
 
 # Shared config: camelCase aliases, populate by either snake_case or camelCase name.
@@ -120,6 +122,55 @@ class ScenarioPlan(BaseModel):
     warnings: list[str] = []
 
 
+# ─── Phase 4 weather block — OQ-API-2 widening ─────────────────────────────────
+
+
+class WeatherBlock(BaseModel):
+    """Classified weather attached to plan response — §E.1/§E.2.
+
+    is_stale=True signals iOS that the cache fallback was used (provider error).
+    All seven flag fields are passed through so iOS EmergencyBanner logic
+    mirrors the backend classification exactly.
+    """
+    model_config = _CAMEL
+
+    temp_f: float
+    humidity_pct: float
+    condition: WeatherCondition
+    flag_hot: bool
+    flag_very_hot: bool
+    flag_humid: bool
+    flag_cold: bool
+    flag_windy: bool
+    flag_rain_risk: bool
+    flag_extreme_heat_risk: bool
+    is_stale: bool = False           # True when cache fallback was used (provider error)
+    fetched_at: datetime
+    provider: str
+
+
+# ─── Phase 4 timeline block — OQ-API-2 / OQ-TRIAGE-1 ───────────────────────────
+
+
+class TimelineEventOut(BaseModel):
+    """Single timeline event in the plan response.
+
+    Field names mirror iOS TimelineEvent.swift exactly (OQ-TRIAGE-1 resolution):
+      id     → UUID v4 string (fresh per request; clients must not persist)
+      time   → ISO 8601 timestamp string
+      title  → short label for the event
+      detail → guidance text (non-optional; emit empty string rather than null)
+      kind   → TimelineEventKind enum value (camelCase string)
+    """
+    model_config = _CAMEL
+
+    id: str
+    time: str          # ISO 8601 timestamp (e.g. "2026-04-27T09:00:00+00:00")
+    title: str
+    detail: str        # iOS contract: non-optional; use "" rather than null
+    kind: TimelineEventKind
+
+
 # ─── Plan (top-level envelope) ────────────────────────────────────────────────
 
 
@@ -148,6 +199,10 @@ class Plan(BaseModel):
     heat_emergency_text: Optional[str] = None  # alias: heatEmergencyText
     warnings: list[str] = []
     scenario_plans: list[ScenarioPlan]  # alias: scenarioPlans
+    # ─ Phase 4 additions (OQ-API-2 incremental widening) ────────────────────────
+    weather: Optional[WeatherBlock] = None        # alias: weather; None when no coords / provider fail
+    timeline: list[TimelineEventOut] = []         # alias: timeline; empty list when engine produces none
+    food_options: Optional[list] = None           # alias: foodOptions; stays None until Task #8
 
 
 # ─── Request / response wrappers ─────────────────────────────────────────────
