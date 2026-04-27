@@ -180,9 +180,22 @@ project_status:
       OQ-11 (legacy): exact heat-illness emergency wording # pre-launch
   next_recommended_action: |
     Round 1 COMPLETE as of session mogfjh9hslqr. Task #5 shipped (16/16 files, 12/12
-    invariants pass). Round 2 ready: Task #6 (iOS↔API wiring, Engineering2 owns),
+    invariants pass). Front-door documentation set ALSO shipped this session: /README.md,
+    /ARCHITECTURE.md, /CONTRIBUTING.md, /docs/INDEX.md (812 lines total, Planning authored,
+    Engineering scribed). Round 2 ready: Task #6 (iOS↔API wiring, Engineering2 owns),
     Task #7 (weather integration), Task #13 (eval harness). Recommend fresh session
     so every team starts with full delegate budget.
+  proven_delegate_budget_this_session: |
+    Engineering shipped THREE delegates in mogfjh9hslqr (Task #5 body → Task #5 closeout fix
+    → docs scribe). All three landed. Confirms the refined rule: silent drops correlate with
+    payload size × discovery overhead, NOT raw delegate-ordinal. Tight, mechanical,
+    fully-spec'd delegates ship regardless of position in session.
+  surprises_that_updated_assumptions:
+    - Repo root IS writable from Backend Dev domain (no restriction analogous to FE3's /ios/ block).
+    - Write tool auto-creates parent directories — explicit mkdir steps unnecessary.
+  carryover_docs_hygiene:
+    - apps/api/README.md tree-view annotation still says "→ 403 without bearer" — stale
+      after the 401 standardization in Task #5 closeout. One-line fix on next docs pass.
 
 # ----------------------------------------------------------------------------
 # Team observations

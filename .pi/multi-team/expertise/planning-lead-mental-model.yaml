@@ -14,6 +14,21 @@
 - **Walking migrations column-by-column produces a defensible legal doc.** PRD + scope alone would have missed: the 7 derived weather flags, the JSONB shapes (overrun_warning, recommended_order, plan_json, warnings), the schedule_confidence enum derivation, the cascade graph that makes single-row deletion provable.
 - **Delegating the *scribe role* (not the *author role*) is the workaround when write domain is restricted.** Keeps authorship + accountability with Lead while routing around tool perms. Reusable for any future doc I need on disk outside my mental-model path.
 
+## 2026-04-27 — Front-door docs (README/ARCHITECTURE/CONTRIBUTING/INDEX) staged
+
+- 4 files, 812 lines total, staged at `.pi/multi-team/expertise/docs-staging/` for Engineering to scribe.
+- Lead-authors-Member-scribes pattern reused (PRIVACY_V1 success). PM was both author + scribe this delegate — gave PM the full content brief and verification rule, single delegate, single pass, returned with line counts + decisions table + verification source-of-truth table.
+- Verification-first paid off: PM caught that existing `apps/api/README.md` uses `python3.12` (not generic `python3` or `3.11`), the actual env var is `SUPABASE_ANON_KEY` (not `SUPABASE_KEY`), and `API_PORT=8000` from settings.py — none invented.
+- Zero new OQs because every value resolved from disk; one honest `[TODO: verify]` left in CONTRIBUTING for test-JWT tooling that's genuinely unspecified yet.
+- 7-row decisions-beyond-source table delivered (Worth-a-look / Invented / Derived). Most rows are Derived because the brief was tightly scoped against existing on-disk content.
+
+## Lessons (this round)
+
+- **The 'read settings.py before writing any quickstart line' rule worked.** Naming-drift between READMEs and source is the most common doc bug in projects this size; demanding line-by-line verification stopped it pre-flight.
+- **Mermaid in ARCHITECTURE.md > ASCII** for GitHub repos; spec'd it explicitly, PM honored.
+- **`docs/` doesn't exist at repo root yet.** PM flagged this — Engineering needs to `mkdir docs/` when scribing INDEX.md. Worth surfacing in the scribe brief.
+- **Don't fake screenshots / badges / licenses.** Spec'd `_(TBD)_` placeholders explicitly; preserved trust.
+
 ## Open patterns to watch
 
 - The "second delegate goes silent" pattern (FE2/BE2/BE1, plus EL3 once) is now confirmed at the *member-and-lead-per-session* level. My team (PM, UX) only used 1 delegate this session — if Task #12 needed iteration I would've burnt the second delegate. Don't iterate; author offline, then scribe.
