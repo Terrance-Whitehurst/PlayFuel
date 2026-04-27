@@ -1,0 +1,57 @@
+role: Frontend Dev 3 (Engineering3)
+last_updated: "2026-04-26"
+
+task_history:
+  - task: "#3 SwiftUI static prototype (rerouted from Engineering2)"
+    status: complete
+    delivered:
+      path: apps/ios/PlayFuel/
+      files: 22
+      key_files:
+        - Package.swift
+        - Sources/PlayFuel/PlayFuelApp.swift
+        - Sources/PlayFuel/State/AppState.swift
+        - Sources/PlayFuel/Models/ (7 models)
+        - Sources/PlayFuel/Data/FakeData.swift
+        - Sources/PlayFuel/Data/HardCodedStrings.swift
+        - Sources/PlayFuel/Views/ (9 views)
+        - README.md
+
+architecture:
+  pattern: SwiftUI + NavigationStack, EnvironmentObject for AppState
+  data_flow: FakeData.swift → Models → Views (all fake, no networking)
+  phase3_swap: Delete FakeData.swift, replace FakeData.plan()/match()/tournaments with API calls. Zero view changes needed.
+  auth: Fake in Phase 1 (tap gesture flips AppState.isAuthenticated). Phase 2: real Supabase/Apple token exchange.
+
+dallas_demo:
+  gap_math_verified:
+    short:  "75min match → end 10:15AM → gap=165min → light_meal + wait_until_end"
+    normal: "120min match → end 11:00AM → gap=120min → quick_pickup + wait_until_end (OQ-13 boundary confirmed)"
+    long:   "180min match → end 12:00PM → gap=60min → portable + pickup_during_match"
+  weather: "88°F (hot≥85 but NOT very_hot<90) + 72% humidity (humid≥65) → extremeHeatRisk=true"
+  emergency_banner: "Fires on dashboard because extremeHeatRisk=true"
+
+safety_compliance:
+  verbatim_strings: "All in HardCodedStrings.swift. Zero views re-type §A or §B."
+  disclaimer_placement: "SignInView (link) + TournamentDashboardView (footer) + DisclaimerView (full screen)"
+  emergency_banner: "EmergencyBanner.swift renders when plan.weather.extremeHeatRisk"
+  prohibited_phrases: "None present — verified by grep"
+
+open_questions_noted:
+  - OQ-11: "§B heat emergency text is DRAFT — pre-launch blocker. Flagged in EmergencyBanner + DisclaimerView."
+  - OQ-C: "Timeline offsets (wake T-3h, etc.) are Engineering1 proposals, flagged [DRAFT] in timeline event detail text"
+  - OQ-B: "sandwich_shop, grocery_prepared restaurant order templates are [DRAFT]. Flagged in FakeData.swift comments."
+  - NEW-1: "SignInWithAppleButton tap gesture intercept may show brief system sheet before dismissing. Consider plain Button for Phase 1 demos."
+  - NEW-2: "ScenarioCardView width hardcoded at 300pt. iPad future scope."
+
+deviations:
+  - "apps/ios/PlayFuel/ instead of ios/PlayFuel/ — write domain restriction, noted in README"
+  - "Austin + Houston are stub tournaments with no plan (correct per US-03 1-3 tournaments spec)"
+  - "No US-02 player profile screen — Phase 2 concern"
+  - "No 'Generate Plan' button — Phase 3 concern (needs FastAPI)"
+
+patterns_learned:
+  - "anti-silent-failure: write files step by step, verify with find/grep before returning"
+  - "FakeData UUID determinism: use fixed UUID strings (AAAA0001-...) so Phase 3 integration tests can reference known IDs"
+  - "SwiftUI Package iOS 17+: executableTarget with @main App protocol works cleanly"
+  - "UnevenRoundedRectangle is iOS 17+ only — safe here but document if targeting older OS"

@@ -1,0 +1,262 @@
+# Orchestrator Mental Model — PlayFuel
+
+last_updated: 2026-04-27
+session: mogfjh9hslqr   # carries-over from mog5k1xastpq → mog2owgx4ixe
+
+# ----------------------------------------------------------------------------
+# Session mogfjh9hslqr — Task #5 COMPLETION (third attempt, finally shipped)
+# ----------------------------------------------------------------------------
+session_mogfjh9hslqr:
+  user_directive: "Can you finish up those previous tasks?"  # i.e. Task #5
+  outcomes:
+    Task_5: SHIPPED ✅. 16/16 files on disk at apps/api/. 12/12 invariants pass.
+  what_worked:
+    delegate_1_engineering: |
+      Followed prior-session rule: FIRST delegate IS scribe-and-ship with full spec inlined.
+      No discovery-then-implement two-step. Lead routed to Backend Dev with the complete
+      16-file file list + invariants + foundation-preservation contract.
+      Result: BD shipped 15/16 in one stream. The [Backend Dev error] wrapper appeared
+      mid-stream but writes had already streamed cleanly to disk — wrapper truncates
+      near end-of-stream, files written before the truncation survive. Last file in
+      stream order (test_routes_smoke.py) was the casualty.
+    delegate_2_validation: |
+      Routed the missing test file + QA pass to Validation (fresh team, zero prior
+      delegates). QA Engineer authored the smoke test (57 lines), staged it in the
+      session dir because their write domain doesn't cover apps/, and ran the full
+      12-row invariant matrix as a parallel deliverable. Returned with PASS/FAIL +
+      file:line evidence + 1 medium defect (401-vs-403) + 2 minor security/lint nits.
+    delegate_3_engineering: |
+      Counter to my prior 'never issue a second-Engineering-delegate' rule, this
+      shipped clean. Two writes (one new file, one in-place edit), <100 lines new
+      content, fully-specified brief with discrete edits called out. EL even improved
+      my spec mid-flight (kept verify_supabase_jwt as the public symbol instead of
+      adding a parallel current_user_id, avoiding 5-file churn) — good Lead judgment.
+  rule_refinement: |
+    Prior rule: "One substantive delegate per team per session."
+    Refined rule (from EL's own observation, validated end-to-end):
+      A second delegate to a team IS safe when ALL of:
+        (a) new content < ~100 lines
+        (b) brief is fully spec'd, zero discovery loop, zero questions for the team to ask
+        (c) edits to existing files are itemized as discrete Edit ops, not 'rewrite this'
+        (d) instruction explicitly forbids internal retries — return-on-error
+    The silent-drop pattern correlates with PAYLOAD SIZE × DISCOVERY-OVERHEAD, not
+    raw delegate-ordinal. Big speculative second delegates still drop; tight surgical
+    second delegates survive.
+  cross_team_handoff_pattern_validated: |
+    QA-staged-content → Engineering-scribed-to-disk worked perfectly:
+      1. QA Engineer (read-only on apps/) authors complete file content in session dir
+      2. Backend Dev (write access on apps/) reads from session dir, writes to apps/
+    This is the read-only-author + write-access-scribe pattern — same shape as the
+    Lead-authors-Member-scribes pattern from session mog2owgx4ixe (Task #12), but
+    across teams instead of within a team. Counts as one delegate per team.
+  task_5_carryover_oqs:
+    - OQ-QA-2: unused PlayerProfileRow import in routes/player_profiles.py (trivial)
+    - test gap: no_next_match branch (§G.5) in rules/scenarios.py uncovered by any of
+      the 5 SCENARIO_ACCEPTANCE cases — recommend dedicated test before Phase 3
+    - test gap: heat_emergency_text set-when-extreme not asserted; rewarm boundary
+      gap=59 vs gap=60 not isolated; verify_supabase_jwt negative paths untested
+    - 401-standardization shipped (OQ-QA-1 resolved this session)
+  next_recommended_action: |
+    Round 1 COMPLETE. All Phase 0/1 deliverables shipped:
+      - PRD, USER_STORIES, MVP_SCOPE, SAFETY_DISCLAIMERS, SCENARIO_ACCEPTANCE
+      - RULES_CONSTANTS_V1.md (Task #2)
+      - apps/ios/PlayFuel/ — 22-file SwiftUI prototype (Task #3)
+      - db/supabase/ — schema + RLS (Task #4)
+      - apps/api/ — 23-file FastAPI body w/ rules engine (Task #5)
+      - PRIVACY_V1.md (Task #12)
+    Ready for Round 2: Task #6 (iOS↔API wiring), Task #7 (weather), Task #13 (eval).
+    Recommend fresh session for Round 2 to start every team's delegate budget at zero.
+
+# ----------------------------------------------------------------------------
+# Session mog5k1xastpq — Task #5 retry attempt
+
+# ----------------------------------------------------------------------------
+# Session mog5k1xastpq — Task #5 retry attempt
+# ----------------------------------------------------------------------------
+session_mog5k1xastpq:
+  user_directive: |
+    User pasted a clipboard screenshot of the prior session's wrap-up note about
+    Task #5 being PARTIAL (16 files outstanding) and asked "can you do this task".
+  outcomes:
+    Task_5: STILL PARTIAL. 0 net new files written this session. Recommend fresh session.
+  what_happened:
+    delegate_1_engineering: |
+      Rich, accurate response. EL reconfirmed:
+        - Foundation is actually 16 files on disk (not 12 — BE1's prior 'errored' first
+          delegate had silently shipped 4 extra files: buckets.py, weather.py, auth.py, db.py).
+        - 16 files genuinely outstanding: main.py, rules/{scenarios,plan}.py, all 6 routes/,
+          all 7 tests/.
+        - EL's own write-domain does not cover apps/ — needs a Member to scribe.
+        - Recommended fresh session for completion.
+    delegate_2_engineering: SILENT DROP (empty response, only team header).
+    delegate_3_engineering: SILENT DROP (probe-only, 1-line write request — still empty).
+    delegate_4_validation: ALIVE (returned VALIDATION_ALIVE) — confirms drop is per-team, not global.
+    filesystem_verify: ENOENT on _probe.txt and main.py — confirms zero writes.
+  lesson_learned_this_session: |
+    **I violated my own playbook.** The mental model already documented:
+      - 'One substantive delegate per team per session.'
+      - 'Lead authors, Member scribes' workaround MUST happen in a single delegate cycle.
+    My delegate #1 to Engineering should have BEEN the scribe instruction:
+      'Backend Dev: write all 16 files now using Write tool, here are the specs inline.'
+    Instead I asked for a discovery+plan+implement combo and the Lead responded with
+    discovery+plan only. By the time I sent the 'now ship it' follow-up, Engineering's
+    per-session budget was burned. Same mistake as session mog2owgx4ixe.
+  rule_for_next_time: |
+    When the prior session's wrap-up identifies a known concrete deliverable (file list,
+    spec, decisions all baked), the FIRST delegate to the relevant team must be the
+    scribe-and-ship instruction with the spec inlined. Do NOT ask for plans or probes.
+    The 'discover then implement' two-step is a luxury this session topology does not afford.
+
+# ----------------------------------------------------------------------------
+# Session mog2owgx4ixe — sequential Round 1 execution log
+# ----------------------------------------------------------------------------
+session_mog2owgx4ixe:
+
+# ----------------------------------------------------------------------------
+# Session mog2owgx4ixe — sequential Round 1 execution log
+# ----------------------------------------------------------------------------
+  user_directive: |
+    Execute Round 1 SEQUENTIALLY (not parallel as PLAN.md §5 suggests):
+      1. Engineering2 → Task #3 (SwiftUI prototype)
+      2. Engineering1 → Task #5 (FastAPI backend)
+      3. Planning     → Task #12 (Privacy doc)
+    Engineering2 explicitly authorized to borrow Frontend Dev 3 from Engineering3.
+  outcomes:
+    Task_3: SHIPPED via reroute (EL2 → EL3/FE3). 22 files at apps/ios/PlayFuel/.
+    Task_5: PARTIAL. EL1/BE1 shipped 12 files (foundation) at apps/api/. Reroute to EL3 for the remaining 16 files silently dropped. Recommend fresh session.
+    Task_12: SHIPPED. Planning Lead authored, PM scribed (workaround for write-domain restriction). 595-line PRIVACY_V1.md at .pi/multi-team/expertise/.
+  cross_session_pattern_confirmed: |
+    Silent-second-delegate is now confirmed at TEAM scope, not member scope.
+    First delegate to a team in a session: works.
+    Second delegate to the SAME team in the same session: silently drops.
+    Affected this session: Engineering2 (FE2 first ping), Engineering1 (BE1 second delegate),
+    Engineering3 (when used for Task #5 reroute — i.e., their second delegate after Task #3).
+    Planning was UNAFFECTED because they only had one delegate (Task #12).
+  reroute_playbook_v2:
+    rule: "One substantive delegate per team per session. Plan accordingly."
+    implication: |
+      For multi-step work involving the same team, batch ALL of that team's asks into a
+      single delegate. Do NOT split into 'foundation then body' even when the foundation
+      author offers a clean handoff brief — the second delegate to ANY team will drop.
+    when_blocked: |
+      If a team's second delegate is needed mid-session, route to a team that has not yet
+      been used in this session. If all teams have been used, wrap and recommend fresh session.
+  workaround_discovered:
+    pattern: "Lead authors, Member scribes"
+    detail: |
+      When a Lead's write domain doesn't cover the target path, the Lead can author the
+      content in-message and assign a Member to do the file write in a single delegate cycle.
+      Planning used this for Task #12 (PM scribed PRIVACY_V1.md to .pi/multi-team/expertise/).
+      Counts as one delegate, not two — works around per-team budget AND write-domain restriction.
+
+
+# ----------------------------------------------------------------------------
+# Project status
+# ----------------------------------------------------------------------------
+project_status:
+  phase: "1 → 2 transition"
+  phase_0:
+    status: COMPLETE
+    deliverables:
+      - PRD.md                         # Task #1 ✅
+      - USER_STORIES.md                # Task #1 ✅
+      - MVP_SCOPE.md                   # Task #1 ✅
+      - SAFETY_DISCLAIMERS.md          # Task #1 ✅
+      - SCENARIO_ACCEPTANCE.md         # Task #1 ✅
+      - RULES_CONSTANTS_V1.md          # Task #2 ✅ (this session)
+    blockers_resolved:
+      OQ-05: hardcoded SCENARIO_DURATIONS_MIN {short:75, normal:120, long:180}; duration_overrides kwarg reserved for v1.1/v1.2
+      OQ-13: half-open [a,b) intervals; food bag_only/portable/quick_pickup/light_meal at 0/45/90/150; pickup at 0/60/120
+      OQ-14: degraded plan + warning, HTTP 200; new gap_status enum {ok,tight,overrun,no_next_match}; overrun clamps food→bag_only, pickup→bring_portable, rewarm_up→null
+    new_OQs_carried_forward:
+      OQ-A: hydration cadence numeric sources              # blocks Phase 6 LLM layer
+      OQ-B: restaurant template definitions beyond fast_casual_bowl  # blocks Phase 5
+      OQ-C: pre-match/warm-up offset numeric sources       # blocks Phase 3
+      OQ-D: extreme_heat_risk naming confirmation          # cosmetic, blocks Phase 4
+      OQ-E: tight_threshold minute value                   # blocks Phase 3
+      OQ-F: rain-delay handling                            # blocks Phase 4
+      OQ-G: schedule_confidence schema field               # blocks Phase 2
+      OQ-06 (legacy): COPPA legal review                   # pre-launch
+      OQ-11 (legacy): exact heat-illness emergency wording # pre-launch
+  next_recommended_action: |
+    Round 1 COMPLETE as of session mogfjh9hslqr. Task #5 shipped (16/16 files, 12/12
+    invariants pass). Round 2 ready: Task #6 (iOS↔API wiring, Engineering2 owns),
+    Task #7 (weather integration), Task #13 (eval harness). Recommend fresh session
+    so every team starts with full delegate budget.
+
+# ----------------------------------------------------------------------------
+# Team observations
+# ----------------------------------------------------------------------------
+team_dynamics:
+  Engineering1:
+    strengths:
+      - Decisive on engineering trade-offs; closed OQ-05/13/14 with rationale and forward-compatible defaults (duration_overrides kwarg).
+      - Surfaces *new* OQs proactively (added OQ-A through OQ-G).
+      - Cites source sections precisely.
+    quirks:
+      - Team members (Backend Dev 1, Frontend Dev 1) went silent on large file-write payloads to session dir. Lead is constrained from writing under sessions/ directly. Workaround used: Lead returned full structured content inline; Planning wrote the actual file.
+    delegation_tip: |
+      When you need a file written, route the writing step to whichever team owns that path.
+      Engineering1 is great for *deciding* and *drafting*; pair with Planning (or another team
+      that has the right write scope) for *committing*.
+  Engineering2:
+    strengths:
+      - Lead is reflective and surfaces failure modes clearly with diagnostic detail.
+      - Lead correctly proposed cross-team rerouting ("borrow Frontend Dev 3") when own members stalled.
+    quirks:
+      - Both members (Frontend Dev 2, Backend Dev 2) hit the silent-failure pattern fast — first small ping works, every follow-up drops.
+    notes: owns mobile/SwiftUI; Task #3 prototype NOT shipped this session due to member stalls.
+  Engineering3:
+    strengths:
+      - Most reliable team this session — shipped Task #4 cleanly first try.
+      - Made two additive deviations (venue lat/lng, full §E weather flags) and proactively justified both.
+      - Resolved OQ-G in-flight without needing a second round trip.
+      - Honest about validation gaps (no supabase CLI in sandbox — manual greps used).
+    notes: owns data/Supabase; Task #4 ✅ at db/supabase/.
+    surfaced_OQ: "OQ-H — weather_condition enum: do we need partly_cloudy/fog/haze? Blocks Phase 4."
+  Planning:
+    strengths:
+      - Produces tight, tabular, copy-paste-ready specs.
+      - Self-flags decisions made *beyond* the source material (transparency table at the end).
+    quirks:
+      - Will invent reasonable structures (e.g., semver change-control rules in §J of RULES_CONSTANTS_V1) when source is silent. Always ask them to flag invented vs. derived decisions.
+      - **Hit silent-failure pattern after heavy Phase 0 work.** Two retries on Task #12 (Privacy doc) returned only the team header and zero file written. Likely a per-team session quota.
+    delegation_tip: |
+      Give Planning the exact file path, the exact section structure, and any verbatim
+      Engineering resolutions to bake in. They will return path + TOC + flagged decisions
+      without prompting if asked.
+      AVOID burning Planning on small polish tasks before their real Phase 1+ work —
+      they appear to have a per-session budget.
+
+# ----------------------------------------------------------------------------
+# Delegation patterns that worked
+# ----------------------------------------------------------------------------
+patterns:
+  sequential_handoff_engineering_then_planning:
+    when: "A spec/constants doc needs engineering decisions baked in."
+    flow: |
+      1. delegate(Engineering1, "resolve OQs + produce a foundation memo")
+      2. delegate(Planning, "author the canonical doc, here are Eng1's verbatim resolutions")
+    why_it_worked: |
+      Avoided the trap of asking Planning to make engineering trade-offs, AND
+      avoided asking Engineering to commit final-form Planning prose.
+      Each team operated in its strength.
+
+  spot_check_planning_decisions:
+    rule: |
+      Planning's "decisions made beyond source" table is gold — review items flagged
+      "Worth a look" or "Invented" before treating the doc as binding.
+    this_session_items_to_revisit:
+      - "RULES_CONSTANTS_V1.md item #4 (re-warm-up nulled when gap < 60min) — derived, not explicit in source"
+      - "RULES_CONSTANTS_V1.md §J change-control / semver rules — invented; needs Eng1 + Planning sign-off"
+
+# ----------------------------------------------------------------------------
+# Domain-restriction notes
+# ----------------------------------------------------------------------------
+domain_notes:
+  orchestrator_writable: [".pi/multi-team/expertise/"]
+  orchestrator_readable_only: ["specs/", "everything else under PlayFuel/"]
+  consequence: |
+    I cannot update specs/PLAN.md status checkboxes directly. Track Phase 0 status here
+    and in RULES_CONSTANTS_V1.md frontmatter. If user wants PLAN.md updated, they need to
+    delegate the write or do it themselves.

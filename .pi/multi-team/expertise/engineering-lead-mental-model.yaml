@@ -1,0 +1,384 @@
+# Engineering Lead — Mental Model (PlayFuel)
+# Note: file is shared across leads; appended to by EL3 in session mog2owgx4ixe.
+# Updated: 2026-04-26 (Phase 1 Round 1 — Task #3 SwiftUI shipped via FE3 reroute)
+
+project: PlayFuel
+role: Engineering Lead 1 (backend / rules engine owner per PLAN.md)
+
+# ---------------------------------------------------------------------------
+# Architecture decisions made
+# ---------------------------------------------------------------------------
+
+decisions:
+  oq_05_scenario_durations:
+    decision: hardcoded module constants for MVP
+    location: backend/app/rules/constants.py — SCENARIO_DURATIONS_MIN
+    values: { short: 75, normal: 120, long: 180 }
+    override_hierarchy:
+      mvp: module constants only
+      v1_1_deferred: player_profiles.scenario_duration_overrides JSONB
+      v1_2_deferred: (age_bracket, match_format, surface) lookup table
+    rationale: |
+      USER_STORIES.md OQ-3 already pre-resolved as "hardcoded for MVP".
+      All 5 canonical eval scenarios use literal 75/120/180.
+      DB+RLS+UI = ~3 days of work for zero MVP value.
+      Function signature reserves `duration_overrides` kwarg so v1.1 is additive.
+
+  oq_13_gap_boundaries:
+    decision: pseudocode wins over prose; half-open [a,b) is canonical
+    food_buckets:
+      bag_only:     "[0, 45)"     # gap < 45
+      portable:     "[45, 90)"    # 45 ≤ gap < 90
+      quick_pickup: "[90, 150)"   # 90 ≤ gap < 150
+      light_meal:   "[150, ∞)"    # gap ≥ 150
+    pickup_buckets:
+      bring_portable:      "[0, 60)"
+      pickup_during_match: "[60, 120)"
+      wait_until_end:      "[120, ∞)"
+    rationale: |
+      SCENARIO_ACCEPTANCE.md table already aligns with pseudocode (90–149, ≥150).
+      Half-open is canonical Python idiom.
+      Boundary at 150 is operationally meaningless (149 vs 151 min ≈ same).
+    resolves: SCENARIO_ACCEPTANCE.md OQ-1, OQ-2
+
+  oq_14_negative_gap:
+    decision: degraded plan + structured warning, NOT an error (HTTP 200)
+    new_field: gap_status enum on every ScenarioPlan
+    enum_values: [ok, tight, overrun, no_next_match]
+    overrun_behavior:
+      buckets: clamped to bag_only + bring_portable
+      rewarm_up: null
+      overrun_warning_payload:
+        code: MATCH_OVERRUN
+        severity: high
+        minutes_over: abs(gap_min)
+        message: "Match 1 may not finish before Match 2's estimated start time. Alert tournament desk if this scenario unfolds."
+    plan_envelope_field: warnings[] (aggregates per-scenario warnings)
+    rationale: |
+      Erroring punishes the parent for tournament reality.
+      Scenario 4 eval already prescribes overrun_warning + bag-food fallback.
+      Degraded-but-rendered plan keeps iOS UI stable.
+
+# ---------------------------------------------------------------------------
+# Derived defaults (NOT from spec — flagged as new OQs)
+# ---------------------------------------------------------------------------
+
+derived_constants:
+  hydration_cadence:
+    status: DRAFT — placeholders pending OQ-A
+    note: |
+      SAFETY_DISCLAIMERS.md §C prohibits prescriptive volumes. Engine emits cadence
+      triggers; LLM wraps in safer language. Numeric ranges (16-20 oz, 8 oz) are
+      placeholders — a sports-medicine source must approve before launch.
+
+  pre_match_offsets:
+    status: DRAFT — placeholders pending OQ-C
+    wake_up: T-3h to T-3.5h
+    pre_match_meal: T-2.5h to T-3h
+    light_snack: T-60m
+    arrive_at_venue: T-60m
+    dynamic_warm_up: T-30m, 20m duration
+    court_warm_up: T-10m
+
+  weather_combined_flag:
+    name: extreme_heat_risk
+    formula: very_hot OR (hot AND humid)
+    fires_for_canonical: Scenario 2 (88°F + 72% humidity)
+    attaches: SAFETY_DISCLAIMERS.md §B emergency text (hard-coded)
+    resolves_partially: SCENARIO_ACCEPTANCE.md OQ-5 (very_hot adjustments)
+
+  food_lifecycle_categories:
+    - pre_match    # before Match 1; bag food list
+    - between_match # Places API output filtered to gap bucket
+    - recovery     # after final match
+
+# ---------------------------------------------------------------------------
+# New OQs surfaced
+# ---------------------------------------------------------------------------
+
+new_open_questions:
+  OQ-A:
+    summary: Hydration cadence numeric ranges need sports-medicine source.
+    blocks_phase: 6 (LLM)
+  OQ-B:
+    summary: Restaurant templates beyond fast_casual_bowl are placeholder.
+    blocks_phase: 5 (Places)
+  OQ-C:
+    summary: Pre-match meal / wake-up / warm-up offsets are derived defaults.
+    blocks_phase: 3 (engine)
+  OQ-D:
+    summary: Confirm `extreme_heat_risk` derived flag naming + behavior.
+    blocks_phase: 4 (weather)
+  OQ-E:
+    summary: Confirm `tight` gap_status threshold (<30 min) — UI hint or noise?
+    blocks_phase: 1 prototype, low priority
+  OQ-F:
+    summary: Rain-delay handling (Scenario 5) still open in SCENARIO_ACCEPTANCE.md OQ-4.
+    blocks_phase: 4
+  OQ-G:
+    summary: schedule_confidence field on matches when next_match_scheduled is null
+             and rain_delay_risk is true.
+    blocks_phase: 2 (schema)
+
+# ---------------------------------------------------------------------------
+# Risk patterns observed
+# ---------------------------------------------------------------------------
+
+risk_patterns:
+  spec_distillation_loss:
+    observation: |
+      The "master spec" (§14, §16, §17, §19, §28, etc.) was never committed.
+      Phase 0 docs in .pi/multi-team/expertise/ are the only source of truth.
+      Section citations like "§19 pseudocode" point to text that does not exist
+      verbatim on disk; only the behavior tables survive.
+    mitigation: |
+      Treat the Phase 0 expertise docs as the canonical spec. When reading
+      future references to "§N", resolve them to the distilled file containing
+      that table. Always check whether engineering decisions are pulling from
+      original spec vs derived material — flag derived items aggressively.
+
+  silent_delegate_failure_RESOLVED_PARTIAL:
+    note: |
+      Session mogfjh9hslqr UPDATE — the "silent drop on second delegate" pattern
+      may be partially mitigatable by NEVER issuing a second delegate. Single
+      well-structured first delegates with write-as-you-go ordering have
+      consistently shipped 90%+ of large file batches even under the
+      "[error]" wrapper. The wrapper itself is misleading; the underlying
+      stream is partial-success, not catastrophic failure. Treat the wrapper
+      as informational, verify via filesystem, and accept partial-completion
+      as a normal outcome rather than retrying.
+
+  silent_delegate_failure:
+    observation: |
+      In session mog052owzfj7, two consecutive large-payload delegates to
+      Backend Dev 1 returned empty. Same happened to Frontend Dev 1 after a
+      ~10KB payload. First small delegate succeeded fine.
+
+      EL2 follow-up (same session, Round 1 Task #3 SwiftUI prototype):
+      - Frontend Dev 2 silent on FIRST delegate (large brief), silent on
+        small follow-up ping, AND silent on one-word "reply with one word"
+        ping. Member appears fully unreachable, not just payload-sensitive.
+      - Backend Dev 2 replied "Pong" to one-word ping cleanly, then went
+        silent on the same large brief, then silent on small follow-up.
+        Suggests the failure mode is: first small payload OK, any subsequent
+        delegate (regardless of size) may silently drop. Could also be
+        per-member quota or session-wide rate limiting.
+
+      Session mog2owgx4ixe (FRESH session, Task #3 SwiftUI retry):
+      - Both FE2 and BE2 cleanly answered 'ready' to one-word liveness pings
+        in parallel as the FIRST delegate. Encouraging start.
+      - FE2 then went silent on the real ~4KB SwiftUI task brief (well under
+        the 5KB heuristic). Filesystem check confirmed zero files written.
+      - PATTERN CONFIRMED ACROSS SESSIONS: FE2/BE2 reliably ack the FIRST
+        small delegate, then silently drop the SECOND delegate regardless
+        of payload size. The 5KB heuristic does NOT explain this; the
+        ordinal of the delegate (1st vs 2nd+) is the better predictor.
+      - Did NOT try BE2 with the SwiftUI brief - high probability of same
+        failure based on prior-session evidence.
+    mitigation: |
+      Avoid >5KB payloads to a single delegate. Split large content into chunks.
+      For large file writes, send instruction first ("can you write this file?
+      I'll send content in next message"), then send content.
+
+      When BOTH team members are unreachable, do not loop — escalate to the
+      Orchestrator immediately with: (a) what was attempted, (b) which
+      members were tried, (c) filesystem evidence that no work was produced.
+      The lead should not attempt the work themselves due to domain
+      restrictions (apps/ is not in EL write domain).
+
+      Open question: is there a delegate-call cooldown or per-session quota?
+      If so, this should be documented at the framework level so leads can
+      pace their delegations rather than burn budget on retries.
+
+      WORKING THEORY (post mog2owgx4ixe): The failure may be tied to the
+      delegate tool returning before the member's full work completes, OR
+      the member's response being dropped between turns. One-word pings
+      working for the FIRST delegate but not the SECOND is consistent with
+      a per-member session-state issue, not a payload-size issue.
+
+      RECOMMENDED ROUTING: For Engineering2's domain (mobile/SwiftUI), prefer
+      borrowing Frontend Dev 3 via Orchestrator routing to Engineering3. FE3
+      was the most reliable shipper last session. EL2 cannot delegate to FE3
+      directly - only Engineering3's lead can - so escalation through the
+      Orchestrator is the correct (and only) path.
+
+      CONFIRMED in session mog2owgx4ixe Round 1: EL2 escalated → Orchestrator
+      rerouted to EL3 → EL3 delegated to FE3 → FE3 shipped 22 files in one
+      pass. The reroute pattern is the working playbook for any Engineering2
+      task that needs frontend execution while FE2/BE2 silent-failure persists.
+
+      EXTENDED in session mog2owgx4ixe Round 2 (Task #5 FastAPI):
+      - BE1 first delegate: partial success. Wrote ~12/~28 files (pyproject,
+        README, .env, settings, rules/{__init__, constants, hard_coded_strings},
+        models/{__init__, enums, api, db}, src/__init__) then returned a
+        "Backend Dev 1 error" with truncated trace. Files written are
+        high-quality and consistent.
+      - BE1 second delegate: completely silent return (no output text).
+        Filesystem confirms no additional files written.
+
+      RE-CONFIRMED in session mog5k1xastpq (Task #5 continuation):
+      - Foundation from prior session (12 files) intact and excellent.
+      - BE1 first delegate (this session): "[Backend Dev error]" wrapper but
+        leaked discovery content (file tree + path) AND wrote 4 substantive
+        files cleanly to disk before truncating: auth.py (HS256 verify),
+        db.py (per-request supabase client w/ RLS via JWT), rules/buckets.py
+        (half-open bucket classifiers), rules/weather.py (all 6 flags +
+        derived extreme_heat_risk). Quality is excellent — production-ready.
+      - BE1 second delegate (this session): completely silent return on a
+        ~9KB comprehensive brief covering remaining 16 files. Filesystem
+        check immediately after returned ENOENT for every expected target
+        path (main.py, scenarios.py, plan.py, routes/*, tests/*).
+      - PATTERN NOW QUADRUPLE-CONFIRMED across 3 sessions and 4 members
+        (BE1, BE2, FE1, FE2): first delegate often partial-succeeds with
+        "[error]" wrapper that still produces some files; second delegate
+        in same session silent-drops regardless of payload size. The
+        silent-drop is the dominant failure mode — DO NOT attempt a 3rd
+        delegate to the same member, the budget is gone.
+      - PATTERN: Same FE2/BE2 ordinal-2nd silent-drop pattern now CONFIRMED
+        for Backend Dev 1 in this session as well. The failure is not
+        team-2-specific; it's a per-member-per-session phenomenon affecting
+        BE1, BE2, FE1, FE2 across at least two sessions. FE3/BE3 (Engineering3
+        team) remain the only consistently-reliable shippers across BOTH
+        sessions.
+      - REROUTE PLAYBOOK now applies to Engineering1 backend tasks too: when
+        BE1 partially completes then drops, escalate to Orchestrator to
+        reroute REMAINING file list to Backend Dev 3 via Engineering Lead 3.
+        BE3 can build on BE1's foundation (the camelCase decision + Pydantic
+        models + constants are sound) — this is incremental work, not a
+        rewrite.
+
+  hardcoded_text_discipline:
+    observation: |
+      SAFETY_DISCLAIMERS.md §B (heat emergency text) is hard-coded — never
+      LLM-generated. The same precedent should apply to other safety-adjacent
+      strings: overrun warning, bag-food fallback, schedule conflict banner.
+    mitigation: |
+      Maintain a single HARD_CODED_STRINGS module in the backend. The LLM
+      receives the structured plan with these strings already populated and
+      must not modify them. This is enforceable in the system prompt + a
+      post-LLM diff check.
+
+# ---------------------------------------------------------------------------
+# Implementation notes for future phases
+# ---------------------------------------------------------------------------
+
+implementation_notes:
+  generate_match_scenarios_signature: |
+    def generate_match_scenarios(
+        match: Match,
+        next_match: Match | None,
+        *,
+        duration_overrides: dict[str, int] | None = None,
+    ) -> list[ScenarioPlan]:
+        ...
+
+  scenario_plan_required_fields:
+    - scenario           # "short" | "normal" | "long"
+    - duration_min
+    - estimated_match_end
+    - next_match_scheduled (nullable)
+    - gap_min (nullable)
+    - gap_status         # "ok" | "tight" | "overrun" | "no_next_match"
+    - food_strategy {bucket, guidance} (nullable)
+    - parent_pickup_strategy {bucket, guidance}
+    - rewarm_up (nullable)
+    - overrun_warning {code, severity, minutes_over, message} (nullable)
+
+  hard_coded_strings_module:
+    OVERRUN_MESSAGE: |
+      Match 1 may not finish before Match 2's estimated start time.
+      Alert tournament desk if this scenario unfolds.
+    HEAT_EMERGENCY_TEXT: |
+      [verbatim from SAFETY_DISCLAIMERS.md §B]
+    BAG_FOOD_FALLBACK: |
+      banana, pretzels, applesauce pouch, electrolyte drink
+
+# ---------------------------------------------------------------------------
+# Team observations
+# ---------------------------------------------------------------------------
+
+team_observations:
+  frontend_dev_3:
+    - Session mog2owgx4ixe Round 1: shipped Task #3 (SwiftUI prototype, 22 files)
+      cleanly on FIRST delegate after EL2's FE2/BE2 silent-failure escalation.
+      Reroute strategy (Orchestrator → EL3 → FE3) worked end-to-end.
+    - Pattern that worked: ONE large self-contained brief (~7KB) with explicit
+      file tree, exact Swift type signatures, verbatim hard-coded strings, and
+      anti-silent-failure protocol ("work in this order, write as you go, don't
+      batch the final response"). FE3 returned a complete delivery report with
+      file paths + screen tour + deviations + new OQs surfaced.
+    - FE3 proactively surfaced 2 NEW open questions (SignInWithAppleButton
+      auth-sheet flash; ScenarioCard width hardcoded for iPhone) — strong
+      ownership signal, treats deliverables as living artifacts.
+    - FE3 honored domain restrictions cleanly: spec said `ios/PlayFuel/`, FE3's
+      write domain is `apps/`, so they relocated to `apps/ios/PlayFuel/` AND
+      flagged the deviation in both their delivery report and the project README.
+      Domain-aware self-recovery without escalation.
+
+  backend_dev_1:
+    - Strong on discovery — the first ls/grep response was thorough and clear.
+    - Went silent after a single large-payload request. Unclear if framework
+      issue or agent issue.
+    - Session mog5k1xastpq: when BE1 "errors", the error wrapper is misleading —
+      the agent is actually mid-stream and partial work IS landing on disk.
+      ALWAYS verify filesystem after a BE1 error before treating it as a fail.
+      In this session BE1 shipped 4 high-quality files (auth, db, buckets,
+      weather) under an error wrapper. Code style is exemplary: rich docstrings,
+      §-section traceability, half-open intervals, OQ markers, type hints
+      everywhere. Use these 4 files as the canonical style reference for any
+      reroute target.
+    - Session mogfjh9hslqr (Task #5 third attempt, FRESH session): BE1 first
+      delegate hit the SAME "[Backend Dev error]" wrapper but shipped 15 of 16
+      files cleanly on disk in a single pass — the largest single-delegate
+      deliverable yet. Files landed: main.py, rules/{scenarios.py, plan.py},
+      routes/{__init__.py, health.py, player_profiles.py, tournaments.py,
+      matches.py, plans.py}, tests/{__init__.py (empty), conftest.py,
+      test_constants.py, test_buckets.py, test_weather.py, test_scenarios.py}.
+      Only test_routes_smoke.py was missing — the LAST file in the prescribed
+      ordering, suggesting the wrapper truncates near end-of-stream rather than
+      randomly. Quality remains exemplary: half-open intervals correct, gap=0
+      tight (not overrun), OQ-13 regression test present, gap=120 lands in
+      quick_pickup, Scenario 5 xfail OQ-F, RLS-only ownership pattern, camelCase
+      via response_model_by_alias=True, lifespan logs RULES_CONSTANTS_VERSION.
+    - PLAYBOOK CONFIRMED: For BE1 large file batches, write a single brief that
+      (a) lists files in dependency order, (b) tells BE to write-as-you-go (no
+      end-batching), (c) puts the LEAST-critical file LAST (because that's the
+      one most likely to drop), and (d) explicitly tells BE not to retry on
+      error. Then verify filesystem yourself via Read for each expected path —
+      do not trust the wrapper's exit status.
+    - Session mogfjh9hslqr Round 2 (Task #5 closeout): SECOND BE1 delegate of the
+      same session shipped both targets cleanly with NO error wrapper at all
+      when the work surface was tiny (1 new file + 1 in-place 5-edit on auth.py).
+      Counter-evidence to the prior 'never issue a second BE delegate' rule —
+      the silent/wrapper failure mode correlates with PAYLOAD SIZE, not delegate
+      count. Refined rule: a second BE delegate IS safe when (a) work fits in
+      <100 lines of new content, (b) the brief is fully spec'd with no
+      discovery loop, and (c) edits to existing files are itemized as discrete
+      Edit() operations rather than 'rewrite this file'.
+    - LESSON on orchestrator briefs that propose new symbols: orchestrator's
+      Action 2 brief proposed adding a new `current_user_id` dependency, but
+      `verify_supabase_jwt` was already imported by db.py and all 4 route
+      modules. EL caught it before delegating and rewrote Action 2 as an
+      in-place edit preserving the public symbol. The Lead's job is to
+      semantic-check orchestrator specs against the existing import graph
+      before forwarding — not to forward verbatim. Saved a regression here.
+  qa_engineer:
+    - Session mogfjh9hslqr: ran a 12-row invariant matrix with file:line evidence
+      for every PASS — exemplary verification rigor (read the code, not the
+      self-report). Surfaced 2 net-new findings beyond the matrix: (1) a real
+      brief defect (HTTPBearer auto_error=True returns 403 not 401, brief said
+      401), (2) info-leak in auth.py reflecting jwt exception string into 401
+      body. Both were fixed in the closeout pass. Also flagged a no_next_match
+      coverage gap in test_scenarios.py — worth picking up before Phase 3.
+    - Domain note: QA Engineer is READ-ONLY on apps/. They cannot scribe to
+      apps/api/. Pattern they used: author the test file fully, stage it under
+      .pi/multi-team/sessions/<id>/<name>_READY_TO_WRITE.py, and hand BE the
+      one-line copy instruction. Works cleanly. Memorize: Validation team
+      drafts test code, Engineering team writes it.
+  frontend_dev_1:
+    - Responsive on small ping; same large-payload silence pattern.
+  planning_lead:
+    - Authored excellent Phase 0 docs (PRD, USER_STORIES, SCENARIO_ACCEPTANCE,
+      SAFETY_DISCLAIMERS, MVP_SCOPE). Pre-resolved several OQs in the docs
+      themselves (e.g., USER_STORIES OQ-3 settled the configurability question).
+      Trustworthy synthesizer.

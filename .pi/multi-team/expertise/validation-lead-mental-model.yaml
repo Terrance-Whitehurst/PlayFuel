@@ -1,0 +1,52 @@
+# Validation Lead — Mental Model
+
+# Recurring failure modes / coverage gaps / risk patterns observed across sessions.
+
+domain_routing:
+  - id: qa_engineer_cannot_write_to_apps
+    observed: 2026-04-26 / session mogfjh9hslqr
+    detail: |
+      QA Engineer's domain is read-only on `apps/`. When orchestrator routes a
+      "write a test file" task to Validation, QA staged the authored file in the
+      session dir and flagged the blocker — final write must be done by Backend
+      Dev (Engineering's domain).
+    playbook: |
+      Before accepting "write a file under apps/" tasks, confirm the path falls
+      in a Member's write domain. If not, either (a) push back to orchestrator
+      to re-route, or (b) accept and stage in session dir with a write-action
+      handoff. Option (b) wastes a turn — push back is preferred.
+
+invariant_check_patterns:
+  - id: read_dont_trust
+    rule: |
+      Always verify Engineering's self-reported invariant compliance by reading
+      code, not the report. Engineering reports are usually accurate but can
+      mask brief defects (see qa_brief_defects below).
+
+  - id: spec_drift_at_framework_boundaries
+    observed: 2026-04-26
+    detail: |
+      Briefs that specify HTTP status codes can drift from framework defaults.
+      Example: orchestrator brief said "no token → 401" but FastAPI's
+      HTTPBearer(auto_error=True) raises 403 for missing header (401 only when
+      token present but invalid). Always cross-reference framework semantics
+      before treating brief status codes as ground truth.
+
+security_smells_to_check_first:
+  - jwt_error_strings_leaked_in_response_bodies   # f"Invalid token: {exc}" → leaks library internals
+  - algorithm_allow_list_present                  # algorithms=["HS256"] (no None/RS256 confusion)
+  - authenticated_client_factory_has_no_unauth_path  # every protected dep threads JWT
+  - uuid_path_param_validation_at_ingest          # FastAPI typing catches this for free
+  - rls_returns_404_for_both_missing_and_unauthorized  # prevents existence-disclosure
+
+test_gap_archetypes:
+  - branch_with_None_input_uncovered              # "no_next_match" / null arg paths
+  - boundary_isolation_tests_missing              # named test for the exact tipping value (e.g., gap=59 vs 60)
+  - negative_auth_paths_uncovered                 # expired / missing-claim / malformed-claim
+  - derived_helpers_only_tested_indirectly        # confidence functions, formatters
+
+return_format_for_qa_pass:
+  - matrix_first_then_findings                    # 12-row PASS/FAIL/N/A table is the headline
+  - file_line_evidence_for_every_pass             # claim without evidence == not verified
+  - severity_tags_on_findings                     # 🔴 medium / 🟡 low — orchestrator needs to triage
+  - stage_files_in_session_dir_when_blocked       # never silently invent fixtures
