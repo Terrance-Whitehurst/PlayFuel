@@ -179,23 +179,112 @@ project_status:
       OQ-06 (legacy): COPPA legal review                   # pre-launch
       OQ-11 (legacy): exact heat-illness emergency wording # pre-launch
   next_recommended_action: |
-    Round 1 COMPLETE as of session mogfjh9hslqr. Task #5 shipped (16/16 files, 12/12
-    invariants pass). Front-door documentation set ALSO shipped this session: /README.md,
-    /ARCHITECTURE.md, /CONTRIBUTING.md, /docs/INDEX.md (812 lines total, Planning authored,
-    Engineering scribed). Round 2 ready: Task #6 (iOS↔API wiring, Engineering2 owns),
-    Task #7 (weather integration), Task #13 (eval harness). Recommend fresh session
-    so every team starts with full delegate budget.
+    Round 1 + Round 2 (sans Task #8) COMPLETE as of session mogfjh9hslqr.
+    Phase 1.5 milestone solidified: live auth + tournaments + scenario generation +
+    classified weather + timeline + 4 OQs triaged + 88 tests green + eval harness
+    running clean.
+    Remaining for fresh session:
+      • Task #8 (food/places + restaurant templates) — Engineering, deferred from
+        this session because Engineering had 7 delegates already; Task #8 deserves
+        full member budget for clean ship.
+      • iOS Repository hybrid-splice retirement — Frontend Dev, replace
+        `?? FakeData` fallbacks for `weather` and `timeline` (now real from API)
+        with `// PHASE 4/5 SPLICE` marker scoped to foodOptions only. Tiny task.
+      • OQ-API-1 (a) execution — Engineering, write 0005_match_labels.sql migration
+        adding round_label/opponent_label/court_label nullable text columns to
+        public.matches per Triage decision.
+      • OQ-iOS-1 — Schedule the SPM → .xcodeproj migration session before first
+        TestFlight. Bundle ID locked: com.playfuel.ios.
+      • OQ-06 + OQ-PRIV-2/3/4 + OQ-11 — Legal review (external, not engineering).
+    Recommend fresh session for Task #8.
   proven_delegate_budget_this_session: |
-    Engineering shipped THREE delegates in mogfjh9hslqr (Task #5 body → Task #5 closeout fix
-    → docs scribe). All three landed. Confirms the refined rule: silent drops correlate with
-    payload size × discovery overhead, NOT raw delegate-ordinal. Tight, mechanical,
-    fully-spec'd delegates ship regardless of position in session.
+    Engineering shipped SEVEN delegates in mogfjh9hslqr without a single silent drop:
+      1. Task #5 body (BD)
+      2. Task #5 closeout fix (BD)
+      3. Docs scribe (BD)
+      4. Task #6 iOS wiring (FE primary, BD untouched) — fresh-FE first delegate
+      5. Task #7 weather + plan widening + heat-text v1.1 (BD primary, FE for 3 tiny
+         iOS edits at end — FE's second delegate, still shipped)
+      6. Validation staged-tests scribe (BD)
+      7. Final test runs + report (BD)
+    Plus Planning shipped 2 delegates clean (docs authoring + quad triage), and
+    Validation shipped 2 (Task #5 QA + Tasks #13–18 staging).
+    The silent-drop rule is now FULLY DEPRECATED in its original form. Updated:
+      Silent drops correlate primarily with discovery-overhead-in-the-brief.
+      Tight, fully-spec'd, mechanical-or-narrowly-scoped delegates ship at any
+      ordinal, against any member, on any team. The `[Backend Dev error]` and
+      `[Frontend Dev error]` wrappers are misleading log artifacts — files
+      land regardless of the wrapper appearing.
   surprises_that_updated_assumptions:
     - Repo root IS writable from Backend Dev domain (no restriction analogous to FE3's /ios/ block).
     - Write tool auto-creates parent directories — explicit mkdir steps unnecessary.
   carryover_docs_hygiene:
     - apps/api/README.md tree-view annotation still says "→ 403 without bearer" — stale
       after the 401 standardization in Task #5 closeout. One-line fix on next docs pass.
+
+  task_7_findings:
+    weather_provider: Open-Meteo (free, global, no API key). Documented in code + README.
+    plan_response_widening: |
+      `weather` block (WeatherBlock) and `timeline` array (list[TimelineEventOut])
+      now in plan response. `food_options` field exists, set to None until Task #8.
+      Widening is backwards-compatible: iOS Repository.assembleHybridPlan continues
+      to work because the API now returns the real value where it used to be None.
+    timeline_event_kind_extension: |
+      Added 4 cases to enum (gap, foodWindow, pickup, matchEnd). Python and Swift
+      enums byte-identical (camelCase). 11 total values.
+    weather_cache: |
+      Read-through cache on weather_snapshots table. TTL 30min default. Stale
+      fallback flag (is_stale=True) emitted when provider fails but a stale row exists.
+    heat_emergency_text_v1_1: |
+      Synced verbatim across hard_coded_strings.py and HardCodedStrings.swift.
+      Source of truth: SAFETY_DISCLAIMERS.md §B (v1.1, pending OQ-06 legal review).
+
+  task_13_18_findings:
+    test_count: "88 passed, 1 xfailed (Scenario 5 rain delay = OQ-F, expected)"
+    eval_harness: |
+      Runnable as `python -m playfuel_api.eval.run_acceptance` from apps/api/.
+      Exit code 0 = all expected outcomes. Documented in README.
+    new_coverage:
+      - no_next_match branch (§G.5): 6 tests
+      - heat_emergency_text plumbing: 5 tests + 4-case parametrize
+      - rewarm boundary at gap=59 vs gap=60: 2 named tests
+      - JWT negatives (expired/missing-sub/non-UUID/wrong-aud/no-header): 7 tests
+      - 5 SCENARIO_ACCEPTANCE cases via fixture-driven harness
+    setuptools_packaging_quirk: |
+      `pip install -e .` fails on setuptools 82 with
+      `ModuleNotFoundError: setuptools.backends`. Workaround: PYTHONPATH=src or
+      pin `setuptools<82` in dev deps. Will need fixing before CI. Recorded.
+    derive_schedule_confidence_test_gap: |
+      Still only exercised indirectly. Belt-and-suspenders direct unit test would
+      be nice but low priority. Flagged for whoever does the next test polish pass.
+
+  task_6_findings_to_triage:
+    OQ-iOS-1: |
+      SwiftUI Package can't declare com.apple.developer.applesignin entitlement.
+      Real SIWA on-device requires migrating to .xcodeproj with Apple Developer team.
+      SPM build validates compilation only. Decision needed pre-TestFlight.
+    OQ-API-1: |
+      iOS Match model has fields (round, opponent, court, scheduledTime as string,
+      estimatedNextMatchTime) that don't exist in public.matches. DB has
+      scheduled_start:timestamp, estimated_duration_minutes:int, no opponent/round/court.
+      Three options: (a) add columns, (b) drop fields from iOS, (c) derive at view layer.
+      Planning + Engineering co-decision. Blocks any future match-detail view.
+    OQ-API-2: |
+      API Plan response missing weather/foodOptions/timeline that iOS Plan expects.
+      Phase 1.5 splices from FakeData via Repository.assembleHybridPlan with explicit
+      // PHASE 4/5 SPLICE marker. Phase 4 (Task #7 weather) and Phase 5 (Task #8 food)
+      replace splice pieces. Splice persists until both ship. iOS README documents
+      the swap point under "Hybrid Plan Splice (Phase 1.5)".
+
+  task_6_architectural_decision_to_remember: |
+    iOS uses TWO JSONDecoders — snakeDecoder (.convertFromSnakeCase + .iso8601) for CRUD
+    endpoints, camelDecoder (.iso8601 only) for plans-generate. The Pydantic
+    alias_generator=to_camel only fires on the explicit ScenarioPlan response model;
+    raw CRUD returns from supabase-py are snake_case dicts. DTOs.swift is the bridge
+    layer with .toModel() mappers — keeps domain Models untouched. Future endpoints
+    that pass through Pydantic ScenarioPlan/Plan models use camelDecoder; raw
+    table-pass-through endpoints use snakeDecoder. Document this when the next person
+    touches Networking/.
 
 # ----------------------------------------------------------------------------
 # Team observations

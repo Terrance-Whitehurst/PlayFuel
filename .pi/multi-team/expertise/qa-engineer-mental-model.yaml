@@ -1,5 +1,5 @@
 session: mogfjh9hslqr
-date: "2026-04-26"
+date: "2026-04-27"
 
 project_context:
   name: PlayFuel
@@ -169,10 +169,30 @@ test_coverage_patterns:
   bucket_tests: 13 cases (8 food + 4 pickup + 1 named regression)
   weather_tests: 6 parametrized cases (2 extreme_heat paths, 1 cold, 1 rain, 1 hot-only, 1 none)
   scenario_tests: 4 acceptance cases fully passing + 1 xfail (rain delay OQ-F)
-  routes_smoke: 3 cases (healthz 200, no-token 403, mocked-auth 200)
-  known_gaps:
-    - no_next_match path
-    - build_plan_envelope heat text
-    - derive_schedule_confidence unit tests
-    - rewarm_up gap boundary isolation
-    - verify_supabase_jwt negative paths (expired, missing sub, invalid UUID sub)
+  routes_smoke: 3 cases (healthz 200, no-token 401, mocked-auth 200) — 401 confirmed after Task#5 closeout fix
+  task13_test_gaps_filled:
+    no_next_match: staged at staged_validation/tests/test_scenarios_no_next_match.py (6 tests)
+    heat_emergency: staged at staged_validation/tests/test_scenarios_heat_emergency.py (5 tests + parametrize)
+    rewarm_boundary: staged at staged_validation/tests/test_scenarios_rewarm_boundary.py (4 tests)
+    auth_negatives: staged at staged_validation/tests/test_auth_negatives.py (7 tests incl. jwt_test_client fixture)
+  eval_harness:
+    location: staged_validation/eval/ (4 files)
+    target: apps/api/src/playfuel_api/eval/
+    runnable_as: python3.12 -m playfuel_api.eval.run_acceptance (from apps/api/)
+    fixtures: 5 scenarios, scenario 5 xfail per OQ-F
+  still_not_covered:
+    - derive_schedule_confidence unit tests (not in brief scope)
+  resolved_gaps:
+    - no_next_match path: NOW COVERED
+    - build_plan_envelope heat text: NOW COVERED
+    - rewarm_up gap boundary isolation: NOW COVERED
+    - verify_supabase_jwt negative paths: NOW COVERED
+
+write_domain_reminder:
+  note: "QA Engineer CANNOT write to apps/ directly. Always stage in session dir."
+  path_confirmed: "Direct write to apps/ returns 'Domain: write denied' error."
+  staging_location: ".pi/multi-team/sessions/mogfjh9hslqr/staged_validation/"
+  target_mapping:
+    tests: "staged_validation/tests/* → apps/api/src/playfuel_api/tests/*"
+    eval: "staged_validation/eval/* → apps/api/src/playfuel_api/eval/*"
+    readme: "staged_validation/README_APPEND.md → append to apps/api/README.md"

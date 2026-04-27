@@ -88,6 +88,27 @@ docs_scribing_task_mogfjh9hslqr:
     db_supabase_readme: "PASS — complete: 4-migration list in order, RLS posture, schedule_confidence rule, cascade deletes, fixed UUIDs"
   scribe_pattern: "root paths (README.md, ARCHITECTURE.md, CONTRIBUTING.md, docs/INDEX.md) are writable — no domain restriction at repo root"
 
+validation_scribe_task_mogfjh9hslqr:
+  completed: "2026-04-27"
+  description: "Scribed 9 staged Validation files to disk (test gap fills + eval harness)"
+  files_written:
+    - tests/test_scenarios_no_next_match.py (115 lines)
+    - tests/test_scenarios_heat_emergency.py (142 lines)
+    - tests/test_scenarios_rewarm_boundary.py (139 lines)
+    - tests/test_auth_negatives.py (213 lines)
+    - eval/__init__.py (10 lines)
+    - eval/fixtures/__init__.py (1 line)
+    - eval/fixtures/scenario_acceptance.py (218 lines)
+    - eval/run_acceptance.py (164 lines)
+    - README.md appended (eval harness section, +17 lines)
+  pytest_result: "88 passed, 1 xfailed, 0 failed"
+  eval_harness_result: "4 passed, 1 expected fail, 0 failed — exit 0"
+  install_note: >
+    setuptools.backends.legacy:build in pyproject.toml does NOT work with
+    setuptools 82 in a fresh venv (ModuleNotFoundError). Workaround:
+    install all deps directly via pip, then run with PYTHONPATH=src.
+    Do NOT use -e editable install on this machine.
+
 new_oqs:
   - id: "OQ-H"
     question: "weather_condition enum — does it need 'partly_cloudy', 'fog', or 'haze'?"

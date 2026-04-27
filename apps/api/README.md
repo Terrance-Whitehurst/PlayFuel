@@ -182,3 +182,54 @@ Derived before INSERT per `db/supabase/README.md` (resolves OQ-G):
 | GET | `/v1/tournaments/{tid}/plans` | yes | List plans for tournament |
 | POST | `/v1/tournaments/{tid}/plans/generate` | yes | Run rules engine, persist plan, return Plan |
 | GET | `/v1/plans/{id}` | yes | Fetch one plan |
+
+---
+
+## Weather (Phase 4 — Task #7)
+
+The plan generation endpoint fetches current weather from Open-Meteo
+(https://open-meteo.com — free, keyless, global). Weather is cached per
+tournament in `weather_snapshots` with a configurable TTL (default 30 min).
+On provider errors, a stale snapshot is returned with `is_stale: true` in the
+plan response so iOS can show a staleness indicator. If the tournament has no
+`venue_lat` / `venue_lng`, the plan is generated without a weather block (`null`).
+
+### Weather environment variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `WEATHER_PROVIDER` | `open-meteo` | Reserved for future provider swap |
+| `OPEN_METEO_BASE_URL` | `https://api.open-meteo.com` | Override for testing / mocking |
+| `WEATHER_CACHE_TTL_SEC` | `1800` | Read-through cache freshness (seconds) |
+
+### Plan response additions (OQ-API-2)
+
+`POST /v1/tournaments/{tid}/plans/generate` now returns two additional top-level
+fields in the `plan` object:
+
+| Field | Type | Notes |
+|---|---|---|
+| `weather` | `WeatherBlock \| null` | Classified weather — null when no venue coords or fetch fails |
+| `timeline` | `TimelineEvent[]` | Chronological event list — empty array when engine produces none |
+| `foodOptions` | `null` | Stays null until Task #8 (Places API integration) |
+
+`WeatherBlock` includes all seven classification flags (`flagHot`, `flagVeryHot`,
+`flagHumid`, `flagCold`, `flagWindy`, `flagRainRisk`, `flagExtremeHeatRisk`),
+`isStale`, `fetchedAt`, and `provider`.
+
+## Eval harness
+
+Smoke-test the rules engine against the 5 SCENARIO_ACCEPTANCE cases:
+
+```
+cd apps/api
+python3.12 -m playfuel_api.eval.run_acceptance
+```
+
+Scenario 5 (rain delay) is expected-fail per OQ-F (deferred to Phase 4).
+Exit code 0 means no unexpected regressions; non-zero means a real failure.
+
+The harness is located at `src/playfuel_api/eval/` and imports directly from
+the `playfuel_api` package — no external deps beyond what the package already
+requires. The fixture data lives in `eval/fixtures/scenario_acceptance.py` and
+mirrors the 5 acceptance cases in `.pi/multi-team/expertise/SCENARIO_ACCEPTANCE.md`.

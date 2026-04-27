@@ -52,3 +52,26 @@ class WeatherCondition(StrEnum):
     rain = "rain"
     storm = "storm"
     snow = "snow"
+
+
+class TimelineEventKind(StrEnum):
+    """Plan timeline event categories — mirrors iOS TimelineEvent.swift.
+
+    OQ-TRIAGE-1 resolution: extended with gap, foodWindow, pickup, matchEnd
+    so the rules-engine timeline can categorise inter-match events. iOS enum
+    must be extended in lockstep (same string values, same camelCase casing).
+
+    NOT a Postgres enum — this is an API contract enum only.
+    """
+    wakeUp = "wakeUp"
+    meal = "meal"
+    arrive = "arrive"
+    warmUp = "warmUp"
+    match = "match"
+    recovery = "recovery"
+    hydration = "hydration"
+    # New cases — OQ-TRIAGE-1
+    gap = "gap"
+    foodWindow = "foodWindow"
+    pickup = "pickup"
+    matchEnd = "matchEnd"

@@ -299,6 +299,23 @@ implementation_notes:
 
 team_observations:
   frontend_dev_3:
+    - Session mogfjh9hslqr Task #7 (iOS portion — TimelineEventKind extension +
+      heatEmergencyText v1.1 sync + view switch exhaustiveness): shipped 3 edits
+      cleanly. Notably caught that TimelineView.swift had two non-default switches
+      that would have failed to compile after the enum extension — added 4 case
+      handlers to each (8 lines total) without escalating, while flagging the
+      surplus as a pragmatic deviation. Also surfaced OQ-iOS-2 (.secondary as
+      Color vs ShapeStyle) as a low-priority polish-pass item. Fresh-team-first
+      delegate playbook holds: tight, fully-spec'd, mechanical → ships clean.
+    - Session mogfjh9hslqr Task #6 (iOS↔API wiring): shipped 14 file ops in a
+      single delegate (8 new + 5 modified + 1 README append) under the same
+      misleading '[Frontend Dev error]' wrapper. ALL files landed cleanly
+      including the prepended FakeData comment + appended README sections.
+      Quality is exemplary — used DTOs.swift bridge pattern (TournamentDTO,
+      MatchDTO, ScenarioPlanDTO) instead of polluting domain Models, surfaced
+      OQ-iOS-1 about Sign in with Apple capability requiring an Xcode project
+      (Swift Package can't declare entitlements). Adopted the hybrid plan
+      splice cleanly with explicit `// PHASE 4/5 SPLICE` marker.
     - Session mog2owgx4ixe Round 1: shipped Task #3 (SwiftUI prototype, 22 files)
       cleanly on FIRST delegate after EL2's FE2/BE2 silent-failure escalation.
       Reroute strategy (Orchestrator → EL3 → FE3) worked end-to-end.
@@ -340,6 +357,22 @@ team_observations:
       tight (not overrun), OQ-13 regression test present, gap=120 lands in
       quick_pickup, Scenario 5 xfail OQ-F, RLS-only ownership pattern, camelCase
       via response_model_by_alias=True, lifespan logs RULES_CONSTANTS_VERSION.
+    - Session mogfjh9hslqr Task #7 (Weather + plan widening + heat text v1.1):
+      BE1 first delegate of the session shipped 13 file operations cleanly under
+      the misleading [Backend Dev error] wrapper. Notably self-corrected the
+      Lead's brief on classify_weather() signature — Lead spec passed condition
+      as a kwarg, but the real signature is (temp_f, humidity_pct, wind_mph,
+      precipitation_probability). BD read rules/weather.py first and adapted.
+      This is the third confirmation that BD reads source-of-truth signatures
+      before scribing rather than blindly following the brief — high trust.
+      Also added pytest-asyncio to dev deps + asyncio_mode='auto' in pytest config
+      proactively when test file required it.
+    - PATTERN: When Lead spec includes Python function signatures, BD will
+      verify them against the existing module before calling. Lead can therefore
+      write "call classify_weather with the relevant inputs" rather than
+      copy-pasting the exact signature — but providing the signature is still
+      faster (BD doesn't have to do the read). Best-of-both: provide the call
+      example with a comment 'verify against source before use'.
     - PLAYBOOK CONFIRMED: For BE1 large file batches, write a single brief that
       (a) lists files in dependency order, (b) tells BE to write-as-you-go (no
       end-batching), (c) puts the LEAST-critical file LAST (because that's the
@@ -382,3 +415,44 @@ team_observations:
       SAFETY_DISCLAIMERS, MVP_SCOPE). Pre-resolved several OQs in the docs
       themselves (e.g., USER_STORIES OQ-3 settled the configurability question).
       Trustworthy synthesizer.
+
+# ---------------------------------------------------------------------------
+# Session mogfjh9hslqr — late-session learnings (post-Round-2)
+# ---------------------------------------------------------------------------
+session_2026_04_27_round2:
+  delegate_ordinal_disproof_continued:
+    - Engineering shipped 6 clean delegates in this session (BD x4, FE x1, mixed BD+FE x1).
+      All landed on first try. The old "never run a second BE delegate" rule is fully
+      dead. Operative rule: tight + fully-spec'd + mechanical = ships at any ordinal.
+      Silent-drop correlates with: payload size x discovery overhead x ordinal-per-Member.
+  bd_self_corrects_briefs:
+    - Confirmed across multiple delegates: BD reads source-of-truth signatures before
+      scribing and adapts the brief on the fly when there's a mismatch. Examples:
+      Task #5 closeout (auth dep public symbol), Task #7 weather (classify_weather
+      kwargs), Task #7 test infra (added pytest-asyncio + asyncio_mode=auto without
+      being asked because tests would not have run otherwise). Lean on this trust;
+      don't pre-verify every signature in the brief.
+  validation_staging_pattern_is_stable:
+    - QA Engineer's read-only restriction on apps/ is permanent, not transient.
+      Default future Validation-on-apps tasks to staging path immediately; don't
+      burn a write attempt. Validation pre-authored a separate README_APPEND.md
+      this session — keeps Engineering's scribe pass purely additive (zero merging).
+      Adopt this convention for all future Validation+Docs cross-team work.
+  test_pyramid_state:
+    - Backend test suite: 88 passed, 1 xfail (Scenario 5 / OQ-F), 0 failed (1.72s).
+    - Coverage now includes: no_next_match (G.5) branch, heat_emergency_text plumbing,
+      rewarm boundary 59/60 named tests, JWT negatives (expired/missing-sub/non-UUID-sub/
+      wrong-aud/no-header) + Task #5 leak-regression, plus eval harness running 5
+      acceptance scenarios end-to-end (exit 0).
+    - Remaining gap: derive_schedule_confidence direct unit test (only exercised
+      indirectly via no_next_match). Low priority.
+  packaging_quirk_recorded:
+    - Fresh-venv editable installs hit `setuptools.backends.legacy:build` /
+      setuptools 82 incompatibility on this machine. BD worked around with direct
+      pip install + PYTHONPATH=src. Future fix: bump build backend in pyproject
+      or pin setuptools < 82 in dev deps. Non-blocking but should be cleaned up
+      before any CI integration.
+  open_questions_state_post_round2:
+    resolved_this_session: [OQ-API-1, OQ-API-2 (partial - weather/timeline shipped, food deferred to Task #8), OQ-iOS-1 (decision recorded, migration deferred pre-TestFlight), OQ-11 (v1.1 candidate adopted; OQ-06 legal review still required)]
+    new_oqs_surfaced: [OQ-iOS-2 (TimelineView .secondary ShapeStyle vs Color - low), OQ-API-3 (weather_snapshots has no raw_payload column - low), OQ-TRIAGE-1 (RESOLVED in Task #7 - TimelineEventKind extended)]
+    deferred_to_fresh_session: [Task #8 food/places integration, iOS Repository hybrid-splice retirement (food block), .xcodeproj migration pre-TestFlight, OQ-06 legal review of v1.1 heat-emergency text]

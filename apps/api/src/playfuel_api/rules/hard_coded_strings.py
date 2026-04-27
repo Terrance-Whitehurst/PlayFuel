@@ -27,15 +27,15 @@ BAG_FOOD_FALLBACK: str = (
 
 # ─── §H.2 — HEAT_EMERGENCY_TEXT ──────────────────────────────────────────────
 #
-# ⚠️  DRAFT — OQ-11 (pre-launch blocker).
-# Verbatim from SAFETY_DISCLAIMERS.md §B. Pending attorney review.
-# Surface this string ONLY through this constant — never re-type it in views,
-# routes, or LLM prompts.
+# v1.1 wording from SAFETY_DISCLAIMERS.md §B (revised 2026-04-27 per OQ-11).
+# Pending legal sign-off (OQ-06). Surface this string ONLY through this
+# constant — never re-type it in views, routes, or LLM prompts.
 
 HEAT_EMERGENCY_TEXT: str = (
-    "If the player feels faint, confused, has chest pain, stops sweating in "
-    "extreme heat, has severe cramps, vomits repeatedly, or shows signs of "
-    "heat illness, stop play and seek medical help immediately."
+    "If your player feels faint or confused, has chest pain, stops sweating in "
+    "extreme heat, has severe cramps, vomits repeatedly, or shows signs of heat "
+    "illness: stop play and seek medical help. Call 911 (or your local emergency "
+    "number) in an emergency."
 )
 
 # ─── Food-bucket display text (§B.2) — maps FoodBucket value → text ──────────

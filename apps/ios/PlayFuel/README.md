@@ -138,3 +138,47 @@ apps/ios/PlayFuel/
 | §B banner when extreme_heat_risk | ✅ EmergencyBanner renders on Dallas dashboard |
 | §C prohibited phrases absent | ✅ No "prevents cramps", "guarantees", "safe for every player" anywhere |
 | OQ-11 draft caveat present | ✅ Visible in EmergencyBanner + DisclaimerView |
+
+---
+
+## Configuration (Task #6)
+
+The app reads three values at launch via `Sources/PlayFuel/Configuration.swift`.
+Set them as Xcode scheme environment variables (**Product → Scheme → Edit Scheme → Run → Arguments → Environment Variables**) for local dev.
+For production, inject via `.xcconfig` per Apple's standard guidance.
+
+| Constant | Env var | Phase 1 default | Notes |
+|---|---|---|---|
+| `apiBaseURL` | `PLAYFUEL_API_BASE_URL` | `http://localhost:8000` | FastAPI from `apps/api/` |
+| `supabaseURL` | `SUPABASE_URL` | `https://YOUR_PROJECT.supabase.co` | Supabase project URL |
+| `supabaseAnonKey` | `SUPABASE_ANON_KEY` | `YOUR_ANON_KEY` | Publishable / anon key |
+
+> **OQ-iOS-1:** Sign in with Apple on a real device requires the `Sign In with Apple` capability in an Xcode project (`.xcodeproj`). This Swift Package cannot declare entitlements. For device testing, wrap the package in an Xcode project with the capability enabled. Simulator runs work without it.
+
+---
+
+## Test Data (Task #6)
+
+Task #6 wires **read-only** flows: sign-in, tournament list, and plan generation.
+There is no in-app create flow — tournaments and matches must already exist in
+the authenticated user's Supabase account, created via the Supabase Console or
+the seed data in `db/supabase/seed/dallas_demo.sql`.
+
+The Dallas demo tournament UUID is preserved in `FakeData.dallasTournament.id`
+(`11111111-0000-0000-0000-000000000001`) for reference.
+
+---
+
+## Hybrid Plan Splice (Phase 1.5)
+
+`Repository.generatePlan(tournamentId:)` calls
+`POST /v1/tournaments/{tid}/plans/generate` for the live rules-engine output
+(scenario plans, warnings, heat emergency text) and splices in `weather`,
+`foodOptions`, and `timeline` from `FakeData` until:
+
+- **Phase 4 (Task #7):** real weather from the weather provider integration
+- **Phase 5 (Task #8):** real food options from the Places API
+
+Search the codebase for `// PHASE 4/5 SPLICE` to locate the boundary in
+`Networking/Repository.swift`. `FakeData.swift` remains in the build target
+as the single source of truth for `#Preview` blocks and the splice data.

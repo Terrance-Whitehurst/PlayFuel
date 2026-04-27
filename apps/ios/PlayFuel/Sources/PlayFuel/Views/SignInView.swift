@@ -3,19 +3,23 @@ import AuthenticationServices
 
 /// US-01 — Sign In screen.
 ///
-/// Uses the real `SignInWithAppleButton` for native appearance.
-/// Auth is FAKE in Phase 1: tapping the button flips `appState.isAuthenticated = true`.
-/// Phase 2: wire to Supabase Auth (Apple identity token exchange).
+/// Task #6: wired to real Sign in with Apple → Supabase id_token grant via
+/// `AuthService.signIn(with:)`. The tap gesture fake-auth from Phase 1 is removed.
+///
+/// NOTE — OQ-iOS-1: Full SIWA flow on device requires the "Sign In with Apple"
+/// capability declared in an Xcode project. This Swift Package cannot declare
+/// entitlements. For device testing, wrap in an .xcodeproj with the capability.
+/// Simulator previews and simulator runs work without it.
 struct SignInView: View {
 
     @EnvironmentObject var appState: AppState
     @State private var showingDisclaimer = false
+    @State private var errorMessage: String? = nil
+    @State private var isExchanging = false
 
     var body: some View {
         ZStack {
-            // Background
-            Color(.systemGroupedBackground)
-                .ignoresSafeArea()
+            Color(.systemGroupedBackground).ignoresSafeArea()
 
             VStack(spacing: 0) {
                 Spacer()
@@ -38,25 +42,24 @@ struct SignInView: View {
 
                 Spacer()
 
-                // Sign in button
+                // Sign in controls
                 VStack(spacing: 16) {
-                    // Real SignInWithAppleButton for native appearance.
-                    // Phase 1: onTapGesture overrides auth — just flips the flag.
-                    // Phase 2: use .onCompletion handler to send token to Supabase.
-                    SignInWithAppleButton(.signIn) { _ in
-                        // Phase 2: handle ASAuthorizationAppleIDRequest here
-                    } onCompletion: { _ in
-                        // Phase 2: decode ASAuthorization credential, send to Supabase
+                    SignInWithAppleButton(.signIn) { request in
+                        request.requestedScopes = [.fullName, .email]
+                    } onCompletion: { result in
+                        Task { await handle(result) }
                     }
                     .signInWithAppleButtonStyle(.black)
                     .frame(height: 50)
                     .padding(.horizontal, 40)
-                    // Phase 1 fake auth: tap gesture intercepts before real auth flow
-                    .onTapGesture {
-                        appState.fakeSignIn()
+                    .disabled(isExchanging)
+
+                    if isExchanging {
+                        ProgressView()
+                            .padding(.top, 4)
                     }
 
-                    // Disclaimer link (US requirement — SAFETY_DISCLAIMERS §A)
+                    // Disclaimer link — §A placement requirement
                     Button {
                         showingDisclaimer = true
                     } label: {
@@ -73,10 +76,48 @@ struct SignInView: View {
         .sheet(isPresented: $showingDisclaimer) {
             DisclaimerView()
         }
+        .alert("Sign-in failed", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    // MARK: - Apple credential handler
+
+    private func handle(_ result: Result<ASAuthorization, Error>) async {
+        switch result {
+        case .failure(let err):
+            // User cancelled: ASAuthorizationError.canceled — swallow silently.
+            if (err as? ASAuthorizationError)?.code == .canceled { return }
+            errorMessage = err.localizedDescription
+
+        case .success(let auth):
+            guard let cred = auth.credential as? ASAuthorizationAppleIDCredential else {
+                errorMessage = "Unexpected credential type from Apple."
+                return
+            }
+            isExchanging = true
+            defer { isExchanging = false }
+            do {
+                try await appState.authService.signIn(with: cred)
+                // appState.isAuthenticated flips via the Combine bridge in AppState.
+            } catch {
+                errorMessage = (error as? LocalizedError)?.errorDescription
+                    ?? error.localizedDescription
+            }
+        }
     }
 }
 
 #Preview {
-    SignInView()
-        .environmentObject(AppState())
+    // Preview uses stub AppState — no real auth round-trip needed.
+    let auth = AuthService()
+    let api  = APIClient(authService: auth)
+    let repo = Repository(api: api)
+    return SignInView()
+        .environmentObject(AppState(repository: repo, authService: auth))
 }
