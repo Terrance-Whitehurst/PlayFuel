@@ -22,4 +22,20 @@ struct Match: Codable, Identifiable, Hashable {
 
     /// Court identifier, e.g. "Court 4". Optional.
     let court: String?
+
+    // MARK: - OQ-API-1(a) label fields (Phase 5)
+    //
+    // Explicit `= nil` default so the synthesized memberwise initialiser makes
+    // these parameters omittable — existing FakeData/Match call sites need not change.
+
+    /// Human-readable round label from the API, e.g. "R16", "QF". Optional.
+    /// Distinct from the display `round` string above — populated from DB column
+    /// `matches.round_label` added in migration 0005.
+    let roundLabel: String? = nil
+
+    /// Human-readable opponent display name from the API. Optional.
+    let opponentLabel: String? = nil
+
+    /// Human-readable court designation from the API, e.g. "Court 7". Optional.
+    let courtLabel: String? = nil
 }

@@ -22,6 +22,7 @@ struct TournamentDashboardView: View {
 
     @EnvironmentObject var appState: AppState
     @State private var showingDisclaimer = false
+    @State private var showingCreateMatch = false
 
     var body: some View {
         ScrollView {
@@ -47,8 +48,26 @@ struct TournamentDashboardView: View {
         .navigationTitle(tournament.name)
         .navigationBarTitleDisplayMode(.inline)
         .background(Color(.systemGroupedBackground))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                // Phase 5b: Add match — always visible on dashboard.
+                // TODO: hide when matchCount >= 2 once match fetching is wired on dashboard load.
+                Button {
+                    showingCreateMatch = true
+                } label: {
+                    Label("Add Match", systemImage: "plus")
+                }
+            }
+        }
         .sheet(isPresented: $showingDisclaimer) {
             DisclaimerView()
+        }
+        .sheet(isPresented: $showingCreateMatch) {
+            MatchCreateView(
+                tournamentId: tournament.id,
+                existingMatchCount: 0
+            )
+            .environmentObject(appState)
         }
         .task {
             // Reset plan state on each dashboard appearance so a stale plan from a
@@ -64,6 +83,11 @@ struct TournamentDashboardView: View {
         // §B Emergency banner — renders when extreme_heat_risk = true
         if plan.weather.extremeHeatRisk {
             EmergencyBanner()
+        }
+
+        // Phase 6: LLM/template plan summary — below EmergencyBanner, above WeatherCard
+        if let llmSummary = plan.llmSummary {
+            PlanSummaryCard(explanation: llmSummary)
         }
 
         // US-07 Weather card
@@ -104,7 +128,7 @@ struct TournamentDashboardView: View {
             Text("Generate today's plan")
                 .font(.headline)
 
-            Text("The rules engine builds your match scenarios from scheduled start times and weather. Weather and food options use demo data until Phase 4/5.")
+            Text("Add your matches with the + button, then generate a personalised fuel plan.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)

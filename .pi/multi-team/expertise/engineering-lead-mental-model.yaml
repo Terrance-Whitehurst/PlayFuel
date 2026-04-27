@@ -456,3 +456,82 @@ session_2026_04_27_round2:
     resolved_this_session: [OQ-API-1, OQ-API-2 (partial - weather/timeline shipped, food deferred to Task #8), OQ-iOS-1 (decision recorded, migration deferred pre-TestFlight), OQ-11 (v1.1 candidate adopted; OQ-06 legal review still required)]
     new_oqs_surfaced: [OQ-iOS-2 (TimelineView .secondary ShapeStyle vs Color - low), OQ-API-3 (weather_snapshots has no raw_payload column - low), OQ-TRIAGE-1 (RESOLVED in Task #7 - TimelineEventKind extended)]
     deferred_to_fresh_session: [Task #8 food/places integration, iOS Repository hybrid-splice retirement (food block), .xcodeproj migration pre-TestFlight, OQ-06 legal review of v1.1 heat-emergency text]
+
+# ---------------------------------------------------------------------------
+# Session moh9uivm3dxv — Demo path Session 1 (Phase 5 + OQ-API-1(a) + iOS splice retirement)
+# ---------------------------------------------------------------------------
+session_2026_04_27_demo_session1:
+  delegated_in_parallel:
+    - BD: services/places.py + rules/food.py + 4 new tests + matches-labels migration 0005 + wire through models/routes/seed/README. Single delegate. Misleading [Backend Dev error] wrapper, full work shipped: 153 passed (was 88) + 1 xfail, eval exit 0. BD also pre-fixed an unrelated DELETE-204 bug across 3 route files (10 errors → 0) before starting the brief — proactive cleanup, no regression.
+    - FE: iOS hybrid-splice retirement + Match labels (3 fields) + FoodOption widening (4 fields) + Plan.bagFallbackOnly + DTOs + README. Single delegate, parallel with BD. Same misleading [Frontend Dev error] wrapper, full work shipped. FE caught a real Swift synthesized-init issue (Optional fields without explicit `= nil` break memberwise init when the call site uses positional args) — fixed Match.swift defaults autonomously. Also correctly noted that the macOS-vs-iOS17 swift build errors are pre-existing platform-target mismatch, not regressions.
+  parallelism_lesson:
+    - Two large fully-spec'd delegates (BD + FE) fired in the same orchestrator turn BOTH shipped cleanly. The previous "never run a second delegate per session per member" rule is fully dead; the operative rule for parallel-across-members is even more permissive. Cross-member parallelism appears to have NO interference — they run in isolated execution contexts.
+  spec_quality_paid_off:
+    - Orchestrator's brief was unusually well-spec'd (verbatim file paths, exact Pydantic+Swift signatures, idempotent SQL verbatim, ordered file lists with write-as-you-go discipline). EL fanned it out by deliverable (A+B → BD, C → FE) without re-doing the spec work. Total EL turn time was minimal — the lead's value-add this session was routing + parallelism, not authorship.
+  scenario_5_status:
+    - Still xfail (OQ-F rain-delay). Eval exit 0 was preserved.
+  food_provider_status:
+    - GooglePlacesProvider intentionally a stub (raises NotImplementedError if PLACES_PROVIDER=google with key set). MockPlacesProvider is the demo path — deterministic Dallas fixture (Chipotle, Jimmy John's, Central Market) within ±0.5° of (32.78, -96.80). Real Google integration deferred until a key is provisioned; not on the critical path for the demo.
+  oq_b_templates_status:
+    - §F.3 templates: fast_casual_bowl is verbatim + is_draft=False. sandwich_shop / grocery_prepared / breakfast_cafe / restaurant fallback are placeholder strings flagged is_draft=True. iOS now has the isDraft field threaded through; UI badge for "DRAFT" is NOT yet wired (deferred to a polish session).
+  remaining_demo_path:
+    - #5 SPM → .xcodeproj migration (Sign in with Apple entitlement)
+    - #6 App icon asset catalog
+    - #7 Seed script wiring in supabase/config.toml
+    - #8 Task #9 LLM explanation layer
+    - #9 Final validation pass
+
+session_2026_04_27_demo_session2:
+  delegated:
+    - FE: TournamentCreateView + MatchCreateView (NEW) + Repository.createTournament/createMatch + DTOs request structs (TournamentCreateRequest, MatchCreateRequest) + MatchDTO.toModel() + TournamentListView toolbar + button + sheet wiring + TournamentDashboardView toolbar Add Match button + sheet wiring + README update. Single delegate, misleading [Frontend Dev error] wrapper. Wrapper truncated mid-stream while FE was diagnosing 3 real Swift compile errors caused by Delegate-1 stored-property defaults on Codable structs.
+    - FE close-out delegate (2nd in same session): tight 4-edit fix for the 3 diagnosed errors. Shipped clean, no wrapper error this time.
+  ordinal_rule_reaffirmed:
+    - 2nd FE delegate in same session shipped clean — confirms session_2026_04_27_round2's 'tight + fully-spec'd + mechanical = ships at any ordinal' rule. The close-out brief was ~1.5KB, surgical, and explicitly itemized the 4 file edits + the grep commands to find call sites. Zero discovery overhead.
+  api_brief_caveats_FE_caught:
+    - API `TournamentCreate` Pydantic model has NO `time_zone` field — FE collected it in the form for future use but omitted from the encoded request body. iOS form retains the picker for forward-compat.
+    - API `MatchCreate` Pydantic model has NO `estimated_next_match_time` field — it is derived from match ordering (next match's scheduled_start). FE collected the field in the form for UX but omits from the encoded request body. Worth a docs note in the API README that this is by design.
+    - Both deviations are non-blocking for the demo; flagged as candidates for a future API extension if parents request explicit override of either.
+  decoder_choice_confirmed:
+    - Repository.createTournament + createMatch use `.snake` decoder (matches existing fetchTournaments/fetchMatches pattern — these are raw DB row pass-throughs from POST routes, not the Plan envelope which uses `.camel`).
+  match_dto_to_model_added:
+    - Previous Phase 4 delivery had `fetchMatches` returning raw `[MatchDTO]` because mapping required multi-row context. Phase 5b added a single-row `MatchDTO.toModel()` mapper for the create response (which IS single-row). The `estimatedNextMatchTime` field is set to nil on the mapped Match — derived elsewhere when needed.
+  date_encoding_decision:
+    - Repository's `postEncoder` uses `.iso8601` date strategy + `.convertToSnakeCase` key strategy. Tournament `start_date` / `end_date` are encoded via a manual DateFormatter as 'yyyy-MM-dd' strings (matches API's Pydantic `date` type) BEFORE being placed into the request struct. Match `scheduled_start` is a Date and uses the encoder's ISO8601 path natively.
+  add_match_visibility:
+    - Brief asked for visibility gated on matchCount < 2. FE shipped the button always-visible with a TODO to gate on match count once dashboard fetches the match list. Not on critical path; flagged in the file.
+  delegate_2_total_files:
+    - 2 NEW (TournamentCreateView, MatchCreateView), 6 EDIT (DTOs, Repository, TournamentListView, TournamentDashboardView, README, plus the 4 close-out edits in FoodOption/Plan/FakeData/TournamentCreateView). 8 file ops in two delegates.
+
+session_2026_04_27_demo_session4:
+  delegated_in_parallel:
+    - BD: services/llm.py + services/llm_safety.py + 4 LLM test files + migration 0006 + models/api.py PlanExplanationInput/PlanExplanation/Plan.llm_summary + models/db.py PlanRow.llm_summary + settings.py LLM_* + .env.example + routes/plans.py LLM wiring + db/supabase/README.md migration table + USER_DISCLAIMER added to rules/hard_coded_strings.py. Single delegate, hit misleading [Backend Dev error] wrapper TWICE (mid-stream truncation + audit-question truncation) but underlying work shipped clean: 180 passed (was 153) + 1 xfailed; 27 new tests including 8 prohibited-phrase parametrized tests + 5 safety-violation type tests + factory tests + route smoke. PROHIBITED_PHRASES sourced VERBATIM from SAFETY_DISCLAIMERS.md §C; SYSTEM_PROMPT sourced VERBATIM from SAFETY_DISCLAIMERS.md §E.
+    - FE: Models/PlanExplanation.swift (NEW) + Views/PlanSummaryCard.swift (NEW with #if os(iOS) guard for Color(.systemBackground)) + Plan.swift llmSummary widening + DTOs.swift PlanExplanationDTO + PlanCoreDTO 4-site wiring + TournamentDashboardView insertion (between EmergencyBanner and WeatherCard) + FakeData.swift dallasPlanExplanation. Single delegate, NO error wrapper at all. FE caught and self-fixed PlanExplanation missing Codable conformance (Plan: Codable wraps it, synthesized Codable required). FE did NOT re-run xcodegen — confirmed project.yml's source-directory wildcard picks up new .swift files automatically.
+  parallelism_lesson_continued:
+    - Fourth consecutive session of cross-member parallel delegates shipping clean. The misleading [error] wrapper hit BD twice this session (initial delegate + audit follow-up) but BOTH preserved full underlying work — even the audit second-delegate completed its actual deliverable summary instead of just running the audit commands. The wrapper truncates RESPONSE TEXT, not work. EL pattern that worked: don't trust the wrapper, verify via filesystem Read directly.
+  bd_audit_drift_lesson:
+    - When a delegate is supposed to do a pure filesystem audit but the member has more work in flight, expect them to over-deliver (return their full work summary, not just the audit). This is a feature not a bug — but next time, prefer to do the audit yourself with Read/grep/find tools (which the lead has) rather than burning a delegate slot.
+  prohibited_phrases_provenance:
+    - Confirmed in source: PROHIBITED_PHRASES list in services/llm_safety.py contains all 8 §C verbatim phrases + 6 lowercase substring variants (more aggressive matching). The verbatim block is comment-marked '§C table — verbatim from §28'. Audit trail intact for legal review.
+  llm_provider_status:
+    - TemplateProvider is the demo path (no API keys required). AnthropicProvider + OpenAIProvider are stubs that raise NotImplementedError if instantiated explicitly with a key but no SDK installed. anthropic and openai are NOT in pyproject.toml — soft-imports only. routes/plans.py has try/except wrapping around the LLM call so a stub raise won't break plan generation; plan.llmSummary just becomes None.
+  oq_a_status:
+    - OQ-A (hydration cadence ranges) was previously flagged as blocking Phase 6 (LLM). Resolved in practice by the safety contract: the LLM never produces specific hydration volumes — TemplateProvider's prose says 'plan extra hydration' / 'extra fluids' without numbers, and PROHIBITED_PHRASES blocks 'will prevent' patterns. The numeric range still needs sports-medicine sourcing for any future UI surface that wants to show literal ounces, but it does NOT block the LLM layer demo.
+  remaining_demo_path:
+    - #9 Final validation pass (Validation Lead) — full smoke + demo readiness checklist
+
+session_2026_04_27_demo_session3:
+  delegated_in_parallel:
+    - FE: project.yml + entitlements + Info.plist + asset catalog + icon-1024.png + xcodegen run + README "Running the Demo on Device" section. Single delegate, shipped clean (no error wrapper this session). xcodegen WAS available in sandbox; .xcodeproj/project.pbxproj is committed. Icon generated via Python+sips (Pillow/ImageMagick unavailable). Old Sources/PlayFuel/Info.plist left as legacy artifact — flagged for cleanup.
+    - BD: supabase/config.toml at repo root (NEW — supabase/ dir didn't exist) + db/supabase/README.md edit + root README.md edit. Single delegate, shipped clean. Verified `grep psql.*dallas_demo` → 0 matches across both READMEs.
+  parallelism_lesson_continued:
+    - Third consecutive session of cross-member parallel delegates shipping clean on first try. Two FRESH delegates (FE delegate #3 of session, BD delegate #3 of session counting prior demo sessions) — neither hit the misleading [error] wrapper. The wrapper itself appears to correlate with discovery overhead in the FIRST delegate of a session more than ordinal — this session both members had warm context from prior sessions and skipped most discovery.
+  oq_resolved_this_session:
+    - OQ-iOS-1 (Sign in with Apple entitlement) → RESOLVED. .xcodeproj committed with entitlement wired. Real on-device auth unblocked.
+  caveats_for_validation:
+    - Old Sources/PlayFuel/Info.plist still on disk as a legacy artifact (the active build plist is now Resources/Info.plist). Will appear in Xcode navigator but won't be used. Safe to delete in cleanup; not blocking.
+    - supabase/config.toml has placeholder project_id="playfuel" — fine for `supabase start` local-dev; must be replaced with real ref for remote project.
+    - App icon is solid PlayFuel green #227F52 placeholder — needs real icon before TestFlight/App Store.
+  remaining_demo_path:
+    - #8 Task #9 LLM explanation layer (optional polish)
+    - #9 Final validation pass
+

@@ -193,21 +193,33 @@ enum FakeData {
             category: "fast_casual_bowl",
             driveTimeMin: 5,
             // Verbatim §F.3 / USER_STORIES US-08
-            recommendedOrder: "Chicken rice bowl with light beans, mild toppings, sauce on the side"
+            recommendedOrder: "Chicken rice bowl with light beans, mild toppings, sauce on the side",
+            isDraft: false,
+            distanceMeters: nil,
+            placeId: nil,
+            provider: "fake"
         ),
         FoodOption(
             id: UUID(uuidString: "CC000002-0000-0000-0000-000000000002")!,
             name: "Jimmy John's",
             category: "sandwich_shop",  // [DRAFT — OQ-B]
             driveTimeMin: 8,
-            recommendedOrder: "Turkey sandwich on French bread, no heavy sauces, add avocado if tolerated"  // [DRAFT — OQ-B]
+            recommendedOrder: "Turkey sandwich on French bread, no heavy sauces, add avocado if tolerated",  // [DRAFT — OQ-B]
+            isDraft: true,
+            distanceMeters: nil,
+            placeId: nil,
+            provider: "fake"
         ),
         FoodOption(
             id: UUID(uuidString: "CC000003-0000-0000-0000-000000000003")!,
             name: "Central Market",
             category: "grocery_prepared",  // [DRAFT — OQ-B]
             driveTimeMin: 12,
-            recommendedOrder: "Prepared deli chicken, plain rice, fruit cup from deli section"  // [DRAFT — OQ-B]
+            recommendedOrder: "Prepared deli chicken, plain rice, fruit cup from deli section",  // [DRAFT — OQ-B]
+            isDraft: true,
+            distanceMeters: nil,
+            placeId: nil,
+            provider: "fake"
         )
     ]
 
@@ -303,6 +315,28 @@ enum FakeData {
         )
     ]
 
+    // MARK: - LLM Summary (Dallas — TemplateProvider output)
+    //
+    // Fake PlanExplanation mirroring what TemplateProvider would produce for the
+    // Dallas demo input. `safetyNote` is §B emergency text (prepended, because
+    // extremeHeatRisk=true) followed by \n\n then the verbatim §A disclaimer.
+    // All content originates from the structured plan — no invented facts.
+
+    static let dallasPlanExplanation = PlanExplanation(
+        summary: "Saturday Round of 16 at Samuell Grand Tennis Center starts at 9:00 AM. Hot and humid conditions (88°F / 72% humidity) — plan extra hydration and shade between points. Most likely scenario: a normal-length match (~2 hrs) with a comfortable break before the next round at 1:00 PM.",
+        scenarioExplanations: [
+            "short": "If the match wraps in ~75 minutes, you'll have a long break (2 hrs 45 min) before the next round. Plenty of time for a light meal — avoid heavy or greasy foods. Banana, pretzels, and an electrolyte drink work well as a bridge snack right after the match.",
+            "normal": "A typical ~2-hour match leaves a comfortable 2-hour break. A quick fast-casual pickup nearby is a solid choice — Chipotle's chicken rice bowl (light beans, mild toppings, sauce on the side) is a good option at ~5 min drive.",
+            "long": "A longer match (~3 hours) leaves only a 1-hour gap before the next round. Pre-bought portable food is the priority — bring a turkey sandwich or rice bowl from home. If a trusted adult can leave during the final portion to pick up food, that's ideal."
+        ],
+        weatherNote: "Expect 88°F with 72% humidity — heat index will feel higher. Keep shade and cool water available between points and during changeovers.",
+        foodNote: "Nearby options include Chipotle (~5 min, fast casual bowl) and Jimmy John's (~8 min, sandwich shop). Central Market (~12 min) is a good grocery backup for prepared items.",
+        safetyNote: "If your player feels faint or confused, has chest pain, stops sweating in extreme heat, has severe cramps, vomits repeatedly, or shows signs of heat illness: stop play and seek medical help. Call 911 (or your local emergency number) in an emergency.\n\nThis app provides general tournament preparation guidance. It is not medical advice, nutrition therapy, or a substitute for a coach, physician, athletic trainer, or registered dietitian. For injuries, illness, heat symptoms, allergies, eating disorders, or medical conditions, consult a qualified professional.",
+        provider: "template",
+        model: nil,
+        generatedAt: Date(timeIntervalSince1970: 1745661600) // 2026-04-26T09:00:00Z
+    )
+
     // MARK: - Full Dallas Plan
 
     static let dallasPlan = Plan(
@@ -318,7 +352,9 @@ enum FakeData {
         ],
         weather: dallasWeather,
         foodOptions: dallasFoodOptions,
-        timeline: dallasTimeline
+        timeline: dallasTimeline,
+        bagFallbackOnly: false,
+        llmSummary: dallasPlanExplanation
     )
 
     // MARK: - Plan Lookup

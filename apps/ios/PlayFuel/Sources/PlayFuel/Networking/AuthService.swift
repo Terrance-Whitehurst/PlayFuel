@@ -90,6 +90,14 @@ final class AuthService: ObservableObject {
         try await exchange(req: req)
     }
 
+    #if DEBUG
+    /// DEBUG hook: flip published flag after `DebugAuth` writes a session
+    /// directly to Keychain. No-op in Release builds (entire branch excluded).
+    func notifyDebugSignIn() {
+        self.isSignedIn = true
+    }
+    #endif
+
     /// Sign out: clear Keychain tokens and flip published flag.
     func signOut() {
         KeychainStore.delete(KeychainStore.Keys.accessToken)

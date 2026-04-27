@@ -68,6 +68,10 @@ class MatchRow(BaseModel):
     format: Optional[str] = None
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
+    # OQ-API-1(a) — migration 0005_match_labels.sql
+    round_label: Optional[str] = None
+    opponent_label: Optional[str] = None
+    court_label: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
@@ -113,7 +117,7 @@ class PlanRow(BaseModel):
     id: UUID
     tournament_id: UUID
     plan_json: dict[str, Any]
-    llm_summary: Optional[str] = None
+    llm_summary: Optional[dict[str, Any]] = None
     rules_constants_version: str
     warnings: list[str]
     schedule_confidence: ScheduleConfidence

@@ -157,28 +157,43 @@ For production, inject via `.xcconfig` per Apple's standard guidance.
 
 ---
 
-## Test Data (Task #6)
+## Test Data (Task #6 → Phase 5b)
 
-Task #6 wires **read-only** flows: sign-in, tournament list, and plan generation.
-There is no in-app create flow — tournaments and matches must already exist in
-the authenticated user's Supabase account, created via the Supabase Console or
-the seed data in `db/supabase/seed/dallas_demo.sql`.
+**Phase 5b (April 2026):** Tournament + match create flows shipped.
+Tournaments can now be created in-app via the `+` button in `TournamentListView`
+(`TournamentCreateView` sheet → `POST /v1/tournaments`).
+Matches can be created in-app via the `+` button in `TournamentDashboardView`
+(`MatchCreateView` sheet → `POST /v1/tournaments/{tid}/matches`).
 
-The Dallas demo tournament UUID is preserved in `FakeData.dallasTournament.id`
-(`11111111-0000-0000-0000-000000000001`) for reference.
+The Dallas demo seed data in `db/supabase/seed/dallas_demo.sql` remains the
+fastest path for the recorded demo. The Dallas demo tournament UUID
+(`11111111-0000-0000-0000-000000000001`) is preserved in `FakeData.dallasTournament.id` for reference.
 
 ---
 
-## Hybrid Plan Splice (Phase 1.5)
+## Networking
 
-`Repository.generatePlan(tournamentId:)` calls
-`POST /v1/tournaments/{tid}/plans/generate` for the live rules-engine output
-(scenario plans, warnings, heat emergency text) and splices in `weather`,
-`foodOptions`, and `timeline` from `FakeData` until:
+**Phase 5 (April 2026):** Hybrid splice retired — `Repository` now consumes the real API response directly for weather, timeline, and food options. `FakeData` remains in the build target for SwiftUI `#Preview` blocks only.
 
-- **Phase 4 (Task #7):** real weather from the weather provider integration
-- **Phase 5 (Task #8):** real food options from the Places API
+---
 
-Search the codebase for `// PHASE 4/5 SPLICE` to locate the boundary in
-`Networking/Repository.swift`. `FakeData.swift` remains in the build target
-as the single source of truth for `#Preview` blocks and the splice data.
+## Running the Demo on Device
+
+The app now supports on-device deployment via a proper Xcode project with the `Sign In with Apple` capability. `Package.swift` is preserved; it continues to serve as the source layer for `#Preview` blocks.
+
+1. **Database:** `supabase start && supabase db reset`  
+   Brings up Supabase locally and auto-applies the Dallas demo seed (via `supabase/config.toml` — BD-managed).
+
+2. **API:** `cd apps/api && uvicorn playfuel_api.main:app --reload --port 8000`  
+   Starts the FastAPI server. No environment variables required for the demo (mock Places provider is default).
+
+3. **Xcode project:** `cd apps/ios/PlayFuel && brew install xcodegen && xcodegen`  
+   Generates `PlayFuel.xcodeproj`. XcodeGen is already installed in the repo's dev environment — this step is only needed if `PlayFuel.xcodeproj` is absent (e.g. on a fresh clone).
+
+4. **Xcode signing:** Open `PlayFuel.xcodeproj` in Xcode. In *Signing & Capabilities*, set your Development Team (requires a free or paid Apple Developer account). Bundle ID is locked to `com.playfuel.ios`.
+
+5. **Run on iPhone:** Select your device in the Xcode toolbar and hit ▶. Tap **Sign in with Apple** — the real `AuthenticationServices` flow will trigger and the entitlement (`com.apple.developer.applesignin`) is baked into `Resources/PlayFuel.entitlements`.
+
+> **App icon:** A placeholder 1024×1024 PNG (PlayFuel green `#227F52`) is at  
+> `Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.  
+> Replace with a production-quality icon before TestFlight / App Store submission.

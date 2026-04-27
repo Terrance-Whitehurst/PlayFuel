@@ -51,6 +51,10 @@ class MatchInput(BaseModel):
     match_id: UUID
     tournament_id: UUID
     scheduled_start: datetime  # timezone-aware recommended; UTC assumed if naive
+    # OQ-API-1(a) label fields — optional; rules engine ignores them
+    round_label: Optional[str] = None
+    opponent_label: Optional[str] = None
+    court_label: Optional[str] = None
 
 
 # ─── ScenarioPlan sub-objects ─────────────────────────────────────────────────
@@ -202,8 +206,115 @@ class Plan(BaseModel):
     # ─ Phase 4 additions (OQ-API-2 incremental widening) ────────────────────────
     weather: Optional[WeatherBlock] = None        # alias: weather; None when no coords / provider fail
     timeline: list[TimelineEventOut] = []         # alias: timeline; empty list when engine produces none
-    food_options: Optional[list] = None           # alias: foodOptions; stays None until Task #8
+    # ─ Phase 5 additions (Task #8 / Places integration) ──────────────────────
+    food_options: Optional[list["FoodOption"]] = None  # alias: foodOptions
+    bag_fallback_only: bool = False                     # alias: bagFallbackOnly
+    # ─ Phase 6 additions (Task #9) ─────────────────────────────────────────────
+    llm_summary: Optional["PlanExplanation"] = None    # alias: llmSummary; None for pre-Phase-6 plans
 
+
+# ─── Phase 5 food option model — Task #8 ─────────────────────────────────────
+
+
+class FoodOption(BaseModel):
+    """Single restaurant / food option recommended for the plan window.
+
+    Attached to Plan.food_options when venue coords are available and
+    scenarios include at least one non-bag_only bucket.
+
+    Fields:
+        name:               Display name of the restaurant.
+        category:           Food category (§F.1 enum value).
+        drive_time_minutes: Estimated drive from venue (None if unknown).
+        recommended_order:  §F.3 verbatim order template string.
+        is_draft:           True for OQ-B unconfirmed templates.
+        distance_meters:    Straight-line distance from venue (None if unknown).
+        place_id:           Provider place ID (for deep-linking, deferred).
+        provider:           Source identifier: "google" | "mock".
+    """
+    model_config = ConfigDict(populate_by_name=True, alias_generator=to_camel)
+
+    name: str
+    category: str
+    drive_time_minutes: Optional[int] = None
+    recommended_order: str
+    is_draft: bool = False
+    distance_meters: Optional[int] = None
+    place_id: Optional[str] = None
+    provider: str
+
+
+
+# ─── Phase 6 LLM explanation models — Task #9 ────────────────────────────────────
+
+
+class ScenarioSummary(BaseModel):
+    """Condensed per-scenario data used as input to LLM/TemplateProvider."""
+    model_config = _CAMEL
+
+    scenario: str                         # "short" | "normal" | "long"
+    duration_min: int
+    gap_status: str                       # "ok" | "tight" | "overrun" | "no_next_match"
+    food_bucket: Optional[str] = None     # None when no food strategy
+    pickup_bucket: str                    # "bring_portable" | "pickup_during_match" | "wait_until_end"
+
+
+class FoodRecommendationSummary(BaseModel):
+    """Condensed food-option data for LLM input (no address / place_id)."""
+    model_config = _CAMEL
+
+    name: str
+    category: str
+    drive_time_minutes: Optional[int] = None
+    is_draft: bool = False
+
+
+class PlanExplanationInput(BaseModel):
+    """Frozen structured input to the LLM/TemplateProvider.
+
+    EVERY field that appears in the output prose MUST come from this object.
+    Nothing is invented. Disclaimers pass through verbatim.
+    Built via build_explanation_input() in services/llm.py.
+    """
+    venue_name: str
+    match_start_iso: str
+    match_round_label: Optional[str] = None
+    next_match_estimated_iso: Optional[str] = None
+    weather_temp_f: Optional[float] = None
+    weather_humidity_pct: Optional[int] = None
+    weather_flags: list[str] = []
+    extreme_heat_risk: bool = False
+    scenarios: list[ScenarioSummary] = []
+    food_recommendations: list[FoodRecommendationSummary] = []
+    bag_fallback_only: bool = False
+    heat_emergency_text: Optional[str] = None
+    user_disclaimer: str
+
+
+class PlanExplanation(BaseModel):
+    """Structured parent-friendly explanation produced by LLM or TemplateProvider.
+
+    Fields:
+        summary:               2–4 sentence parent-friendly intro.
+        scenario_explanations: one entry per scenario kind ("short", "normal", "long").
+        weather_note:          1–2 sentences on weather; None when no weather data.
+        food_note:             1–2 sentences on food picks; None when not applicable.
+        safety_note:           Always present. Contains user_disclaimer verbatim.
+                               When extreme_heat_risk, heat_emergency_text is prepended verbatim.
+        provider:              "template" | "anthropic" | "openai"
+        model:                 e.g. "claude-haiku-3-5"; None for template provider.
+        generated_at:          UTC timestamp of explanation generation.
+    """
+    model_config = _CAMEL
+
+    summary: str
+    scenario_explanations: dict[str, str]
+    weather_note: Optional[str] = None
+    food_note: Optional[str] = None
+    safety_note: str
+    provider: str
+    model: Optional[str] = None
+    generated_at: datetime
 
 # ─── Request / response wrappers ─────────────────────────────────────────────
 

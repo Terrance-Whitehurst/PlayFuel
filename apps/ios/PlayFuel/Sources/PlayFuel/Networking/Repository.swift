@@ -6,14 +6,23 @@ import Foundation
 /// remain structurally unchanged. DTOs in Networking/DTOs.swift do the wire-
 /// format adaptation.
 ///
-/// Hybrid plan strategy (Phase 1.5 — active until Tasks #7/#8 land):
-///   REAL from API:  scenarioPlans, planId, generatedAt, warnings, heatEmergencyText
-///   STUB from FakeData: weather, foodOptions, timeline
-/// The splice boundary is marked `// PHASE 4/5 SPLICE` below.
+/// Phase 5 (April 2026): Hybrid splice retired — `Repository` now consumes the
+/// real API response directly for weather, timeline, and food options.
+/// `FakeData` remains in the build target for SwiftUI `#Preview` blocks only.
 @MainActor
 final class Repository: ObservableObject {
 
     private let api: APIClient
+
+    /// Encoder for POST request bodies.
+    /// .convertToSnakeCase maps Swift camelCase property names → API snake_case field names.
+    /// .iso8601 handles Date → "2026-04-27T09:00:00Z" (accepted by FastAPI `datetime` fields).
+    private let postEncoder: JSONEncoder = {
+        let enc = JSONEncoder()
+        enc.keyEncodingStrategy = .convertToSnakeCase
+        enc.dateEncodingStrategy = .iso8601
+        return enc
+    }()
 
     init(api: APIClient) {
         self.api = api
@@ -69,10 +78,83 @@ final class Repository: ObservableObject {
         )
     }
 
+    // MARK: - Tournament Mutation
+
+    /// Create a new tournament via POST /v1/tournaments.
+    ///
+    /// `startDate` and `endDate` are formatted as "yyyy-MM-dd" strings because the API's
+    /// `TournamentCreate` Pydantic model declares them as `date` (not `datetime`) type.
+    ///
+    /// `timeZone` is presented in the iOS form for future use but is NOT in the current API
+    /// Pydantic model — it is omitted from the encoded request body.
+    func createTournament(
+        name: String,
+        venueName: String,
+        venueLat: Double,
+        venueLng: Double,
+        startDate: Date,
+        endDate: Date,
+        timeZone: String
+    ) async throws -> Tournament {
+        let dateFmt = DateFormatter()
+        dateFmt.dateFormat = "yyyy-MM-dd"
+        dateFmt.timeZone = TimeZone(identifier: "UTC")
+        let body = TournamentCreateRequest(
+            name: name,
+            venueName: venueName,
+            venueLat: venueLat,
+            venueLng: venueLng,
+            startDate: dateFmt.string(from: startDate),
+            endDate: dateFmt.string(from: endDate)
+        )
+        let bodyData = try postEncoder.encode(body)
+        let dto = try await api.send(
+            Endpoints.createTournament(baseURL: api.baseURL, body: bodyData),
+            as: .snake,
+            expecting: TournamentDTO.self
+        )
+        return dto.toModel()
+    }
+
+    // MARK: - Match Mutation
+
+    /// Create a new match via POST /v1/tournaments/{tid}/matches.
+    ///
+    /// `estimatedNextMatchTime` is collected by the iOS form for UX (pre-filling next match
+    /// time) but is NOT a DB column — it is derived from match ordering. It is omitted from
+    /// the encoded request body.
+    func createMatch(
+        tournamentId: UUID,
+        scheduledStart: Date,
+        estimatedDurationMinutes: Int,
+        roundLabel: String?,
+        opponentLabel: String?,
+        courtLabel: String?,
+        estimatedNextMatchTime: Date?,
+        displayOrder: Int
+    ) async throws -> Match {
+        let body = MatchCreateRequest(
+            scheduledStart: scheduledStart,
+            estimatedDurationMinutes: estimatedDurationMinutes,
+            roundLabel: roundLabel,
+            opponentLabel: opponentLabel,
+            courtLabel: courtLabel,
+            displayOrder: displayOrder
+        )
+        let bodyData = try postEncoder.encode(body)
+        let dto = try await api.send(
+            Endpoints.createMatch(baseURL: api.baseURL, tournamentId: tournamentId, body: bodyData),
+            as: .snake,
+            expecting: MatchDTO.self
+        )
+        return dto.toModel()
+    }
+
     // MARK: - Plans
 
-    /// Generate a plan for a tournament via the rules engine, then assemble a
-    /// hybrid `Plan` model splicing in FakeData for weather/food/timeline.
+    /// Generate a plan for a tournament via the rules engine and return a full `Plan`
+    /// mapped directly from the API response (weather, food options, and timeline
+    /// are all real data as of Phase 5).
     ///
     /// HTTP 200 always (the backend returns 200 even for overrun scenarios per OQ-14/§G).
     func generatePlan(tournamentId: UUID) async throws -> Plan {
@@ -81,38 +163,6 @@ final class Repository: ObservableObject {
             as: .camel,
             expecting: GeneratePlanResponseDTO.self
         )
-        return assembleHybridPlan(core: envelope.plan, tournamentId: tournamentId)
-    }
-
-    // MARK: - Internal
-
-    /// Assembles a full iOS `Plan` model from real API engine output + FakeData splices.
-    ///
-    /// - PHASE 4/5 SPLICE -
-    /// `weather`, `foodOptions`, and `timeline` are sourced from FakeData until:
-    ///   - Phase 4 (Task #7): real weather from classify_weather() + weather provider
-    ///   - Phase 5 (Task #8): real food options from Places API
-    ///
-    /// Only the Dallas tournament UUID has FakeData; others fall back to safe defaults
-    /// (dallasWeather + empty arrays). This is intentional — Phase 4 will replace
-    /// the splice for all tournaments.
-    private func assembleHybridPlan(core: PlanCoreDTO, tournamentId: UUID) -> Plan {
-        // PHASE 4/5 SPLICE — replace these three assignments when Tasks #7/#8 land.
-        let fakePlan   = FakeData.plan(for: tournamentId)
-        let weather    = fakePlan?.weather    ?? FakeData.dallasWeather
-        let foodOptions = fakePlan?.foodOptions ?? []
-        let timeline   = fakePlan?.timeline   ?? []
-
-        return Plan(
-            id: core.planId,
-            planId: core.planId.uuidString,
-            tournamentId: core.tournamentId,
-            generatedAt: core.generatedAt,
-            warnings: core.warnings,
-            scenarioPlans: core.scenarioPlans.map { $0.toModel() },
-            weather: weather,
-            foodOptions: foodOptions,
-            timeline: timeline
-        )
+        return envelope.plan.toModel()
     }
 }

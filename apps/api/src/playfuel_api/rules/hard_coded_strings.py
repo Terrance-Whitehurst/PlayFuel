@@ -38,6 +38,20 @@ HEAT_EMERGENCY_TEXT: str = (
     "number) in an emergency."
 )
 
+# ─── §A — USER_DISCLAIMER ──────────────────────────────────────────────────
+#
+# Verbatim from SAFETY_DISCLAIMERS.md §A. Surface in onboarding, settings,
+# and as the base safety_note in every PlanExplanation.
+# Never rephrase or paraphrase — used verbatim in LLM output validation.
+
+USER_DISCLAIMER: str = (
+    "This app provides general tournament preparation guidance. "
+    "It is not medical advice, nutrition therapy, or a substitute for a coach, "
+    "physician, athletic trainer, or registered dietitian. "
+    "For injuries, illness, heat symptoms, allergies, eating disorders, or "
+    "medical conditions, consult a qualified professional."
+)
+
 # ─── Food-bucket display text (§B.2) — maps FoodBucket value → text ──────────
 
 FOOD_BUCKET_TEXT: dict[str, str] = {

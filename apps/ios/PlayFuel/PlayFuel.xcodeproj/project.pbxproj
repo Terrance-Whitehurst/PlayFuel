@@ -8,26 +8,31 @@
 
 /* Begin PBXBuildFile section */
 		00858D2D2AAAB084FAE5B6F1 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6A58B35CC45E975FBC588 /* TimelineView.swift */; };
+		08657BC986D100C7B3F57DEA /* DebugAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA6EA336A6452F24FB5DAC8E /* DebugAuth.swift */; };
 		1C14B6E345DEBE8847E9C5B8 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAA6A3A9295F34782002C64 /* SignInView.swift */; };
 		20D42EFDD419A10C3EFB3F22 /* DTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76DABD1D9959D5B47FF1F2AF /* DTOs.swift */; };
 		22D3F3A459353D91423F53F9 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0D016A6E8FAAC7A7465B28 /* AuthService.swift */; };
 		2515717BE346CDFB3E25B9DC /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BD8523CE3798434A447923 /* APIError.swift */; };
 		2819CB8C07935F8521876AB7 /* FoodOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A8963D6167FAD62CA951AE /* FoodOption.swift */; };
 		3E6C828C968501222BF5227C /* Match.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEF49588955B05641B5EE27 /* Match.swift */; };
+		5547E735DB3706C7244A7034 /* PlanExplanation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604200C03C727C2AD4A3F47E /* PlanExplanation.swift */; };
 		5C3C77FEAE066B90F5AB2AAB /* PlayFuelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE76F905584434E9D20721B7 /* PlayFuelApp.swift */; };
 		6115DE510C6D96BC011BF18C /* Plan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B0D0628C8AC1E5CB21A121 /* Plan.swift */; };
 		70762A9A6832EF3E24E150ED /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90EDC8DE31DF2989BEB0A3E /* APIClient.swift */; };
 		78A360B065D2EED8FA426E92 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC59EB7BC5AA3895B189FBF0 /* Repository.swift */; };
 		7E3B9CBD99D512F8AD4C03F8 /* HardCodedStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */; };
 		87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */; };
+		9F13CB35D1297C00EF2B82E7 /* PlanSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B0C6A0B70E723E8BA64E6D /* PlanSummaryCard.swift */; };
 		A40238D231C23EA61E02A1D5 /* Tournament.swift in Sources */ = {isa = PBXBuildFile; fileRef = D79888F3E040BD239741B1D5 /* Tournament.swift */; };
 		AD64452F4938CC50EAFAB031 /* WeatherSnapshot.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */; };
 		ADF44C64562D35C64E107F79 /* TimelineEvent.swift in Sources */ = {isa = PBXBuildFile; fileRef = 796A0EDD57748854929E6897 /* TimelineEvent.swift */; };
+		B140B06C66624EEFECF166DD /* MatchCreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 499C95E4DF0C4C4D64ABB501 /* MatchCreateView.swift */; };
 		B48E8CF5C50296DC00C411DF /* User.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB91EF7D1C39218BE3F841E3 /* User.swift */; };
 		B612304F8385D746BAB63507 /* ScenarioPlan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */; };
 		B814A0A0B5FD265771CD010E /* Configuration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 4721B1139B643E63A8FB6C01 /* Configuration.swift */; };
 		BAE452A692D9D36BF40BA429 /* DisclaimerView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A7B07537E35072C03DA3414D /* DisclaimerView.swift */; };
 		BF90BA9A227446C650B84BBC /* EmergencyBanner.swift in Sources */ = {isa = PBXBuildFile; fileRef = 97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */; };
+		CA3285505E0E15A784AF51FE /* TournamentCreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B03D40B2468D26075E6590 /* TournamentCreateView.swift */; };
 		D3E6C151169F080F6D22709E /* FoodCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733A9D96157E16CBB306C4EC /* FoodCardView.swift */; };
 		D80D0DD80AA05237B50B4F1E /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7090F3FCDB10326A70336B /* KeychainStore.swift */; };
 		DA01C6EF112E562C54A53462 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD5E9D4E0FA822FA31182B2 /* Endpoints.swift */; };
@@ -44,10 +49,13 @@
 		136FAA9B0E2AACEC604CF6F4 /* PlayFuel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PlayFuel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		14F6A58B35CC45E975FBC588 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		2FEF49588955B05641B5EE27 /* Match.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Match.swift; sourceTree = "<group>"; };
-		3911B023F7463D889B4ADB37 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = Info.plist; sourceTree = "<group>"; };
+		30B0C6A0B70E723E8BA64E6D /* PlanSummaryCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanSummaryCard.swift; sourceTree = "<group>"; };
 		438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioPlan.swift; sourceTree = "<group>"; };
 		4721B1139B643E63A8FB6C01 /* Configuration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Configuration.swift; sourceTree = "<group>"; };
+		499C95E4DF0C4C4D64ABB501 /* MatchCreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchCreateView.swift; sourceTree = "<group>"; };
+		53B03D40B2468D26075E6590 /* TournamentCreateView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentCreateView.swift; sourceTree = "<group>"; };
 		5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardCodedStrings.swift; sourceTree = "<group>"; };
+		604200C03C727C2AD4A3F47E /* PlanExplanation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanExplanation.swift; sourceTree = "<group>"; };
 		63A8963D6167FAD62CA951AE /* FoodOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodOption.swift; sourceTree = "<group>"; };
 		6F52B449265DCBA14E961E95 /* WeatherCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherCardView.swift; sourceTree = "<group>"; };
 		733A9D96157E16CBB306C4EC /* FoodCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodCardView.swift; sourceTree = "<group>"; };
@@ -63,6 +71,7 @@
 		AB7090F3FCDB10326A70336B /* KeychainStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = KeychainStore.swift; sourceTree = "<group>"; };
 		AB91EF7D1C39218BE3F841E3 /* User.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = User.swift; sourceTree = "<group>"; };
 		AE76F905584434E9D20721B7 /* PlayFuelApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayFuelApp.swift; sourceTree = "<group>"; };
+		BA6EA336A6452F24FB5DAC8E /* DebugAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugAuth.swift; sourceTree = "<group>"; };
 		C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioCardView.swift; sourceTree = "<group>"; };
 		CA0D016A6E8FAAC7A7465B28 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
 		D79888F3E040BD239741B1D5 /* Tournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tournament.swift; sourceTree = "<group>"; };
@@ -111,6 +120,7 @@
 				63A8963D6167FAD62CA951AE /* FoodOption.swift */,
 				2FEF49588955B05641B5EE27 /* Match.swift */,
 				85B0D0628C8AC1E5CB21A121 /* Plan.swift */,
+				604200C03C727C2AD4A3F47E /* PlanExplanation.swift */,
 				438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */,
 				796A0EDD57748854929E6897 /* TimelineEvent.swift */,
 				D79888F3E040BD239741B1D5 /* Tournament.swift */,
@@ -126,6 +136,7 @@
 				A90EDC8DE31DF2989BEB0A3E /* APIClient.swift */,
 				75BD8523CE3798434A447923 /* APIError.swift */,
 				CA0D016A6E8FAAC7A7465B28 /* AuthService.swift */,
+				BA6EA336A6452F24FB5DAC8E /* DebugAuth.swift */,
 				76DABD1D9959D5B47FF1F2AF /* DTOs.swift */,
 				0CD5E9D4E0FA822FA31182B2 /* Endpoints.swift */,
 				AB7090F3FCDB10326A70336B /* KeychainStore.swift */,
@@ -147,7 +158,6 @@
 			isa = PBXGroup;
 			children = (
 				4721B1139B643E63A8FB6C01 /* Configuration.swift */,
-				3911B023F7463D889B4ADB37 /* Info.plist */,
 				AE76F905584434E9D20721B7 /* PlayFuelApp.swift */,
 				BC5A968F7E2A2EAB0E1E7401 /* Data */,
 				89B7753550A993180C723D3F /* Models */,
@@ -164,9 +174,12 @@
 				A7B07537E35072C03DA3414D /* DisclaimerView.swift */,
 				97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */,
 				733A9D96157E16CBB306C4EC /* FoodCardView.swift */,
+				499C95E4DF0C4C4D64ABB501 /* MatchCreateView.swift */,
+				30B0C6A0B70E723E8BA64E6D /* PlanSummaryCard.swift */,
 				C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */,
 				FFAA6A3A9295F34782002C64 /* SignInView.swift */,
 				14F6A58B35CC45E975FBC588 /* TimelineView.swift */,
+				53B03D40B2468D26075E6590 /* TournamentCreateView.swift */,
 				E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */,
 				A30AE19CFED4698BCC9E569E /* TournamentListView.swift */,
 				6F52B449265DCBA14E961E95 /* WeatherCardView.swift */,
@@ -204,7 +217,7 @@
 				LastUpgradeCheck = 1430;
 				TargetAttributes = {
 					F1CFB326231E4D915F036712 = {
-						DevelopmentTeam = "";
+						DevelopmentTeam = G89TZ927TJ;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -239,6 +252,7 @@
 				22D3F3A459353D91423F53F9 /* AuthService.swift in Sources */,
 				B814A0A0B5FD265771CD010E /* Configuration.swift in Sources */,
 				20D42EFDD419A10C3EFB3F22 /* DTOs.swift in Sources */,
+				08657BC986D100C7B3F57DEA /* DebugAuth.swift in Sources */,
 				BAE452A692D9D36BF40BA429 /* DisclaimerView.swift in Sources */,
 				BF90BA9A227446C650B84BBC /* EmergencyBanner.swift in Sources */,
 				DA01C6EF112E562C54A53462 /* Endpoints.swift in Sources */,
@@ -248,7 +262,10 @@
 				7E3B9CBD99D512F8AD4C03F8 /* HardCodedStrings.swift in Sources */,
 				D80D0DD80AA05237B50B4F1E /* KeychainStore.swift in Sources */,
 				3E6C828C968501222BF5227C /* Match.swift in Sources */,
+				B140B06C66624EEFECF166DD /* MatchCreateView.swift in Sources */,
 				6115DE510C6D96BC011BF18C /* Plan.swift in Sources */,
+				5547E735DB3706C7244A7034 /* PlanExplanation.swift in Sources */,
+				9F13CB35D1297C00EF2B82E7 /* PlanSummaryCard.swift in Sources */,
 				5C3C77FEAE066B90F5AB2AAB /* PlayFuelApp.swift in Sources */,
 				78A360B065D2EED8FA426E92 /* Repository.swift in Sources */,
 				87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */,
@@ -257,6 +274,7 @@
 				ADF44C64562D35C64E107F79 /* TimelineEvent.swift in Sources */,
 				00858D2D2AAAB084FAE5B6F1 /* TimelineView.swift in Sources */,
 				A40238D231C23EA61E02A1D5 /* Tournament.swift in Sources */,
+				CA3285505E0E15A784AF51FE /* TournamentCreateView.swift in Sources */,
 				F595DE549B9CF77D38C5A898 /* TournamentDashboardView.swift in Sources */,
 				FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */,
 				B48E8CF5C50296DC00C411DF /* User.swift in Sources */,
@@ -272,17 +290,22 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/PlayFuel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G89TZ927TJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sources/PlayFuel/Info.plist;
+				INFOPLIST_FILE = Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.playfuel.PlayFuel;
+				PRODUCT_BUNDLE_IDENTIFIER = com.playfuel.ios;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Release;
 		};
@@ -319,10 +342,8 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
-				DEVELOPMENT_TEAM = "";
 				ENABLE_NS_ASSERTIONS = NO;
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -340,7 +361,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Release;
 		};
@@ -348,17 +369,22 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = Resources/PlayFuel.entitlements;
 				CODE_SIGN_IDENTITY = "iPhone Developer";
+				CODE_SIGN_STYLE = Automatic;
+				DEVELOPMENT_TEAM = G89TZ927TJ;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
-				INFOPLIST_FILE = Sources/PlayFuel/Info.plist;
+				INFOPLIST_FILE = Resources/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				PRODUCT_BUNDLE_IDENTIFIER = com.playfuel.PlayFuel;
+				PRODUCT_BUNDLE_IDENTIFIER = com.playfuel.ios;
 				SDKROOT = iphoneos;
-				TARGETED_DEVICE_FAMILY = "1,2";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = 1;
 			};
 			name = Debug;
 		};
@@ -395,10 +421,8 @@
 				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
 				CLANG_WARN_UNREACHABLE_CODE = YES;
 				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
-				CODE_SIGN_STYLE = Automatic;
 				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEVELOPMENT_TEAM = "";
 				ENABLE_STRICT_OBJC_MSGSEND = YES;
 				ENABLE_TESTABILITY = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu11;
@@ -423,7 +447,7 @@
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
-				SWIFT_VERSION = 5.9;
+				SWIFT_VERSION = 5.0;
 			};
 			name = Debug;
 		};

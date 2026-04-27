@@ -1,6 +1,6 @@
 role: Backend Dev (Engineering3 team)
-session: mog052owzfj7
-last_updated: "2026-04-26"
+session: moh9uivm3dxv
+last_updated: "2026-04-27"
 
 task_completed:
   id: "Phase 2 Task #4"
@@ -108,6 +108,20 @@ validation_scribe_task_mogfjh9hslqr:
     setuptools 82 in a fresh venv (ModuleNotFoundError). Workaround:
     install all deps directly via pip, then run with PYTHONPATH=src.
     Do NOT use -e editable install on this machine.
+
+session3_seed_wiring_moh9uivm3dxv:
+  completed: "2026-04-27"
+  description: "Repo-root seed auto-apply wiring (Session 3 BD portion)"
+  files_written:
+    - path: "/supabase/config.toml"
+      status: "NEW — created; no prior supabase/ dir at repo root"
+      note: "project_id=playfuel; [db.seed] enabled=true; sql_paths=[../db/supabase/seed/dallas_demo.sql]"
+    - path: "/db/supabase/README.md"
+      status: "EDIT — replaced manual psql seed step with auto-seed one-liner"
+    - path: "/README.md"
+      status: "EDIT — removed psql seed command from Quickstart; replaced with auto-seed note"
+  path_math: "supabase/config.toml at repo root; seed at db/supabase/seed/dallas_demo.sql; relative path = ../db/supabase/seed/dallas_demo.sql"
+  verification: "grep psql.*dallas_demo returns zero matches in both READMEs"
 
 new_oqs:
   - id: "OQ-H"

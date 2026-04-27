@@ -59,6 +59,23 @@ struct SignInView: View {
                             .padding(.top, 4)
                     }
 
+                    #if DEBUG
+                    if DebugAuth.jwtSecret != nil {
+                        Button {
+                            _ = DebugAuth.signInAsTestUser(authService: appState.authService)
+                        } label: {
+                            Text("Skip Auth (DEBUG)")
+                                .font(.footnote.weight(.medium))
+                                .frame(maxWidth: .infinity)
+                                .frame(height: 40)
+                                .background(.orange.opacity(0.15))
+                                .foregroundStyle(.orange)
+                                .clipShape(RoundedRectangle(cornerRadius: 8))
+                        }
+                        .padding(.horizontal, 40)
+                    }
+                    #endif
+
                     // Disclaimer link — §A placement requirement
                     Button {
                         showingDisclaimer = true

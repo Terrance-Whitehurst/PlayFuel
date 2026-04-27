@@ -1,4 +1,4 @@
-session: mogfjh9hslqr
+session: moh9uivm3dxv  # (prev: mogfjh9hslqr)
 date: "2026-04-27"
 
 project_context:
@@ -166,27 +166,65 @@ new_oqs:
     detail: "Unused import raises linting warnings. Recommend removing before Phase 3."
 
 test_coverage_patterns:
+  total_as_of_session_moh9uivm3dxv: "180 passed, 1 xfailed (was 88+1 at session start; +92 over 4 deliveries)"
   bucket_tests: 13 cases (8 food + 4 pickup + 1 named regression)
   weather_tests: 6 parametrized cases (2 extreme_heat paths, 1 cold, 1 rain, 1 hot-only, 1 none)
   scenario_tests: 4 acceptance cases fully passing + 1 xfail (rain delay OQ-F)
-  routes_smoke: 3 cases (healthz 200, no-token 401, mocked-auth 200) — 401 confirmed after Task#5 closeout fix
-  task13_test_gaps_filled:
-    no_next_match: staged at staged_validation/tests/test_scenarios_no_next_match.py (6 tests)
-    heat_emergency: staged at staged_validation/tests/test_scenarios_heat_emergency.py (5 tests + parametrize)
-    rewarm_boundary: staged at staged_validation/tests/test_scenarios_rewarm_boundary.py (4 tests)
-    auth_negatives: staged at staged_validation/tests/test_auth_negatives.py (7 tests incl. jwt_test_client fixture)
+  routes_smoke: 4 cases (healthz 200, no-token 401, mocked-auth 200, food_options_not_null)
+  food_tests: test_food_categorize + test_food_templates + test_food_assembly + test_places_mock (all PASS)
+  llm_tests: test_llm_template (10) + test_llm_safety (8) + test_llm_factory (5) + test_llm_routes (4) = 27 new
   eval_harness:
-    location: staged_validation/eval/ (4 files)
-    target: apps/api/src/playfuel_api/eval/
-    runnable_as: python3.12 -m playfuel_api.eval.run_acceptance (from apps/api/)
+    runnable_as: "PYTHONPATH=src .venv/bin/python3.12 -m playfuel_api.eval.run_acceptance"
+    note: "bare python3.12 -m ... fails without venv activation; use PYTHONPATH=src + venv python"
     fixtures: 5 scenarios, scenario 5 xfail per OQ-F
   still_not_covered:
     - derive_schedule_confidence unit tests (not in brief scope)
+    - build_timeline() meal/warmUp/wakeUp event types (v1 only emits match+matchEnd)
   resolved_gaps:
     - no_next_match path: NOW COVERED
     - build_plan_envelope heat text: NOW COVERED
     - rewarm_up gap boundary isolation: NOW COVERED
     - verify_supabase_jwt negative paths: NOW COVERED
+
+demo_readiness_report_written:
+  path: .pi/multi-team/sessions/moh9uivm3dxv/demo-readiness-report.md
+  verdict: "Demo-ready YES — 2 pre-record actions"
+  blockers: none
+  pre_record_actions:
+    - "Set LLM_PROVIDER=template in apps/api/.env"
+    - "Resolve timeline event count (extend build_timeline OR narrate around 3-event limit)"
+    - "Fill DEVELOPMENT_TEAM in project.yml for on-device run"
+
+new_oqs_session_moh9uivm3dxv:
+  - id: OQ-QA-3
+    title: "Timeline event count: build_timeline() v1 = 3 events, demo script claims 12+"
+    status: open
+    priority: minor
+    detail: "build_timeline() generates 1 match_start + 1 matchEnd (match 1 only) + 1 match_start per match = 3 events
+             for Dallas seed. FakeData.dallasTimeline has 12 events but is now preview-only (splice retired).
+             Demo step 10 will show 3 events live. Code comment: 'Future versions will splice meal/warmUp/wakeUp'."
+  - id: OQ-QA-4
+    title: "Broad except Exception around LLM block in plans.py catches programming errors"
+    status: open
+    priority: minor
+    detail: "noqa: BLE001 suppresses lint. Not silent (logs WARNING + exc_info=True). Post-demo: narrow scope."
+  - id: OQ-QA-5
+    title: "validate_explanation check #4 restaurant-hallucination is a pass for non-empty food lists"
+    status: open
+    priority: cosmetic
+    detail: "Only real guard is the 'no key → TemplateProvider' architecture. Needs strengthening for real LLM providers."
+  - id: OQ-QA-6
+    title: "LLM_PROVIDER=template must be set in .env if ANTHROPIC_API_KEY is live in shell"
+    status: open
+    priority: minor
+    detail: "auto mode routes to AnthropicProvider stub (NotImplementedError), caught by broad except, llmSummary=null.
+             Demo operator must set LLM_PROVIDER=template in apps/api/.env before recording."
+
+demonstrated_patterns:
+  - "eval harness runnable via: PYTHONPATH=src .venv/bin/python3.12 -m playfuel_api.eval.run_acceptance"
+  - "QA domain cannot write to apps/ — stage in session dir or report inline"
+  - "iOS source truth: splice retired means dallasTimeline (FakeData) is preview-only; live timeline comes from API"
+  - "RLS column inheritance: ALTER TABLE ADD COLUMN is covered by existing table-level RLS policies automatically"
 
 write_domain_reminder:
   note: "QA Engineer CANNOT write to apps/ directly. Always stage in session dir."

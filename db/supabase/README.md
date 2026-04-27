@@ -83,19 +83,8 @@ Should show no diff after a clean `db reset`.
 
 ### 4. Apply seed data (Dallas demo)
 
-If using `supabase db reset`, seed is applied automatically if you add
-`seed/dallas_demo.sql` to `supabase/seed.sql` or configure it in `supabase/config.toml`:
-
-```toml
-[db.seed]
-sql_paths = ["./seed/dallas_demo.sql"]
-```
-
-Or apply manually:
-```bash
-psql "$(supabase status --output json | jq -r '.DB_URL')" \
-  -f db/supabase/seed/dallas_demo.sql
-```
+`supabase db reset` now auto-applies the Dallas demo seed via `supabase/config.toml`
+at the repo root. Manual `psql` application is no longer required.
 
 ### 5. Open Supabase Studio
 
@@ -115,6 +104,8 @@ Migrations **must** be applied in filename order:
 | `0002_tables.sql` | Creates all tables, FK indexes, `set_updated_at()` trigger function, per-table triggers |
 | `0003_rls.sql` | Enables RLS; creates all 4 policies per table |
 | `0004_auth_trigger.sql` | Creates `handle_new_user()` (SECURITY DEFINER) + `on_auth_user_created` trigger on `auth.users` |
+| `0005_match_labels.sql` | Adds nullable `round_label`, `opponent_label`, `court_label` text columns to `public.matches` (resolves OQ-API-1a) |
+| `0006_plan_llm_summary.sql` | Adds nullable `llm_summary` jsonb column to `public.plans` for Phase 6 LLM explanation layer (Phase 6) |
 
 ---
 

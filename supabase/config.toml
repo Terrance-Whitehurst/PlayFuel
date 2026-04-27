@@ -1,0 +1,5 @@
+project_id = "playfuel"
+
+[db.seed]
+enabled = true
+sql_paths = ["../db/supabase/seed/dallas_demo.sql"]

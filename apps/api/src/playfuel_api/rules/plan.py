@@ -27,7 +27,7 @@ import uuid
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
-from playfuel_api.models.api import Plan, ScenarioPlan, TimelineEventOut, WeatherBlock
+from playfuel_api.models.api import FoodOption, Plan, ScenarioPlan, TimelineEventOut, WeatherBlock
 from playfuel_api.models.db import MatchRow
 from playfuel_api.models.enums import GapStatus, ScheduleConfidence, TimelineEventKind
 from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION
@@ -124,16 +124,20 @@ def build_plan_envelope(
     weather_flags: Optional[dict[str, bool]] = None,
     weather_block: Optional[WeatherBlock] = None,
     timeline: Optional[list[TimelineEventOut]] = None,
+    food_options: Optional[list[FoodOption]] = None,
+    bag_fallback_only: bool = False,
 ) -> Plan:
     """Assemble the top-level Plan envelope from engine output.
 
     Args:
-        tournament_id: UUID of the tournament being planned.
-        scenarios:     Output of generate_match_scenarios() — all three ScenarioKinds.
-        weather_flags: Optional output of classify_weather(); triggers HEAT_EMERGENCY_TEXT
-                       when flag_extreme_heat_risk is True (§E.2).
-        weather_block: Optional WeatherBlock for plan response (Phase 4 OQ-API-2).
-        timeline:      Optional list[TimelineEventOut] for plan response (Phase 4 OQ-API-2).
+        tournament_id:    UUID of the tournament being planned.
+        scenarios:        Output of generate_match_scenarios() — all three ScenarioKinds.
+        weather_flags:    Optional output of classify_weather(); triggers HEAT_EMERGENCY_TEXT
+                          when flag_extreme_heat_risk is True (§E.2).
+        weather_block:    Optional WeatherBlock for plan response (Phase 4 OQ-API-2).
+        timeline:         Optional list[TimelineEventOut] for plan response (Phase 4 OQ-API-2).
+        food_options:     Optional list[FoodOption] from Phase 5 Places integration.
+        bag_fallback_only: True when all buckets are bag_only (Phase 5).
 
     Returns:
         Plan — ready for HTTP response. Persist JSONB via
@@ -167,5 +171,6 @@ def build_plan_envelope(
         scenario_plans=scenarios,
         weather=weather_block,
         timeline=timeline or [],
-        food_options=None,  # stays None until Task #8 (Places API integration)
+        food_options=food_options,
+        bag_fallback_only=bag_fallback_only,
     )

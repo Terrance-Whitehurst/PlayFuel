@@ -17,6 +17,7 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import Response
 from pydantic import BaseModel
 from supabase import Client
 
@@ -138,11 +139,13 @@ def update_tournament(
 
 
 @router.delete("/tournaments/{tid}", status_code=status.HTTP_204_NO_CONTENT,
+               response_class=Response,
                summary="Delete tournament")
 def delete_tournament(
     tid: UUID,
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
-) -> None:
+) -> Response:
     """Delete a tournament. RLS enforces ownership. Cascades to matches/plans."""
     client.table(_TABLE).delete().eq("id", str(tid)).execute()
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
