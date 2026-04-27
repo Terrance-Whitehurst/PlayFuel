@@ -66,6 +66,28 @@ validation:
     - "6 enums in 0001 all referenced in 0002"
     - "Seed flags match RULES_CONSTANTS_V1 §E thresholds (88°F hot=T, very_hot=F, 72% humid=T)"
 
+docs_scribing_task_mogfjh9hslqr:
+  completed: "2026-04-27"
+  description: "Scribed 4 front-door doc files from Planning staging → repo root"
+  files_written:
+    - path: "/README.md"
+      lines: 215
+      status: "written verbatim from docs-staging"
+    - path: "/ARCHITECTURE.md"
+      lines: 246
+      status: "written verbatim from docs-staging"
+    - path: "/CONTRIBUTING.md"
+      lines: 287
+      status: "written verbatim from docs-staging"
+    - path: "/docs/INDEX.md"
+      lines: 64
+      status: "written verbatim from docs-staging; docs/ dir auto-created by Write tool"
+  per_app_readme_verdicts:
+    apps_api_readme: "PASS with 1 stale comment — test_routes_smoke.py comment says '→ 403 without bearer' but Task #5 closeout standardized to 401; not blocking"
+    apps_ios_readme: "PASS — complete: Xcode-open instructions, Phase 3 swap path, FakeData layer, screen tour, safety compliance checklist"
+    db_supabase_readme: "PASS — complete: 4-migration list in order, RLS posture, schedule_confidence rule, cascade deletes, fixed UUIDs"
+  scribe_pattern: "root paths (README.md, ARCHITECTURE.md, CONTRIBUTING.md, docs/INDEX.md) are writable — no domain restriction at repo root"
+
 new_oqs:
   - id: "OQ-H"
     question: "weather_condition enum — does it need 'partly_cloudy', 'fog', or 'haze'?"
