@@ -1,5 +1,5 @@
 role: Frontend Dev 3 (Engineering3)
-last_updated: "2026-04-27"
+last_updated: "2026-04-27-phase8"
 
 task_history:
   - task: "#3 SwiftUI static prototype (rerouted from Engineering2)"
@@ -77,3 +77,14 @@ patterns_learned:
   - "Domain models that become stored properties of Codable parent structs must themselves conform to Codable. PlanExplanation.swift required Codable added in Session 4 because Plan: Codable contains `let llmSummary: PlanExplanation?`. Check parent's Codable conformance when adding new model properties."
   - "PlanExplanationDTO uses camelDecoder (.iso8601 dateDecodingStrategy) so `generatedAt: Date` decodes directly from the ISO 8601 datetime string the Python backend produces via Pydantic. No custom CodingKeys or init needed."
   - "Session 4 lesson: PlanCoreDTO has a custom init(from:) — new optional fields must be added to (a) the stored property list, (b) CodingKeys enum, (c) the custom init via decodeIfPresent, AND (d) toModel(). All four sites must be updated or the field will silently decode as nil."
+  - "Session 5 (Doubles) lesson: #Preview blocks with `return` statements produce a macOS-toolchain error ('cannot use explicit return statement in body of result builder ViewBuilder'). This is a pre-existing project-wide pattern (SignInView, TournamentListView, TournamentCreateView all had it before doubles). Not a regression — do not count as new errors."
+  - "Session 5 (Doubles) lesson: When adding new required (non-optional) fields to Plan.swift, FakeData must pass ALL of them at every call site. `matchType: .singles` was added explicitly to `dallasPlan`; new `dallasDoublesPlan` with `matchType: .doubles` was added alongside. The `dallasPlanEnvelope` wraps both for preview use."
+  - "Session 5 (Doubles) lesson: PlanEnvelope should NOT conform to Hashable — Plan itself is not Hashable, so Hashable cannot be synthesized on a struct containing Plan?. Declare PlanEnvelope as `Codable, Sendable` only."
+  - "Session 5 (Doubles) lesson: @EnvironmentObject projected-value binding ($appState.foo) is immutable on macOS toolchain. Use an explicit Binding(get:set:) computed var instead. See matchTypeBinding in TournamentDashboardView.swift."
+  - "Session 5 (Doubles) lesson: resolveActivePlan() helper is needed to extract Plan from PlanEnvelope in a @ViewBuilder body. `let` bindings inside @ViewBuilder are not allowed on some macOS toolchain versions — push logic to a helper method."
+  - "Phase 8 (Nutrition-First IA) lesson: PlanEnvelope moved from singular singlesPlan/doublesPlan to arrays singlesPlans/doublesPlans. Grep for '.singlesPlan' and '.doublesPlan' after this migration to confirm zero live references (comments OK)."
+  - "Phase 8 lesson: Repository should NOT set appState fields directly — it doesn't hold a reference to AppState. Put post-decode side-effects (like selectedMatchId assignment) in AppState's async loader methods instead."
+  - 'Phase 8 lesson: onChange(of:) syntax: use the iOS 17 two-parameter form { _, newValue in } to match existing codebase pattern (TournamentCreateView, MatchCreateView). The deprecated single-parameter form may produce warnings.'
+  - 'Phase 8 lesson: WeatherCardView compact: Bool = false pattern -- default-valued init params on Views are safe (not Codable). Do not confuse with the no-defaults rule on Codable structs.'
+  - 'Phase 8 lesson: ScheduleStripView ForEach uses id: element.matchId on enumerated array because Plan is Identifiable on id (plan UUID) not matchId. matchId identity is intentional for chip-per-match semantics.'
+  - 'Phase 8 lesson: NextAction must conform to Codable (not just Hashable) because Plan: Codable contains nextAction: NextAction?. Same Codable-parent rule as PlanExplanation in Session 4. Verified in NextAction.swift.'

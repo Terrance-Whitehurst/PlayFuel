@@ -6,16 +6,21 @@ import SwiftUI
 /// Weather / food / timeline are FakeData splices until Phase 4 (Task #7) and
 /// Phase 5 (Task #8) replace them with real API data.
 ///
-/// Layout (when plan is loaded):
-///   1. EmergencyBanner (if weather.extremeHeatRisk)
-///   2. WeatherCardView
-///   3. Horizontal scroll of ScenarioCardViews (short / normal / long)
-///   4. FoodCardView (if foodOptions is non-empty)
-///   5. "Full Timeline" button (if timeline is non-empty)
-///   6. Footer disclaimer link (§A placement)
+/// Layout (when plan is loaded — NUTRITION_FIRST_IA_V1.md §B locked order):
+///   0. EmergencyBanner       — when extreme_heat_risk == true (IMMOVABLE per §A.3)
+///   1. Singles|Doubles Picker— only when envelope.hasBothTypes
+///   2. PlanSummaryCard       — when llmSummary present
+///   3. ScheduleStripView     — always (empty-CTA when no plans)
+///   4. NextActionCard        — always (fallback copy when nextAction nil)
+///   5. FoodCardView          — when foodOptions non-empty
+///   6. Scenario cards        — horizontal scroll
+///   7. Full Day Timeline btn — when timeline non-empty
+///   8. WeatherCardView       — compact pill, collapsed by default (demoted)
+///   9. Footer disclaimer link
 ///
-/// MatchInfoStrip is removed in Task #6 — Match data is not fetched in the read-
-/// only wiring task. It will return when the match-create flow ships.
+/// Weather demotion rationale (user steer 2026-04-27): parents already feel the
+/// heat. The weather card was the first thing parents saw but it is not actionable.
+/// Safety logic is UNCHANGED — extreme_heat_risk still fires EmergencyBanner at #0.
 struct TournamentDashboardView: View {
 
     let tournament: Tournament
@@ -27,7 +32,7 @@ struct TournamentDashboardView: View {
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
-                switch appState.currentPlan {
+                switch appState.currentPlanEnvelope {
                 case .idle:
                     generateButton
 
@@ -39,8 +44,8 @@ struct TournamentDashboardView: View {
                 case .failed(let message):
                     errorView(message)
 
-                case .loaded(let plan):
-                    planContent(plan: plan)
+                case .loaded(let envelope):
+                    envelopeContent(envelope: envelope)
                 }
             }
             .padding(.vertical, 16)
@@ -70,38 +75,131 @@ struct TournamentDashboardView: View {
             .environmentObject(appState)
         }
         .task {
-            // Reset plan state on each dashboard appearance so a stale plan from a
+            // Reset plan envelope on each dashboard appearance so a stale plan from a
             // different tournament is never shown. User taps "Generate Plan" to load.
-            appState.currentPlan = .idle
+            // Phase 8: also resets selectedMatchId; re-anchored on envelope arrival.
+            appState.currentPlanEnvelope = .idle
+            appState.selectedMatchType = .singles
+            appState.selectedMatchId = nil
         }
     }
 
-    // MARK: - Plan Content
+    // MARK: - Envelope Content (Phase 8 — per-match plans + schedule strip)
+    //
+    // Resolves the active Plan from the PlanEnvelope:
+    //   - Singles|Doubles segmented picker rendered only when hasBothTypes == true.
+    //   - Active plan = plan matching appState.selectedMatchId (set by strip tap or
+    //     defaulted on envelope arrival via AppState.defaultMatchId(from:)).
+    //
+    // See NUTRITION_FIRST_IA_V1.md §B and §H.14 for the full UX specification.
+    //
+    // NOTE on macOS toolchain: `@EnvironmentObject` projected-value binding
+    // ($appState.xxx) is immutable. Use explicit Binding computed vars instead.
 
     @ViewBuilder
-    private func planContent(plan: Plan) -> some View {
-        // §B Emergency banner — renders when extreme_heat_risk = true
+    private func envelopeContent(envelope: PlanEnvelope) -> some View {
+        // Segmented picker — only when both plan types are present.
+        // When user switches type, also reset selectedMatchId to that type's first match.
+        if envelope.hasBothTypes {
+            Picker("Match Type", selection: matchTypeBinding) {
+                ForEach(MatchType.allCases, id: \.self) { type in
+                    Text(type.displayName).tag(type)
+                }
+            }
+            .pickerStyle(.segmented)
+            .padding(.horizontal, 16)
+            .padding(.top, 8)
+            .onChange(of: appState.selectedMatchType) { _, newType in
+                // Re-anchor strip to the first match of the newly selected type.
+                let firstPlan = newType == .singles
+                    ? envelope.singlesPlans.first
+                    : envelope.doublesPlans.first
+                appState.selectedMatchId = firstPlan?.matchId
+            }
+        }
+        // Resolve active plan via selectedMatchId first; fall back to anyPlan.
+        // Uses resolveActivePlan() helper to avoid illegal `let` in @ViewBuilder bodies
+        // on older macOS Swift toolchains (Session 5 lesson).
+        if let plan = resolveActivePlan(from: envelope) {
+            planContent(plan: plan, envelope: envelope)
+        } else {
+            // No plans at all — defensive guard (shouldn't happen in normal use)
+            generateButton
+        }
+    }
+
+    /// Resolves the Plan to display:
+    ///   1. Plan matching appState.selectedMatchId (strip selection)
+    ///   2. First plan of selectedMatchType (type picker fall-through)
+    ///   3. anyPlan (last resort)
+    private func resolveActivePlan(from envelope: PlanEnvelope) -> Plan? {
+        if let id = appState.selectedMatchId, let p = envelope.plan(for: id) { return p }
+        return envelope.plan(for: appState.selectedMatchType) ?? envelope.anyPlan
+    }
+
+    /// Explicit Binding for `AppState.selectedMatchType`.
+    /// Required because `$appState.selectedMatchType` is immutable on macOS toolchain.
+    private var matchTypeBinding: Binding<MatchType> {
+        Binding(
+            get: { appState.selectedMatchType },
+            set: { appState.selectedMatchType = $0 }
+        )
+    }
+
+    /// Explicit Binding for `AppState.selectedMatchId`.
+    private var selectedMatchIdBinding: Binding<UUID?> {
+        Binding(
+            get: { appState.selectedMatchId },
+            set: { appState.selectedMatchId = $0 }
+        )
+    }
+
+    // MARK: - Plan Content (NUTRITION_FIRST_IA_V1.md §B locked order)
+    //
+    // Order (top → bottom):
+    //   0. EmergencyBanner   (extreme_heat_risk — IMMOVABLE)
+    //   2. PlanSummaryCard   (LLM coach voice)
+    //   3. ScheduleStripView (multi-match schedule strip)
+    //   4. NextActionCard    (next actionable item)
+    //   5. FoodCardView      (food options)
+    //   6. Scenario cards    (horizontal scroll)
+    //   7. Timeline button
+    //   8. WeatherCardView   (compact pill, demoted)
+    //   9. Disclaimer footer
+    //
+    // The envelope is passed so ScheduleStripView gets allPlans for the strip.
+
+    @ViewBuilder
+    private func planContent(plan: Plan, envelope: PlanEnvelope) -> some View {
+        // #0 — Emergency banner (IMMOVABLE: see SAFETY_DISCLAIMERS.md §B)
         if plan.weather.extremeHeatRisk {
             EmergencyBanner()
         }
 
-        // Phase 6: LLM/template plan summary — below EmergencyBanner, above WeatherCard
+        // #2 — LLM/template plan summary (coach voice)
         if let llmSummary = plan.llmSummary {
             PlanSummaryCard(explanation: llmSummary)
         }
 
-        // US-07 Weather card
-        WeatherCardView(weather: plan.weather)
+        // #3 — Schedule strip (primary navigation control)
+        ScheduleStripView(
+            allPlans: envelope.allPlans,
+            selectedMatchId: selectedMatchIdBinding,
+            onAddMatch: { showingCreateMatch = true }
+        )
 
-        // US-06 Scenario cards — horizontal scroll
-        scenariosSection(plan: plan)
+        // #4 — Next action card (glance-test: parent knows "what's next" in 2 sec)
+        NextActionCard(nextAction: plan.nextAction)
 
-        // US-08 Food card (only when food options are available)
+        // #5 — Food card (only when options available; bag fallback rendered inside)
         if !plan.foodOptions.isEmpty {
             FoodCardView(foodOptions: plan.foodOptions)
         }
 
-        // Full Timeline navigation (only when timeline is available)
+        // #6 — Scenario cards (horizontal scroll)
+        scenariosSection(plan: plan)
+
+        // #7 — Full Timeline button
         if !plan.timeline.isEmpty {
             NavigationLink {
                 TimelineView(tournament: tournament, timeline: plan.timeline)
@@ -113,7 +211,12 @@ struct TournamentDashboardView: View {
             .padding(.horizontal, 16)
         }
 
-        // §A Footer disclaimer link
+        // #8 — Weather card (compact pill, demoted — parents already feel the heat)
+        // SAFETY NOTE: demotion of visual weight does NOT disable extreme_heat_risk
+        // logic. The EmergencyBanner at #0 fires independently.
+        WeatherCardView(weather: plan.weather, compact: true)
+
+        // #9 — §A Footer disclaimer link
         footerDisclaimer
     }
 
@@ -216,7 +319,8 @@ struct TournamentDashboardView: View {
     let api   = APIClient(authService: auth)
     let repo  = Repository(api: api)
     let state = AppState(repository: repo, authService: auth)
-    state.currentPlan = .loaded(FakeData.dallasPlan)
+    // Phase 7: use the PlanEnvelope (both singles + doubles plans loaded for preview)
+    state.currentPlanEnvelope = .loaded(FakeData.dallasPlanEnvelope)
     return NavigationStack {
         TournamentDashboardView(tournament: FakeData.dallasTournament)
     }

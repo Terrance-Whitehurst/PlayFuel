@@ -16,6 +16,10 @@ enum TimelineEventKind: String, Codable, CaseIterable {
     case foodWindow     // Food/snack window
     case pickup         // Parent pickup window
     case matchEnd       // Estimated match end
+    // Phase 7 — Doubles spec (DOUBLES_SPEC_V1.md §C.1)
+    // Emitted by the backend at T−60m when match_type == "doubles".
+    // TimelineView.swift exhaustive switches must handle this case.
+    case partnerCoordination  // Doubles-only: confirm with doubles partner
 }
 
 // MARK: - TimelineEvent

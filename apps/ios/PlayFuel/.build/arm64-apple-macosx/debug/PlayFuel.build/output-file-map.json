@@ -37,12 +37,26 @@
     "swift-dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Match.swiftdeps",
     "diagnostics": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Match.dia"
   },
+  "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/MatchType.swift": {
+    "dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.d",
+    "object": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.swift.o",
+    "swiftmodule": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType~partial.swiftmodule",
+    "swift-dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.swiftdeps",
+    "diagnostics": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.dia"
+  },
   "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Plan.swift": {
     "dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.d",
     "object": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.swift.o",
     "swiftmodule": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan~partial.swiftmodule",
     "swift-dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.swiftdeps",
     "diagnostics": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.dia"
+  },
+  "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanEnvelope.swift": {
+    "dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.d",
+    "object": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.swift.o",
+    "swiftmodule": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope~partial.swiftmodule",
+    "swift-dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.swiftdeps",
+    "diagnostics": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.dia"
   },
   "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanExplanation.swift": {
     "dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanExplanation.d",
@@ -113,6 +127,13 @@
     "swiftmodule": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DTOs~partial.swiftmodule",
     "swift-dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DTOs.swiftdeps",
     "diagnostics": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DTOs.dia"
+  },
+  "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DebugAuth.swift": {
+    "dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.d",
+    "object": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.swift.o",
+    "swiftmodule": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth~partial.swiftmodule",
+    "swift-dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.swiftdeps",
+    "diagnostics": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.dia"
   },
   "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Endpoints.swift": {
     "dependencies": "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Endpoints.d",

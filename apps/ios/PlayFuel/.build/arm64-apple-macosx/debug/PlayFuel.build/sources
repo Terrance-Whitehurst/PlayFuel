@@ -3,7 +3,9 @@
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Data/HardCodedStrings.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/FoodOption.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Match.swift
+/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/MatchType.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Plan.swift
+/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanEnvelope.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanExplanation.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/ScenarioPlan.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/TimelineEvent.swift
@@ -14,6 +16,7 @@
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/APIError.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/AuthService.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DTOs.swift
+/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DebugAuth.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Endpoints.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/KeychainStore.swift
 /Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Repository.swift

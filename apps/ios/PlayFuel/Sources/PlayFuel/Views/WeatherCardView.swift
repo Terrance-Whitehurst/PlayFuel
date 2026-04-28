@@ -4,11 +4,92 @@ import SwiftUI
 ///
 /// Shows temperature, humidity, wind, precip, UV, active flags,
 /// and the list of plan adjustments derived from those flags (§E.3).
+///
+/// NUTRITION_FIRST_IA_V1.md §F: Pass `compact: true` on the dashboard to render
+/// a 1-line pill (temp + flags + chevron) that expands inline on tap.
+/// `compact: false` (default) renders the existing full card body — unchanged.
+///
+/// SAFETY NOTE: Demoting the weather card's visual prominence does NOT disable
+/// any safety logic. `extreme_heat_risk` still drives EmergencyBanner at position
+/// #0 regardless of whether WeatherCardView is compact or expanded.
 struct WeatherCardView: View {
 
     let weather: WeatherSnapshot
+    var compact: Bool = false
+
+    /// Expansion state for compact mode. Per-session, default collapsed.
+    @State private var expanded: Bool = false
 
     var body: some View {
+        if compact {
+            compactPillView
+        } else {
+            fullCardBody
+        }
+    }
+
+    // MARK: - Compact Pill
+
+    private var compactPillView: some View {
+        VStack(spacing: 0) {
+            Button {
+                withAnimation(.easeInOut(duration: 0.2)) {
+                    expanded.toggle()
+                }
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "thermometer.medium")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text(pillSummary)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Spacer()
+                    Image(systemName: expanded ? "chevron.up" : "chevron.down")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+            }
+            .buttonStyle(.plain)
+
+            if expanded {
+                Divider()
+                    .padding(.horizontal, 16)
+                fullCardBody
+            }
+        }
+        .background(pillBackground)
+        .clipShape(RoundedRectangle(cornerRadius: 12))
+        .padding(.horizontal, 16)
+    }
+
+    /// 1-line pill summary: "°88°F · humid, hot · feels 95°F"
+    private var pillSummary: String {
+        var parts: [String] = ["❤️ \(Int(weather.tempF))°F"]
+        if !weather.flags.isEmpty {
+            let flagNames = weather.flags.map { $0.rawValue.replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ")
+            parts.append(flagNames)
+        }
+        // apparentTempF not in the model — omit "feels" segment for now (OQ-IA-W1)
+        return parts.joined(separator: " · ")
+    }
+
+    private var pillBackground: some View {
+        Group {
+#if os(iOS)
+            Color(.secondarySystemBackground)
+#else
+            Color.secondary.opacity(0.1)
+#endif
+        }
+    }
+
+    // MARK: - Full Card Body
+
+    @ViewBuilder
+    private var fullCardBody: some View {
         VStack(alignment: .leading, spacing: 16) {
 
             // Header
@@ -152,6 +233,12 @@ private extension View {
 
 #Preview {
     ScrollView {
-        WeatherCardView(weather: FakeData.dallasWeather)
+        VStack(spacing: 16) {
+            // Compact pill (default on dashboard)
+            WeatherCardView(weather: FakeData.dallasWeather, compact: true)
+            // Full card (used in standalone weather views)
+            WeatherCardView(weather: FakeData.dallasWeather)
+        }
+        .padding(.vertical, 16)
     }
 }

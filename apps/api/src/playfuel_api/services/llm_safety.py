@@ -45,9 +45,17 @@ PROHIBITED_PHRASES: list[str] = [
     "solves injury risk",
 ]
 
-# Canonical match durations (§F / RULES_CONSTANTS_V1.md).  Any digit sequence
-# representing minutes that is NOT one of these three is flagged as fabricated.
-_CANONICAL_DURATIONS: frozenset[str] = frozenset({"75", "120", "180"})
+# Canonical match durations (§F / RULES_CONSTANTS_V1.md + DOUBLES_SPEC_V1.md §B).
+# Any digit sequence representing minutes NOT in this set is flagged as fabricated.
+# Singles: 75, 120, 180 (v1.0)
+# Doubles best_of_3: 60, 90, 135 (v1.1 DOUBLES_SPEC_V1.md)
+# Doubles pro_set_8:  45, 70, 100 (v1.1 DOUBLES_SPEC_V1.md)
+# SEC-6 fix: expanded from singles-only {75,120,180} to include all doubles values.
+_CANONICAL_DURATIONS: frozenset[str] = frozenset({
+    "75", "120", "180",   # singles
+    "60", "90", "135",   # doubles best_of_3
+    "45", "70", "100",   # doubles pro_set_8
+})
 
 # Regex to extract standalone duration-like numbers (e.g. "90 min", "95 minutes")
 # We only flag numbers that appear adjacent to "min" / "minute" / "minutes".

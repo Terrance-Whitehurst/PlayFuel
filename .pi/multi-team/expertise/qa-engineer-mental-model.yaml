@@ -5,7 +5,7 @@ project_context:
   name: PlayFuel
   stack: FastAPI (Python 3.11+), Pydantic v2, supabase-py, PyJWT, pytest
   api_root: apps/api/src/playfuel_api/
-  rules_version: "1.0.0"
+  rules_version: "1.1.0"  # bumped for doubles-spec nested SCENARIO_DURATIONS_MIN
 
 domain_restrictions:
   write: .pi/multi-team/ only
@@ -143,10 +143,6 @@ findings:
   - category: REGRESSION_CHECK
     severity: info
     title: "No regressions found vs foundation files"
-    detail: "All new files import from playfuel_api.rules.constants, playfuel_api.models.api,
-             playfuel_api.models.enums — no shadowing, no circular imports detected by read.
-             Foundation files (constants.py, hard_coded_strings.py, models/api.py, etc.)
-             appear untouched."
 
 new_oqs:
   - id: "OQ-QA-1"
@@ -166,6 +162,7 @@ new_oqs:
     detail: "Unused import raises linting warnings. Recommend removing before Phase 3."
 
 test_coverage_patterns:
+  total_as_of_doubles_delivery: "231 passed, 1 xfailed (was 180+1; +51 over doubles delegate)"
   total_as_of_session_moh9uivm3dxv: "180 passed, 1 xfailed (was 88+1 at session start; +92 over 4 deliveries)"
   bucket_tests: 13 cases (8 food + 4 pickup + 1 named regression)
   weather_tests: 6 parametrized cases (2 extreme_heat paths, 1 cold, 1 rain, 1 hot-only, 1 none)
@@ -185,6 +182,14 @@ test_coverage_patterns:
     - build_plan_envelope heat text: NOW COVERED
     - rewarm_up gap boundary isolation: NOW COVERED
     - verify_supabase_jwt negative paths: NOW COVERED
+
+doubles_validation_report_written:
+  path: .pi/multi-team/sessions/moh9uivm3dxv/doubles-validation-report.md
+  verdict: "Demo-ready YES — 231 passed / 1 xfailed / 0 blockers"
+  minor_deviation: "plans.match_type nullable vs NOT NULL DEFAULT 'singles' in spec (OQ-DBL-7)"
+  new_security_findings: "SEC-6 (_CANONICAL_DURATIONS not updated for doubles) + SEC-7 (format not Literal-typed)"
+  pre_record_actions: 3 (unchanged from Session 4 — LLM_PROVIDER, timeline, DEVELOPMENT_TEAM)
+  consolidated_from: [doubles-qa-findings.md, doubles-security-findings.md, demo-readiness-report.md]
 
 demo_readiness_report_written:
   path: .pi/multi-team/sessions/moh9uivm3dxv/demo-readiness-report.md
@@ -219,6 +224,54 @@ new_oqs_session_moh9uivm3dxv:
     priority: minor
     detail: "auto mode routes to AnthropicProvider stub (NotImplementedError), caught by broad except, llmSummary=null.
              Demo operator must set LLM_PROVIDER=template in apps/api/.env before recording."
+
+nutrition_ia_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  test_count: '256 passed, 1 xfailed (was 231+1; +25 over IA pivot delegate)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  findings:
+    - id: QA-IA-1
+      severity: minor
+      title: 'EmergencyBanner/Picker render order swapped when hasBothTypes=true'
+      detail: 'Picker in envelopeContent() lines 103-112 renders BEFORE planContent() call.
+               EmergencyBanner is first element of planContent (line 176). When hasBothTypes=true,
+               Picker appears at visual #0, EmergencyBanner at visual #1 — inverted from spec #0/#1.
+               Demo-safe: Dallas seed is singles-only, Picker never renders. Safety data path intact.'
+    - id: OQ-IA-9 (carry)
+      severity: minor
+      title: 'INSERT not upsert in plans.py — re-generate will DB-constraint-fail'
+      detail: 'routes/plans.py:263 uses .insert() not .upsert(). Docstring at line 11 says
+               upsert — inaccurate. Partial unique index rejects duplicate (match_id, match_type).
+               Non-blocking for demo; UX bug for TestFlight re-generates.'
+  card_order_verified:
+    planContent_line_176: EmergencyBanner
+    planContent_line_181: PlanSummaryCard
+    planContent_line_185: ScheduleStripView
+    planContent_line_192: NextActionCard
+    planContent_line_195: FoodCardView
+    planContent_line_200: scenariosSection
+    planContent_line_202: Timeline button
+    planContent_line_217: 'WeatherCardView(compact: true)'
+    planContent_line_220: footerDisclaimer
+  new_oqs:
+    - OQ-IA-W1: 'WeatherPill omits apparent temp (feels like) — cosmetic'
+    - OQ-IA-6: 'minsUntil stale after server generation time; client-side recompute is Phase 8+'
+
+ia_pivot_patterns:
+  - 'When checking card order: differentiate envelopeContent (wraps planContent) vs planContent itself.
+     Items in envelopeContent render ABOVE items in planContent even if planContent"s comment says #0.'
+  - 'Picker/EmergencyBanner swap: only triggered when hasBothTypes=true AND extreme_heat_risk=true — rare production scenario but spec-required fix.'
+  - 'compact: Bool = false init param is the correct pattern for demoting a view component without removing it.'
+  - 'Per-match plan loop (vs first-of-type): key correctness check is that match_rows order (display_order ASC, scheduled_start ASC) feeds straight into the response arrays without re-sort.'
+  - 'INSERT vs upsert: always grep for .upsert vs .insert when a unique constraint is added in the same session. Docstring claims upsert; implementation has insert — a documentation drift bug.'
+
+doubles_qa_patterns:
+  - "For envelope-refactor validations: grep both the bare old name AND the new name (e.g. currentPlan vs currentPlanEnvelope)"
+  - "partnerCoordination uses camelCase value (consistent with ALL other TimelineEventKind values) — spec snake note was a naming suggestion not a mandate"
+  - "Nullable migration column vs NOT NULL DEFAULT: verify routes always insert explicit value; null-only for pre-migration legacy rows"
+  - "Dual pickers in form views: verify both always-visible (type) and conditional (format) pickerStyle(.segmented) present"
+  - "resolveActivePlan helper pattern: @ViewBuilder bodies cannot contain let bindings on macOS toolchain — extract to function"
 
 demonstrated_patterns:
   - "eval harness runnable via: PYTHONPATH=src .venv/bin/python3.12 -m playfuel_api.eval.run_acceptance"
