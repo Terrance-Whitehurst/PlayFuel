@@ -5,13 +5,16 @@ import SwiftUI
 /// Shows temperature, humidity, wind, precip, UV, active flags,
 /// and the list of plan adjustments derived from those flags (§E.3).
 ///
-/// NUTRITION_FIRST_IA_V1.md §F: Pass `compact: true` on the dashboard to render
-/// a 1-line pill (temp + flags + chevron) that expands inline on tap.
-/// `compact: false` (default) renders the existing full card body — unchanged.
+/// HEADER_BUBBLES_V1.md (Phase 8.1): The dashboard now surfaces weather via
+/// `HeaderBubbleRow` → `WeatherSheet`, which embeds this view with `compact: false`.
 ///
-/// SAFETY NOTE: Demoting the weather card's visual prominence does NOT disable
-/// any safety logic. `extreme_heat_risk` still drives EmergencyBanner at position
-/// #0 regardless of whether WeatherCardView is compact or expanded.
+/// `compact: true` mode is preserved in this file for potential future inline use
+/// but is no longer wired to the dashboard as of Phase 8.1. Pass `compact: false`
+/// (the default) at all current call sites.
+///
+/// SAFETY NOTE: WeatherCardView's compact/expanded state has zero coupling to
+/// `EmergencyStrip` or `extreme_heat_risk` logic. The safety strip triggers from
+/// the Plan model directly and cannot be suppressed by this view's UI state.
 struct WeatherCardView: View {
 
     let weather: WeatherSnapshot
@@ -234,11 +237,20 @@ private extension View {
 #Preview {
     ScrollView {
         VStack(spacing: 16) {
-            // Compact pill (default on dashboard)
             WeatherCardView(weather: FakeData.dallasWeather, compact: true)
-            // Full card (used in standalone weather views)
             WeatherCardView(weather: FakeData.dallasWeather)
         }
         .padding(.vertical, 16)
     }
+}
+
+#Preview("Dark") {
+    ScrollView {
+        VStack(spacing: 16) {
+            WeatherCardView(weather: FakeData.dallasWeather, compact: true)
+            WeatherCardView(weather: FakeData.dallasWeather)
+        }
+        .padding(.vertical, 16)
+    }
+    .preferredColorScheme(.dark)
 }

@@ -77,7 +77,7 @@ struct ScenarioCardView: View {
                 Text(plan.scenarioLabel)
                     .font(.headline.weight(.bold))
                     .foregroundStyle(.white)
-                Text("\(plan.durationMin) min match")
+                Text("\(DurationFormatting.friendly(minutes: plan.durationMin)) match")
                     .font(.caption)
                     .foregroundStyle(.white.opacity(0.85))
             }
@@ -146,9 +146,9 @@ struct ScenarioCardView: View {
 
     private func gapLabel(_ gap: Int) -> String {
         switch plan.gapStatus {
-        case .overrun:        return "⚠ \(abs(gap))m overrun"
-        case .tight:          return "⚡ \(gap)m tight"
-        case .ok:             return "✓ \(gap)m"
+        case .overrun:        return "⚠ \(DurationFormatting.friendly(minutes: abs(gap))) overrun"
+        case .tight:          return "⚡ \(DurationFormatting.friendly(minutes: gap)) tight"
+        case .ok:             return "✓ \(DurationFormatting.friendly(minutes: gap))"
         case .no_next_match:  return "No next match"
         }
     }
@@ -198,7 +198,7 @@ struct ScenarioCardView: View {
 
     private func rewarmText(_ rewarm: RewarmUp) -> String {
         let absOffset = abs(rewarm.startOffsetMin)
-        return "Start \(absOffset) min before Match 2, \(rewarm.durationMin)-min dynamic warm-up."
+        return "Start \(DurationFormatting.friendly(minutes: absOffset)) before Match 2, \(DurationFormatting.friendly(minutes: rewarm.durationMin)) dynamic warm-up."
     }
 }
 
@@ -211,4 +211,16 @@ struct ScenarioCardView: View {
         }
         .padding()
     }
+}
+
+#Preview("Dark") {
+    ScrollView(.horizontal) {
+        HStack(spacing: 16) {
+            ScenarioCardView(plan: FakeData.dallasShortScenario)
+            ScenarioCardView(plan: FakeData.dallasNormalScenario)
+            ScenarioCardView(plan: FakeData.dallasLongScenario)
+        }
+        .padding()
+    }
+    .preferredColorScheme(.dark)
 }

@@ -1,5 +1,5 @@
 project: PlayFuel (Junior Tennis Tournament Assistant)
-last_updated: "2026-04-27"
+last_updated: "2026-04-28T-food-deck-and-map-spec"
 
 positioning:
   one_sentence: "iPhone app for junior tennis parents — schedule-aware, weather-aware, food-aware tournament-day planner."
@@ -163,6 +163,16 @@ open_questions_ia:
     issue: "NextAction 'now' = server now() at generate time. iOS does NOT recompute client-side. Known staleness if dashboard is open across event boundary."
     blocking: Phase 8+
     owner: Engineering Lead
+  - id: OQ-HB-1
+    doc: HEADER_BUBBLES_V1.md §G
+    issue: 'Plan Summary bubble unread-dot badge. DRAFT, not in MVP scope.'
+    blocking: false
+    owner: UX Researcher
+  - id: OQ-HB-3
+    doc: HEADER_BUBBLES_V1.md §G
+    issue: 'Heat guidance sheet dismiss pattern — drag-only locked, Got-It button for accessibility tracked.'
+    blocking: false
+    owner: UX Researcher
   - id: OQ-IA-8
     doc: NUTRITION_FIRST_IA_V1.md §J
     issue: "plans.match_id did not exist in 0002 (PM verified). Migration 0008 must ADD COLUMN, not just add index. plans.match_type is nullable (0007) — index uses WHERE match_id IS NOT NULL."
@@ -171,20 +181,12 @@ open_questions_ia:
 
 observations:
   - date: "2026-04-27"
-    note: "NUTRITION_FIRST_IA_V1.md authored (693 lines). Key verification catch: plans.match_id does NOT exist in 0002_tables.sql — Planning Lead assumed 'probably exists; migration adds only index.' Wrong. Must ADD COLUMN first. plans.match_type is nullable (0007). Unique index uses WHERE match_id IS NOT NULL. Pattern: always read both 0002 AND latest migration before scribing any DDL."
+    note: 'HEADER_BUBBLES_V1.md authored (Phase 8.1). Safety call: option (b) hybrid. PlanSummaryCard and WeatherCard removed from inline scroll — each accessible via 44pt circle bubble. EmergencyBanner replaced by 1-line EmergencyStrip on dashboard (banner kept for other surfaces). QA-IA-1 fixed in same pass: EmergencyStrip hoisted to envelopeContent() above Picker. Key verification catch: PlanExplanation has no scenario-explanation field — PlanSummarySheet scoped to summary/weatherNote/foodNote/safetyNote only. Third spec where verification-before-scribing caught a real model discrepancy.'
   - date: "2026-04-27"
-    note: "User product steer: nutrition + schedule are the hero surfaces. Weather data demoted from #2 to #8 (compact pill). EmergencyBanner at #0 is the ONLY safety exception — never moved regardless of visual pivot. ScheduleStripView + NextActionCard are new hero components. Dashboard card order locked in NUTRITION_FIRST_IA_V1.md §B."
+    note: 'Spec cadence: DOUBLES_SPEC_V1 (matches.format reuse catch), NUTRITION_FIRST_IA_V1 (plans.match_id non-existence catch), HEADER_BUBBLES_V1 (PlanExplanation has no scenario-explanation field catch). Three specs, three real bugs caught via pre-scribe verification. Pattern is reliable: always verify model fields exist before scribing content that references them.'
   - date: "2026-04-27"
-    note: "DOUBLES_SPEC_V1.md authored (538 lines, 26KB). Key verification catch: matches.format column already existed in 0002_tables.sql — brief-specified new match_type column would have been redundant. Resolved in-spec as OQ-DBL-3. Demonstrates value of reading migrations before scribing column decisions."
-  - date: "2026-04-26"
-    note: "Spec is unusually complete and specific — rules, pseudocode, schema, and prompts all present. Phase 0 job was distillation and gap-flagging, not design."
-  - date: "2026-04-26"
-    note: "Most critical open questions are boundary conditions in the rules engine (OQ-13, OQ-14, OQ-15) — these will create bugs if unresolved before Phase 3 backend build."
-  - date: "2026-04-26"
-    note: "OQ-13 and OQ-14 now resolved by Engineering1. Key change: Normal scenario (gap=120) maps to quick_pickup bucket [90,150), NOT light_meal. This is a breaking change from pre-v1 ambiguity. Captured in RULES_CONSTANTS_V1.md §B.4 worked example note."
-  - date: "2026-04-26"
-    note: "Phase 0 complete. RULES_CONSTANTS_V1.md written. 9 open questions remain (OQ-A through OQ-G plus legal blockers OQ-06 and OQ-11). OQ-C (pre-match offsets) blocks Phase 3 — needs Planning Lead confirmation before Engineering1 builds the plan engine."
+    note: 'Dashboard evolution: weather demoted from #2 to #8 compact pill (IA pivot), then fully removed from scroll to bubble (Phase 8.1). EmergencyBanner demoted to 1-line EmergencyStrip on dashboard — banner kept in code for previews. PlanSummaryCard removed from scroll — bubble only. QA-IA-1 fixed: EmergencyStrip now hoisted above Picker in envelopeContent().'
+  - date: "2026-04-28"
+    note: 'FOOD_DECK_AND_MAP_V1.md authored (Phase 8.3). 8 PM-verification findings caught by pre-scribe disk read: (1) RawPlace has no lat/lng — must add to dataclass; (2) FoodOption Pydantic has no lat/lng — must add; (3) iOS driveTimeMin is Int (non-optional) vs Python Optional[int] — latent decode-fail bug, fixed by widening to Int?; (4) Starbucks absent from FakeData.dallasFoodOptions despite user request; (5) food.py fast_casual_bowl template diverges from §F.3 doc — food.py is authoritative; (6) HeaderBubbleRow signature widening needed for tournament: Tournament; (7) FoodOptionDTO.toModel uses ?? 0 hardcode for driveTimeMin; (8) PlanExplanation.scenario_explanations DOES exist (Planning Lead was wrong in HEADER_BUBBLES §J). Pattern is reliable — fifth spec, eighth real bug caught via pre-scribe verification.'
   - date: "2026-04-27"
-    note: "Phases 1-3 shipped. iOS prototype (22 files), Supabase schema (9 tables, RLS), FastAPI body (16 files, 18 endpoints, rules engine, 5 scenario acceptance tests) all on disk. Authored 4 front-door docs staged at .pi/multi-team/expertise/docs-staging/ for Engineering to scribe. Env var names confirmed: SUPABASE_URL, SUPABASE_ANON_KEY, SUPABASE_JWT_SECRET, SUPABASE_SERVICE_ROLE_KEY, API_PORT, CORS_ORIGINS. Port 8000. Python 3.12 used in commands. iOS target iOS 17+. All commands verified against actual on-disk files."
-  - date: "2026-04-27"
-    note: "Task #6 (iOS wiring) shipped. OQ-API-1/API-2/iOS-1/OQ-11 triaged in TRIAGE_2026-04-27.md. Key finding: TimelineEvent.swift uses title/detail/kind (TimelineEventKind enum) NOT label/category/matchId as Lead assumed. Flagged as OQ-TRIAGE-1. SAFETY_DISCLAIMERS.md bumped to v1.1 with new §B candidate text: parent-addressing voice + explicit 911 escalation. Bundle ID locked: com.playfuel.ios. Next migrations filename: 0005_match_labels.sql."
+    note: 'Phases 1-6 shipped. 262 API tests passing. iOS multi-match schedule strip, NextActionCard, header bubbles spec locked. HardCodedStrings symbols: heatEmergencyText, userDisclaimer, overrunMessage, bagFoodFallback. Bundle ID: com.playfuel.ios. Port 8000. Python 3.12.'

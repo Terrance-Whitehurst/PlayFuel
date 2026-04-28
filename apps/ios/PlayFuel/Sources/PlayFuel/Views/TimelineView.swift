@@ -37,8 +37,9 @@ private struct TimelineEventRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 0) {
 
-            // Time column
-            Text(event.time)
+            // Time column — format ISO 8601 timestamps from the backend as "7:00 PM";
+            // FakeData strings like "6:00 AM" / "During Match" pass through unchanged.
+            Text(event.time.asClockTimeFromISO)
                 .font(.caption.monospacedDigit())
                 .foregroundStyle(.secondary)
                 .frame(width: 80, alignment: .trailing)
@@ -128,4 +129,14 @@ private struct TimelineEventRow: View {
             timeline: FakeData.dallasTimeline
         )
     }
+}
+
+#Preview("Dark") {
+    NavigationStack {
+        TimelineView(
+            tournament: FakeData.dallasTournament,
+            timeline: FakeData.dallasTimeline
+        )
+    }
+    .preferredColorScheme(.dark)
 }

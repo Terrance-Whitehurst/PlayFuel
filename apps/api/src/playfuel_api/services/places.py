@@ -36,6 +36,12 @@ class RawPlace:
 
     ``types`` mirrors the Google Places API ``types[]`` field.
     ``provider`` identifies the data source ("google" | "mock").
+
+    ``lat`` and ``lng`` are geographic coordinates of the place.
+    None when the provider does not return geometry (e.g. legacy stub paths).
+    MockPlacesProvider supplies best-guess Uptown Dallas offsets (OQ-FOOD-DECK-3).
+    GooglePlacesProvider should surface geometry.location.lat / .lng.
+    Added: FOOD_DECK_AND_MAP_V1.md §G.2.
     """
     name: str
     types: list[str]
@@ -43,6 +49,9 @@ class RawPlace:
     drive_time_minutes: int | None
     place_id: str | None
     provider: str
+    # Coordinates — optional; must come after all required fields in frozen dataclass
+    lat: float | None = None
+    lng: float | None = None
 
 
 class PlacesProviderError(Exception):
@@ -109,6 +118,9 @@ class GooglePlacesProvider:
 
 
 # fmt: off
+# Coordinates are best-guess Uptown Dallas offsets centred on
+# venue (32.776664, -96.796988).  Real Place API geometry will
+# replace these when GooglePlacesProvider is implemented (OQ-FOOD-DECK-3).
 _DALLAS_FIXTURE: list[RawPlace] = [
     RawPlace(
         name="Chipotle Mexican Grill",
@@ -117,6 +129,8 @@ _DALLAS_FIXTURE: list[RawPlace] = [
         drive_time_minutes=4,
         place_id="mock_chipotle_dallas_001",
         provider="mock",
+        lat=32.7825,
+        lng=-96.7975,
     ),
     RawPlace(
         name="Jimmy John's",
@@ -125,6 +139,8 @@ _DALLAS_FIXTURE: list[RawPlace] = [
         drive_time_minutes=3,
         place_id="mock_jimmyjohns_dallas_001",
         provider="mock",
+        lat=32.7820,
+        lng=-96.8025,
     ),
     RawPlace(
         name="Central Market",
@@ -133,6 +149,8 @@ _DALLAS_FIXTURE: list[RawPlace] = [
         drive_time_minutes=9,
         place_id="mock_centralmarket_dallas_001",
         provider="mock",
+        lat=32.7755,
+        lng=-96.7920,
     ),
     RawPlace(
         name="Starbucks",
@@ -141,6 +159,8 @@ _DALLAS_FIXTURE: list[RawPlace] = [
         drive_time_minutes=2,
         place_id="mock_starbucks_dallas_001",
         provider="mock",
+        lat=32.7805,
+        lng=-96.7990,
     ),
 ]
 # fmt: on

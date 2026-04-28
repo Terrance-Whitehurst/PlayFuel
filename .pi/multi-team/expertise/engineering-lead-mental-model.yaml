@@ -553,6 +553,19 @@ session_2026_04_27_oq_ia_9_hotfix:
     - Top-level logger.exception() wrapper around route bodies is cheap and high-value. Without it, the user's traceback was not visible in the orchestrator/dev console — diagnosis required guessing OQ-IA-9 from prior validation notes. Add this to every new route by default.
   test_count_now: 262 passed, 1 xfail (was 256+1)
 
+session_2026_04_27_header_bubbles:
+  delegated:
+    - FE single delegate, NO wrapper. Shipped 6 NEW files (HeaderBubble, HeaderBubbleRow, EmergencyStrip, PlanSummarySheet, WeatherSheet, HeatGuidanceSheet) + 3 EDITs (TournamentDashboardView reorder, WeatherCardView doc-only, README). Zero backend changes — test count unchanged at 262/1xfail.
+  qa_ia_1_fixed_in_same_pass:
+    - The IA-pivot validation finding (EmergencyBanner rendering at visual #1 below the Picker when hasBothTypes=true) is now resolved. EmergencyStrip is hoisted into envelopeContent() at line 116, ABOVE the hasBothTypes Picker check at line 121. Pattern: when a planning spec touches the same area as an open finding, fold the fix into the same delegate — don't carry it forward as separate post-demo cleanup.
+  spec_drift_caught_by_FE:
+    - Spec used per-field flag accessors like flagRainRisk/flagVeryHot/flagHot/flagCold, but actual WeatherSnapshot exposes a `flags: Set<WeatherFlag>` enum-set. FE adapted to flags.contains(.rain_risk) etc. without escalating. Pattern reaffirmed: FE always grounds field names against the model before scribing — provide spec examples, but FE will adapt.
+  pm_finding_correction:
+    - Planning's §J said PlanExplanation has 'NO scenarioExplanations field'. FE found it DOES exist on the model — but chose not to render it in PlanSummarySheet because ScenarioCardView is already the dedicated surface for that data. Defensible UX call (avoids duplication). Lesson for Planning: 'no field exists' verifications should be verified by Read, not by structural inference. PM verification rigor was good but missed this one because they read the rendering site (PlanSummaryCard) not the model.
+  safety_preservation_intact:
+    - HeatGuidanceSheet uses HardCodedStrings.heatEmergencyText + .userDisclaimer verbatim — zero string-literal manual rendering. EmergencyStrip's @State sheetShown is decoupled from WeatherCardView's @State isExpanded. The 1-line strip honors the user's compactness ask while keeping the heat warning unmissable when active. No OQ-11 legal-review impact.
+  field_count: 6 NEW + 3 EDIT = 9 file ops, single delegate, zero error wrapper.
+
 session_2026_04_27_doubles_integration:
   delegated_in_parallel:
     - BD: migration 0007 (matches.doubles_format + plans.match_type) + nested SCENARIO_DURATIONS_MIN keyed by (match_type, doubles_format) + version bump 1.0.0→1.1.0 + MatchType/DoublesFormat enums + partnerCoordination TimelineEventKind + GeneratePlanResponse envelope refactor + routes/plans.py per-type generation + routes/matches.py validation + LLM TemplateProvider doubles voice + 4 of 5 doubles test files in first delegate, 3 close-out test files in second delegate. 231 passed, 1 xfailed (was 180+1).
@@ -584,4 +597,28 @@ session_2026_04_27_demo_session3:
   remaining_demo_path:
     - #8 Task #9 LLM explanation layer (optional polish)
     - #9 Final validation pass
+
+session_2026_04_28_food_deck_and_map:
+  delegated_in_parallel: "BD owned apps/api (FoodSuggestions schema + 5-bucket templates + lat/lng on RawPlace+FoodOption + 14 tests). FE owned apps/ios (4 NEW files + 6 EDITs + xcodegen regen). Spec FOOD_DECK_AND_MAP_V1.md was 781 lines, §G mechanically copy-pasteable."
+  test_counts: "277->291 passed (+14 new in test_food_suggestions.py); 1 xfail unchanged."
+  xcodebuild_result: "BUILD SUCCEEDED on iPhone 17 Pro Sim, iOS 26.4, after FE caught one self-introduced bug."
+  fe_self_correction: "FE wrote Python-style \\u2014/\\u2013/\\u2265 escapes into Swift literals in FakeData.swift while transcribing food.py templates. Swift requires \\u{XXXX} bracket form. 9 occurrences fixed by replacing escapes with the actual unicode chars. NEW OQ-FE-UNICODE-1 captured: cross-language content copy from Python templates -> Swift literals must use real characters, not escape sequences."
+  fe_design_improvement: "Used MapKit Annotation (not Marker) for food pins -> tap-to-drill into FoodOptionDetailSheet works for free. Spec listed this as optional/OQ; FE delivered it."
+  pm_verification_pattern_continued: "PM caught 8 real findings pre-spec (record). Most impactful: Starbucks was in MockPlacesProvider but absent from FakeData.dallasFoodOptions — user's literal example would have rendered nothing. Also: HeaderBubbleRow needed `tournament:` param widening; iOS FoodOption.driveTimeMin: Int was non-optional with `?? 0` shim hiding a latent decode-fail (now widened to Int? with shim removed)."
+  food_py_authoritative_over_doc: "Lesson: when spec doc and runtime code diverge (RULES_CONSTANTS_V1.md §F.3 was stale vs rules/food.py runtime template), parse from the runtime source. BD did this correctly; tests pass without modifying existing test_food_templates.py assertions."
+  pattern_holding: "4th consecutive session of BD/FE parallel delegates shipping clean on first try when (a) domains are clean (apps/api vs apps/ios), (b) shared schema is locked in PM-verified spec before delegates start, (c) xcodegen-after-new-files is a hard checklist item. Wrapper [error] flags are no longer informative — verify via Read on the actual files instead."
+
+session_2026_04_28_dark_mode_and_xcodegen_landmine:
+  delivery: "Dark mode shipped via Apple semantic colors (Color.primary / Color(.systemBackground) / Color(.secondarySystemBackground)) + AccentColor.colorset and PlayFuelGreen.colorset in Assets.xcassets with light/dark variants. 23 #Preview('Dark') blocks added. Inline System/Light/Dark Picker added to existing DisclaimerView (FE went tighter than spec — no new file, @AppStorage('appearance_mode') + .preferredColorScheme on root WindowGroup). EmergencyStrip + EmergencyBanner kept literal Color.red + Color.white in both modes per safety lock. 2 Color.gray -> Color(.systemFill) swaps for DRAFT badges. Test count unchanged 291/1 xfail."
+  xcodegen_landmine_DISCOVERED: |
+    xcodegen 2.45.4 silently SKIPS generating PBXResourcesBuildPhase for .xcassets bundles. Neither removing `optional: true` from project.yml nor setting `type: folder.assetcatalog` produced the build phase. Result: BUILD SUCCEEDED but Assets.car never made it into the .app bundle initially -> Color.accentColor fell back to system blue, Color('PlayFuelGreen') returned nil, AppIcon at risk.
+    QA caught it via `grep -c Assets.xcassets project.pbxproj` returning 0 + reading all 562 lines of pbxproj to confirm no PBXResourcesBuildPhase block existed.
+    Fix: 5-site MANUAL pbxproj patch (PBXBuildFile + PBXFileReference + root PBXGroup child + new Resources PBXGroup + PBXNativeTarget buildPhases insertion + new PBXResourcesBuildPhase section). After patch: grep returned 4, Assets.car compiled into bundle, AccentColor + PlayFuelGreen baked in. xcodebuild BUILD SUCCEEDED.
+  CRITICAL_FOLLOW_UP_RULE: |
+    The 'every new-file FE delegate must run xcodegen generate' rule from session_2026_04_28_xcode_build_hotfix now has a sharp exception: running xcodegen WIPES the manual Resources build phase patch. Going forward, EVERY engineering brief that mentions xcodegen MUST also include:
+      1. After xcodegen, verify `grep -c Assets.xcassets project.pbxproj` >= 3
+      2. If grep returns 0, re-apply the 5-site Resources build phase patch (FE has the diff in this session's hotfix delivery)
+      3. Long-term mitigation options to evaluate: upgrade xcodegen past 2.45.4 if a fix landed; OR pin pbxproj as source of truth and stop using xcodegen for resource-bundle changes; OR file the bug upstream
+  qa_validation_quality_continues: "QA's pbxproj line-by-line read caught a real runtime regression that BUILD SUCCEEDED would have masked. Lesson reinforced: 'BUILD SUCCEEDED' is necessary but not sufficient — runtime resource resolution requires explicit asset bundle verification. Add to validation checklist for any session that touches Resources or Assets.xcassets."
+  qa_dm_1_status: RESOLVED via 5-site manual pbxproj patch.
 

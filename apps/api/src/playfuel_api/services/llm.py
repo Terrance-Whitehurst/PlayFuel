@@ -26,6 +26,8 @@ import re
 from datetime import datetime, timezone
 from typing import Optional, Protocol
 
+from playfuel_api.rules.duration_format import friendly_duration
+
 _logger = logging.getLogger(__name__)
 
 # ── SAFETY_DISCLAIMERS.md §E — verbatim system prompt for real LLM providers ──
@@ -161,7 +163,7 @@ class TemplateProvider:
             f"scheduled to start at {time_part}. "
             f"We've prepared three scenarios—short, normal, and long—to cover "
             f"different match durations. "
-            f"The normal scenario (~{normal_min} min) is used as the primary planning reference."
+            f"The normal scenario (~{friendly_duration(normal_min)}) is used as the primary planning reference."
             f"{heat_note}"
         )
 
@@ -177,7 +179,7 @@ class TemplateProvider:
             food = _food_bucket_guidance(s.food_bucket)
             pickup = _pickup_bucket_text(s.pickup_bucket)
             result[s.scenario] = (
-                f"In the {s.scenario} scenario ({s.duration_min} min match): "
+                f"In the {s.scenario} scenario ({friendly_duration(s.duration_min)} match): "
                 f"{subject}'ll have a {gap}. "
                 f"For food: {food}. "
                 f"For parent pickup: {pickup}."

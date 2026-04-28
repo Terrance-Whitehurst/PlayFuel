@@ -86,3 +86,11 @@ struct PlanSummaryCard: View {
             .padding(.vertical)
     }
 }
+
+#Preview("Dark") {
+    ScrollView {
+        PlanSummaryCard(explanation: FakeData.dallasPlan.llmSummary!)
+            .padding(.vertical)
+    }
+    .preferredColorScheme(.dark)
+}

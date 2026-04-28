@@ -17,7 +17,7 @@ targets:
           - Info.plist
     resources:
       - path: Resources/Assets.xcassets
-        optional: true
+        type: folder.assetcatalog
     info:
       path: Resources/Info.plist
       properties:

@@ -26,7 +26,7 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 from pydantic.alias_generators import to_camel
 
 from playfuel_api.models.enums import (
@@ -242,6 +242,27 @@ class Plan(BaseModel):
 # ─── Phase 5 food option model — Task #8 ─────────────────────────────────────
 
 
+class FoodSuggestions(BaseModel):
+    """Structured per-restaurant meal suggestions returned to iOS.
+
+    Five buckets expressing what to order, add-on carbs, drinks, what to
+    avoid pre-match, and any timing/logistics notes.
+
+    IMMUTABLE CONTRACT: FoodSuggestions is an iOS-rendering model ONLY.
+    It is NOT passed to the LLM input builder (PlanExplanationInput.food_recommendations
+    consumes only the derived recommendedOrder flat string).
+
+    Added: FOOD_DECK_AND_MAP_V1.md §A.
+    """
+    model_config = _CAMEL
+
+    main_options: list[str] = Field(default_factory=list)
+    add_ons: list[str] = Field(default_factory=list)
+    drinks: list[str] = Field(default_factory=list)
+    avoid: list[str] = Field(default_factory=list)
+    notes: list[str] = Field(default_factory=list)
+
+
 class FoodOption(BaseModel):
     """Single restaurant / food option recommended for the plan window.
 
@@ -268,6 +289,10 @@ class FoodOption(BaseModel):
     distance_meters: Optional[int] = None
     place_id: Optional[str] = None
     provider: str
+    # ─ FOOD_DECK_AND_MAP_V1 additions ──────────────────────────────────────────
+    suggestions: FoodSuggestions = Field(default_factory=FoodSuggestions)
+    lat: Optional[float] = None   # venue-relative latitude; None for non-geo providers
+    lng: Optional[float] = None   # venue-relative longitude; None for non-geo providers
 
 
 

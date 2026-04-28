@@ -1,9 +1,10 @@
 security_reviewer_mental_model:
 
   project: PlayFuel
-  last_updated: "2026-04-27"
+  last_updated: "2026-04-28"
   session: moh9uivm3dxv
   last_nutrition_ia_audit: "2026-04-27"
+  last_food_deck_map_audit: "2026-04-28"
 
   # ── Auth & Trust Boundaries ──────────────────────────────────────────────
   auth:
@@ -157,6 +158,70 @@ security_reviewer_mental_model:
       file: "apps/api/src/playfuel_api/services/llm_safety.py:~155"
       fix: "Update violation message to list all canonical durations or say 'not a canonical duration'"
 
+    - id: OQ-HB-6
+      severity: informational
+      status: NEW (2026-04-27 header_bubbles)
+      description: >
+        EmergencyStrip fires for the ACTIVELY SELECTED plan's extremeHeatRisk value.
+        If multi-match scheduling produces plans with heterogeneous heat risk values
+        (morning match = not extreme, afternoon = extreme), a parent viewing the morning
+        plan would not see the strip. Dallas seed has uniform extremeHeatRisk across all
+        plans (same venue weather) — not blocking for demo. Consider venue-level vs.
+        per-plan heat risk scoping in production.
+      blocker_for_demo: false
+      timing: "UX review pre-TestFlight"
+
+    - id: OQ-HB-7
+      severity: informational
+      status: NEW (2026-04-27 header_bubbles)
+      description: >
+        EmergencyStrip Button has no explicit .contentShape(Rectangle()). The Spacer
+        inside the HStack may reduce hit-test area on some SwiftUI versions. In practice
+        the Color.red background fill drives the visible and tappable region. One-line
+        fix if accessibility testing surfaces dead spots.
+      file: "apps/ios/PlayFuel/Sources/PlayFuel/Views/EmergencyStrip.swift"
+      fix: "Add .contentShape(Rectangle()) after .buttonStyle(.plain)"
+
+    - id: SEC-FOOD-1
+      severity: yellow
+      status: NEW (2026-04-28 food_deck_map)
+      description: >
+        FoodOptionDetailSheet.swift:130 hardcodes a food allergy disclaimer string
+        ("If your player has food allergies, intolerances, or dietary restrictions,
+        consult the relevant professional before following these suggestions.") that
+        is NOT tracked in HardCodedStrings. Not subject to RULES_CONSTANTS_VERSION
+        bump convention. Cannot be verified verbatim against legal-review record.
+        Content is conservative and medically appropriate. QA-FDM-3 confirmed;
+        this is the security/compliance dimension.
+      file: "apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/FoodOptionDetailSheet.swift:130"
+      fix: "Add HardCodedStrings.foodAllergyDisclaimer + FOOD_ALLERGY_DISCLAIMER in hard_coded_strings.py"
+      blocker_for_demo: false
+      blocker_for_app_store: true
+
+    - id: SEC-FOOD-2
+      severity: informational
+      status: NEW (2026-04-28 food_deck_map)
+      description: >
+        VenueMapSheet.swift force-unwraps option.lat! and option.lng! inside Annotation
+        loop body. Safe because the loop iterates foodOptionsWithCoords (filter: non-nil
+        lat/lng), but creates coupling between filter and force-unwrap. Stable code path.
+      file: "apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/VenueMapSheet.swift"
+      fix: "Optional binding inside Annotation if filter ever changes"
+      blocker_for_demo: false
+
+  # ── Files Audited (session moh9uivm3dxv, Food Deck + Map) ──────────────────
+  audited_files_food_deck_map:
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/FoodOptionDeck.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/FoodOptionDetailSheet.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/VenueMapSheet.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Models/FoodSuggestions.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/HeaderBubbleRow.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/TournamentDashboardView.swift (planContent)
+    - apps/ios/PlayFuel/Sources/PlayFuel/Data/FakeData.swift (food options section)
+    - apps/ios/PlayFuel/Sources/PlayFuel/Data/HardCodedStrings.swift (constants verified)
+    - apps/api/src/playfuel_api/services/places.py (coord bounds check)
+    - apps/api/src/playfuel_api/rules/hard_coded_strings.py (backend constants verified)
+
   # ── Observations ──────────────────────────────────────────────────────────
   observations:
     - date: "2026-04-27"
@@ -180,6 +245,42 @@ security_reviewer_mental_model:
       note: >
         NextAction rules engine owns all safety-critical wording (heat prepend is hardcoded).
         LLM never authors or modifies NextAction content. Correct architecture.
+    - date: "2026-04-27"
+      note: >
+        Header Bubbles pivot verified: EmergencyStrip (compact) is NOT a regression from the
+        full EmergencyBanner. The strip is full-width red, non-self-dismissable, renders at #0
+        above the Picker. Its @State sheetShown controls ONLY the HeatGuidanceSheet — not strip
+        visibility. This is the right architecture for a compact-but-forced safety surface.
+    - date: "2026-04-27"
+      note: >
+        Key security pattern confirmed: when demoting a safety surface's visual weight,
+        verify the @State variable inventory — any local @State that controls its OWN
+        visibility (not a child sheet's) is the regression signature. EmergencyStrip has
+        ONLY sheetShown, which is scoped to the sheet. Clean.
+    - date: "2026-04-27"
+      note: >
+        QA-IA-1 resolved in header bubbles delegate. EmergencyStrip in envelopeContent()
+        at line 116; Picker at line 121. The carryover finding (banner below picker when
+        hasBothTypes) is definitively closed. Lesson: carry safety-positioning findings
+        forward explicitly until the file:line evidence shows correct ordering.
+    - date: "2026-04-28"
+      note: >
+        Food Deck + Map (Phase 8.3) verified clean. Key pattern: MKMapItem.openInMaps()
+        is always safe (no URL injection); mapItem.name = string is display metadata
+        NOT a URL component. Grep for URL(string:) / "maps://" is the injection check.
+    - date: "2026-04-28"
+      note: >
+        SEC-FOOD-1 archetype: a new safety string was introduced inline in a View
+        rather than being added to HardCodedStrings. The convention (all safety strings
+        in the registry) is solid but depends on author discipline. Lesson: when
+        reviewing new sheets that show disclaimers or safety guidance, grep for
+        .font(.caption2) + Text literals — that's the visual signature of a disclaimer
+        that may be hardcoded. Also grep for 'allerg' / 'consult' / 'professional'.
+    - date: "2026-04-28"
+      note: >
+        Force-unwrap-after-filter pattern (option.lat! after filter for non-nil lat) is
+        acceptable in SwiftUI ForEach bodies when the filter and unwrap are co-located.
+        Risk: if filter is removed or condition changes, crash. Flag as ⚪ to track.
 
   # ── Files Audited (session moh9uivm3dxv, Nutrition-First IA) ─────────────
   audited_files_nutrition_ia:
@@ -190,3 +291,17 @@ security_reviewer_mental_model:
     - apps/api/src/playfuel_api/rules/hard_coded_strings.py (lines 1-78)
     - apps/api/src/playfuel_api/services/llm.py (lines 1-60 + grep)
     - apps/api/src/playfuel_api/tests/test_llm_safety.py
+
+  # ── Files Audited (session moh9uivm3dxv, Header Bubbles) ─────────────────
+  audited_files_header_bubbles:
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/TournamentDashboardView.swift (envelopeContent)
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/EmergencyStrip.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/HeatGuidanceSheet.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/PlanSummarySheet.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/WeatherSheet.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/HeaderBubble.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/HeaderBubbleRow.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Data/HardCodedStrings.swift
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/EmergencyBanner.swift (verify preserved)
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/WeatherCardView.swift (compact mode)
+    - apps/ios/PlayFuel/Sources/PlayFuel/Views/DisclaimerView.swift (disclaimer chain)

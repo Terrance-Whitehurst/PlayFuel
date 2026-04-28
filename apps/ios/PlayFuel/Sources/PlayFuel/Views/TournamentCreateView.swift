@@ -197,3 +197,13 @@ struct TournamentCreateView: View {
     return TournamentCreateView()
         .environmentObject(state)
 }
+
+#Preview("Dark") {
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    return TournamentCreateView()
+        .environmentObject(state)
+        .preferredColorScheme(.dark)
+}

@@ -96,3 +96,8 @@ struct DisclaimerView: View {
 #Preview {
     DisclaimerView()
 }
+
+#Preview("Dark") {
+    DisclaimerView()
+        .preferredColorScheme(.dark)
+}

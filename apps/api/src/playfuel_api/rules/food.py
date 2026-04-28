@@ -130,17 +130,160 @@ _TEMPLATES: dict[str, tuple[str, bool]] = {
 
 
 def recommended_order_for(category: str) -> tuple[str, bool]:
-    """Return (order_text, is_draft) for the given food category.
+    """Deprecated shim — prefer suggestions_for() + derive_recommended_order().
 
-    Falls back to the generic "restaurant" template if the category is unknown.
+    Kept for backwards-compatibility so any legacy callers (e.g. LLM input
+    builder, test assertions) continue to receive a valid (str, bool) pair.
+    Delegates entirely to the structured path.
+
+    Returns:
+        (order_text: str, is_draft: bool)
+    """
+    sugg, is_draft = suggestions_for(category)
+    return derive_recommended_order(sugg), is_draft
+
+
+# ── Structured suggestions ─────────────────────────────────────────────────────────
+#
+# FOOD_DECK_AND_MAP_V1.md §A.3 — per-category FoodSuggestions templates.
+# Source-of-truth: food.py _TEMPLATES (authoritative per PM finding I-5).
+# DRAFT templates require nutrition review before App Store submission (OQ-B).
+
+# Per-category FoodSuggestions data (populated lazily below as typed dicts
+# to avoid importing FoodSuggestions at module load — prevents circular import).
+_SUGGESTIONS: dict[str, tuple[dict, bool]] = {
+    "fast_casual_bowl": (
+        # Chipotle bowl — CONFIRMED (is_draft=False).
+        # Decomposed from _TEMPLATES["fast_casual_bowl"] authoritative text.
+        {
+            "main_options": [
+                "Rice bowl with grilled chicken or steak: brown or white rice base, black beans",
+                "Add fresh salsa and lettuce",
+            ],
+            "add_ons": [],
+            "drinks": ["16\u201320 oz water"],
+            "avoid": [
+                "Sour cream",
+                "Cheese",
+                "Guacamole \u2014 keep fat and fiber low before competition",
+            ],
+            "notes": ["Eat 60\u201390 min before next match"],
+        },
+        False,  # is_draft
+    ),
+    "breakfast_cafe": (
+        # DRAFT — OQ-B: pending content review. Priority: user said \"click into Starbucks.\"
+        {
+            "main_options": [
+                "Oatmeal (plain or lightly sweetened)",
+                "Whole-grain item with eggs if available",
+            ],
+            "add_ons": ["Banana or fruit cup \u2014 easy carb bridge"],
+            "drinks": [
+                "Water (primary)",
+                "Small black coffee or tea if tolerated",
+            ],
+            "avoid": [
+                "Pastries and muffins \u2014 high sugar spike",
+                "Large milk-based drinks close to match time",
+                "High-sugar syrups and flavored drinks",
+            ],
+            "notes": ["Eat \u226545 min before play. DRAFT \u2014 confirm with your athlete."],
+        },
+        True,
+    ),
+    "sandwich_shop": (
+        # DRAFT — OQ-B: pending content review.
+        {
+            "main_options": [
+                "Turkey or chicken on whole-grain bread",
+                "Add lettuce, tomato, mustard",
+            ],
+            "add_ons": ["Baked chips or pretzels if gap allows"],
+            "drinks": ["Water or diluted sports drink"],
+            "avoid": [
+                "Heavy sauces and extra cheese",
+                "Oil-based dressings",
+            ],
+            "notes": ["Eat within 30 min of ordering. DRAFT \u2014 confirm with your athlete."],
+        },
+        True,
+    ),
+    "grocery_prepared": (
+        # DRAFT — OQ-B: pending content review.
+        {
+            "main_options": [
+                "Rotisserie chicken with rice",
+                "Prepared grain bowl \u2014 lean protein + complex carbs",
+            ],
+            "add_ons": ["Fresh fruit for post-match recovery"],
+            "drinks": ["Water or electrolyte drink"],
+            "avoid": ["Fried items", "Heavy cream-based dishes"],
+            "notes": ["Eat 60\u201390 min before play. DRAFT \u2014 confirm with your athlete."],
+        },
+        True,
+    ),
+    "restaurant": (
+        # Generic fallback — DRAFT.
+        {
+            "main_options": [
+                "Lean protein: chicken, fish, or turkey",
+                "Complex carbs: rice, pasta, or bread",
+                "Side of vegetables",
+            ],
+            "add_ons": [],
+            "drinks": ["Water \u2014 avoid sodas or sugary drinks"],
+            "avoid": [
+                "Heavy sauces and fried foods",
+                "Large portions \u2014 keep it light",
+            ],
+            "notes": ["Eat 90+ min before next match. DRAFT \u2014 confirm with your athlete."],
+        },
+        True,
+    ),
+}
+
+
+def suggestions_for(category: str) -> "tuple[FoodSuggestions, bool]":
+    """Return (FoodSuggestions, is_draft) for the given food category.
+
+    Falls back to the generic \"restaurant\" template if the category is unknown.
+    Lazy-imports FoodSuggestions from models.api to avoid circular import
+    (same pattern as FoodOption in assemble_food_options).
 
     Args:
         category: One of the CATEGORIES values.
 
     Returns:
-        (order_text: str, is_draft: bool)
+        (suggestions: FoodSuggestions, is_draft: bool)
     """
-    return _TEMPLATES.get(category, _TEMPLATES["restaurant"])
+    from playfuel_api.models.api import FoodSuggestions  # lazy — avoids circular import
+
+    data, is_draft = _SUGGESTIONS.get(category, _SUGGESTIONS["restaurant"])
+    return FoodSuggestions(**data), is_draft
+
+
+def derive_recommended_order(suggestions: "FoodSuggestions") -> str:  # type: ignore[name-defined]
+    """Collapse structured FoodSuggestions → single-line recommendedOrder string.
+
+    Algorithm: main_options[0] (if any). Then \"Drinks: \" + drinks[0] if
+    non-empty. Then \"Avoid: \" + avoid[0] if non-empty. Then notes[0] if
+    non-empty.  Parts joined by \". \".
+
+    Rationale: one-line fallback for LLM input and legacy iOS callers that
+    have not yet migrated to structured suggestions.  Returns empty string
+    (not a crash) when all buckets are empty.
+    """
+    parts: list[str] = []
+    if suggestions.main_options:
+        parts.append(suggestions.main_options[0])
+    if suggestions.drinks:
+        parts.append("Drinks: " + suggestions.drinks[0])
+    if suggestions.avoid:
+        parts.append("Avoid: " + suggestions.avoid[0])
+    if suggestions.notes:
+        parts.append(suggestions.notes[0])
+    return ". ".join(parts)
 
 
 # ── Scenario bucket → filter policy ──────────────────────────────────────────
@@ -200,7 +343,8 @@ def assemble_food_options(
             continue
 
         category = categorize_place(place.types, place.name)
-        order_text, is_draft = recommended_order_for(category)
+        sugg, is_draft = suggestions_for(category)
+        order_text = derive_recommended_order(sugg)
 
         options.append(
             FoodOption(
@@ -212,6 +356,9 @@ def assemble_food_options(
                 distance_meters=place.distance_meters,
                 place_id=place.place_id,
                 provider=place.provider,
+                suggestions=sugg,
+                lat=getattr(place, "lat", None),
+                lng=getattr(place, "lng", None),
             )
         )
 

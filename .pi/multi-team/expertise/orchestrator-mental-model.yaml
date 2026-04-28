@@ -216,6 +216,78 @@ session_moh9uivm3dxv_nutrition_first:
     clear input doc and exits with a clear output doc, discovery-overhead is near zero,
     and PM verification + EL self-correction catch real bugs at the spec/build seams.
 
+# ----------------------------------------------------------------------------
+# Session moh9uivm3dxv (cont.) — OQ-IA-9 hotfix + Header Bubbles pivot
+# ----------------------------------------------------------------------------
+session_moh9uivm3dxv_hotfix_and_bubbles:
+  user_500_on_generate: |
+    User hit 'Couldn't generate plan — Server error (500)' on iPhone 17 Pro Sim, iOS 26.4,
+    after pressing Generate twice. Root cause: OQ-IA-9 (INSERT after UNIQUE index from 0008).
+    BD shipped upsert fix + 0-matches degradation + NextAction wrapping + module-level
+    logger.exception in single delegate. Tests 256 → 262. Demo unblocked.
+  lesson_demo_safe_classifications_dangerous: |
+    Validation classified OQ-IA-9 as 'demo-safe (single generate per session works fine)'
+    after IA-pivot delegate 2. Orchestrator (me) accepted the classification without escalating
+    the upsert fix into the same build pass. User pressed Generate twice on first run.
+    NEW RULE: any 'demo-safe based on usage assumptions' classification = treat as 🟡 demo
+    blocker, not green-light. Real users press buttons twice. Cost of in-pass fix is one
+    line `insert` → `upsert`; cost of hotfix delegate during recording is much higher.
+  lesson_after_unique_index_audit_inserts: |
+    Any migration that adds a UNIQUE index (full or partial) MUST trigger an immediate
+    `grep '\.insert(' apps/api/` audit on every route hitting that table, with conversion
+    to upsert in the SAME build pass. Migration 0008 added the partial unique on
+    (match_id, match_type) WHERE match_id IS NOT NULL; the .insert sweep was missed.
+    Add to spec template + Engineering brief checklist.
+
+  bubble_pivot_user_directive: |
+    Make 1) head guidance 2) Plan Summary 3) Weather into popout bubbles to declutter the
+    homepage. User wants a less-overloaded dashboard with details one tap away.
+  bubble_pivot_safety_tension: |
+    EmergencyBanner is treated as IMMOVABLE per SAFETY_DISCLAIMERS.md §B and
+    NUTRITION_FIRST_IA_V1.md §A.3. Bubbling it = forced-encounter regression: a parent
+    who doesn't tap won't see the heat emergency text. Real safety surface change.
+  bubble_pivot_resolution: |
+    Planning chose option (b) hybrid:
+      - PlanSummary + Weather become true bubbles (icon buttons → sheet popovers)
+      - EmergencyBanner becomes a 1-line red full-width 'EmergencyStrip' that's
+        invisible when extreme_heat_risk is false, slams to the very top of the
+        dashboard when true, taps to a sheet with verbatim §B + §A text.
+      - No OQ-11 legal-review impact — text preserved verbatim, just one tap deeper.
+    Validation 7/7 safety gate checks passed. Strip cannot self-dismiss; only flips
+    visibility based on model data (plan.weather.extremeHeatRisk).
+  bubble_pivot_outcomes:
+    HEADER_BUBBLES_V1: SHIPPED ✅ (§F engineering brief copy-paste-ready)
+    iOS_build: SHIPPED ✅ (9 file ops, single FE delegate, no wrapper)
+    iOS_validation: SHIPPED ✅ (262 passed unchanged, 0 blockers, QA-IA-1 ALSO resolved)
+  bonus_QA_IA_1_resolved: |
+    The IA-pivot validation flagged QA-IA-1 (when hasBothTypes, Picker rendered above
+    EmergencyBanner pushing banner to position #1). Header Bubbles spec §F.6/7 hoisted
+    EmergencyStrip into envelopeContent() ABOVE the Picker, also fixing QA-IA-1.
+    Pattern: when next pivot touches the same code area, fold open findings into the
+    same build pass.
+  patterns_added:
+    fold_open_findings_into_same_pass:
+      detail: |
+        When a new feature delegate touches the same code area as a prior session's
+        🟡/⚪ finding, explicitly include the fix in the new spec's hand-off section.
+        QA-IA-1 was open after IA pivot; the bubble pivot §F.6 closed it for free.
+        Beats carrying findings across N sessions and forgetting them.
+    bubble_pattern_for_decluttering:
+      detail: |
+        SwiftUI pattern proven this session: HeaderBubble (icon + optional badge
+        + tap action) → sheet with .presentationDetents([.medium, .large]) →
+        full content of the prior inline card. 56pt circle bubbles in an HStack.
+        Use whenever the user says 'don't overload the homepage' for non-safety content.
+        For safety content: 1-line red full-width strip variant that's still impossible
+        to miss but takes ≈70pt instead of ≈250pt.
+  proven_total_delegate_count_through_session: |
+    Engineering: 10 substantive (4 demo path + 2 doubles + 2 IA + 1 hotfix + 1 bubbles)
+    Validation:  4 substantive (each parallel-then-merge, all clean)
+    Planning:    3 substantive (doubles + IA + bubbles)
+    17 total Lead-level delegates in one session, zero blocking silent drops.
+    Tests grew 88 → 262 (+174). The discovery-overhead theory of silent drops is now
+    overdetermined; tight + spec'd + mechanical = ships at any ordinal.
+
 
 # ----------------------------------------------------------------------------
 # Session mogfjh9hslqr — Task #5 COMPLETION (third attempt, finally shipped)

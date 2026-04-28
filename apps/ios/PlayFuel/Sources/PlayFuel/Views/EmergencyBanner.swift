@@ -44,3 +44,9 @@ struct EmergencyBanner: View {
     EmergencyBanner()
         .padding()
 }
+
+#Preview("Dark") {
+    EmergencyBanner()
+        .padding()
+        .preferredColorScheme(.dark)
+}

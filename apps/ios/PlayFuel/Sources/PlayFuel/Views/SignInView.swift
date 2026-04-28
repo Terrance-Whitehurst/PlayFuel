@@ -131,10 +131,18 @@ struct SignInView: View {
 }
 
 #Preview {
-    // Preview uses stub AppState — no real auth round-trip needed.
     let auth = AuthService()
     let api  = APIClient(authService: auth)
     let repo = Repository(api: api)
     return SignInView()
         .environmentObject(AppState(repository: repo, authService: auth))
+}
+
+#Preview("Dark") {
+    let auth = AuthService()
+    let api  = APIClient(authService: auth)
+    let repo = Repository(api: api)
+    return SignInView()
+        .environmentObject(AppState(repository: repo, authService: auth))
+        .preferredColorScheme(.dark)
 }
