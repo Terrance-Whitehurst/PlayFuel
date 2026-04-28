@@ -9,17 +9,21 @@
 /* Begin PBXBuildFile section */
 		00858D2D2AAAB084FAE5B6F1 /* TimelineView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14F6A58B35CC45E975FBC588 /* TimelineView.swift */; };
 		08657BC986D100C7B3F57DEA /* DebugAuth.swift in Sources */ = {isa = PBXBuildFile; fileRef = BA6EA336A6452F24FB5DAC8E /* DebugAuth.swift */; };
+		0C94EC3417661DD54515D1C7 /* ScheduleStripView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 016BE8196E49B913F0050A0F /* ScheduleStripView.swift */; };
 		1C14B6E345DEBE8847E9C5B8 /* SignInView.swift in Sources */ = {isa = PBXBuildFile; fileRef = FFAA6A3A9295F34782002C64 /* SignInView.swift */; };
 		20D42EFDD419A10C3EFB3F22 /* DTOs.swift in Sources */ = {isa = PBXBuildFile; fileRef = 76DABD1D9959D5B47FF1F2AF /* DTOs.swift */; };
 		22D3F3A459353D91423F53F9 /* AuthService.swift in Sources */ = {isa = PBXBuildFile; fileRef = CA0D016A6E8FAAC7A7465B28 /* AuthService.swift */; };
 		2515717BE346CDFB3E25B9DC /* APIError.swift in Sources */ = {isa = PBXBuildFile; fileRef = 75BD8523CE3798434A447923 /* APIError.swift */; };
 		2819CB8C07935F8521876AB7 /* FoodOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A8963D6167FAD62CA951AE /* FoodOption.swift */; };
+		2920D9C0EC80DD967DC708AE /* NextActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AE661B091859A7E90E4C6A /* NextActionCard.swift */; };
 		3E6C828C968501222BF5227C /* Match.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEF49588955B05641B5EE27 /* Match.swift */; };
 		5547E735DB3706C7244A7034 /* PlanExplanation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 604200C03C727C2AD4A3F47E /* PlanExplanation.swift */; };
 		5C3C77FEAE066B90F5AB2AAB /* PlayFuelApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = AE76F905584434E9D20721B7 /* PlayFuelApp.swift */; };
 		6115DE510C6D96BC011BF18C /* Plan.swift in Sources */ = {isa = PBXBuildFile; fileRef = 85B0D0628C8AC1E5CB21A121 /* Plan.swift */; };
+		66FFF482497A46309998BE6A /* PlanEnvelope.swift in Sources */ = {isa = PBXBuildFile; fileRef = EA04910F6D82636BBE65BCD8 /* PlanEnvelope.swift */; };
 		70762A9A6832EF3E24E150ED /* APIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = A90EDC8DE31DF2989BEB0A3E /* APIClient.swift */; };
 		78A360B065D2EED8FA426E92 /* Repository.swift in Sources */ = {isa = PBXBuildFile; fileRef = EC59EB7BC5AA3895B189FBF0 /* Repository.swift */; };
+		7BCACE5DEF66F8FC3EA7A502 /* MatchType.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6D96F83E7074B58BC6365756 /* MatchType.swift */; };
 		7E3B9CBD99D512F8AD4C03F8 /* HardCodedStrings.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */; };
 		87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */; };
 		9F13CB35D1297C00EF2B82E7 /* PlanSummaryCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 30B0C6A0B70E723E8BA64E6D /* PlanSummaryCard.swift */; };
@@ -35,6 +39,7 @@
 		CA3285505E0E15A784AF51FE /* TournamentCreateView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 53B03D40B2468D26075E6590 /* TournamentCreateView.swift */; };
 		D3E6C151169F080F6D22709E /* FoodCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 733A9D96157E16CBB306C4EC /* FoodCardView.swift */; };
 		D80D0DD80AA05237B50B4F1E /* KeychainStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = AB7090F3FCDB10326A70336B /* KeychainStore.swift */; };
+		D9232DFF26652638DC77BAEE /* NextAction.swift in Sources */ = {isa = PBXBuildFile; fileRef = 70BF0082191F5875F4925374 /* NextAction.swift */; };
 		DA01C6EF112E562C54A53462 /* Endpoints.swift in Sources */ = {isa = PBXBuildFile; fileRef = 0CD5E9D4E0FA822FA31182B2 /* Endpoints.swift */; };
 		E02994AE32CE3A6CB4DFCD83 /* FakeData.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7E1765305F0E1FFE9661C32E /* FakeData.swift */; };
 		E18EBD023A7B6F06606D1C78 /* AppState.swift in Sources */ = {isa = PBXBuildFile; fileRef = DE33ACDB9D45D319F859366D /* AppState.swift */; };
@@ -44,6 +49,7 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		016BE8196E49B913F0050A0F /* ScheduleStripView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScheduleStripView.swift; sourceTree = "<group>"; };
 		0CD5E9D4E0FA822FA31182B2 /* Endpoints.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Endpoints.swift; sourceTree = "<group>"; };
 		0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherSnapshot.swift; sourceTree = "<group>"; };
 		136FAA9B0E2AACEC604CF6F4 /* PlayFuel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PlayFuel.app; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -57,13 +63,16 @@
 		5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HardCodedStrings.swift; sourceTree = "<group>"; };
 		604200C03C727C2AD4A3F47E /* PlanExplanation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanExplanation.swift; sourceTree = "<group>"; };
 		63A8963D6167FAD62CA951AE /* FoodOption.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodOption.swift; sourceTree = "<group>"; };
+		6D96F83E7074B58BC6365756 /* MatchType.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchType.swift; sourceTree = "<group>"; };
 		6F52B449265DCBA14E961E95 /* WeatherCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WeatherCardView.swift; sourceTree = "<group>"; };
+		70BF0082191F5875F4925374 /* NextAction.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextAction.swift; sourceTree = "<group>"; };
 		733A9D96157E16CBB306C4EC /* FoodCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodCardView.swift; sourceTree = "<group>"; };
 		75BD8523CE3798434A447923 /* APIError.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = APIError.swift; sourceTree = "<group>"; };
 		76DABD1D9959D5B47FF1F2AF /* DTOs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DTOs.swift; sourceTree = "<group>"; };
 		796A0EDD57748854929E6897 /* TimelineEvent.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineEvent.swift; sourceTree = "<group>"; };
 		7E1765305F0E1FFE9661C32E /* FakeData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FakeData.swift; sourceTree = "<group>"; };
 		85B0D0628C8AC1E5CB21A121 /* Plan.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Plan.swift; sourceTree = "<group>"; };
+		87AE661B091859A7E90E4C6A /* NextActionCard.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NextActionCard.swift; sourceTree = "<group>"; };
 		97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = EmergencyBanner.swift; sourceTree = "<group>"; };
 		A30AE19CFED4698BCC9E569E /* TournamentListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentListView.swift; sourceTree = "<group>"; };
 		A7B07537E35072C03DA3414D /* DisclaimerView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DisclaimerView.swift; sourceTree = "<group>"; };
@@ -77,6 +86,7 @@
 		D79888F3E040BD239741B1D5 /* Tournament.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Tournament.swift; sourceTree = "<group>"; };
 		DE33ACDB9D45D319F859366D /* AppState.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppState.swift; sourceTree = "<group>"; };
 		E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentDashboardView.swift; sourceTree = "<group>"; };
+		EA04910F6D82636BBE65BCD8 /* PlanEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEnvelope.swift; sourceTree = "<group>"; };
 		EC59EB7BC5AA3895B189FBF0 /* Repository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repository.swift; sourceTree = "<group>"; };
 		FFAA6A3A9295F34782002C64 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -119,7 +129,10 @@
 			children = (
 				63A8963D6167FAD62CA951AE /* FoodOption.swift */,
 				2FEF49588955B05641B5EE27 /* Match.swift */,
+				6D96F83E7074B58BC6365756 /* MatchType.swift */,
+				70BF0082191F5875F4925374 /* NextAction.swift */,
 				85B0D0628C8AC1E5CB21A121 /* Plan.swift */,
+				EA04910F6D82636BBE65BCD8 /* PlanEnvelope.swift */,
 				604200C03C727C2AD4A3F47E /* PlanExplanation.swift */,
 				438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */,
 				796A0EDD57748854929E6897 /* TimelineEvent.swift */,
@@ -175,8 +188,10 @@
 				97EE09FACD903FC03D6523BF /* EmergencyBanner.swift */,
 				733A9D96157E16CBB306C4EC /* FoodCardView.swift */,
 				499C95E4DF0C4C4D64ABB501 /* MatchCreateView.swift */,
+				87AE661B091859A7E90E4C6A /* NextActionCard.swift */,
 				30B0C6A0B70E723E8BA64E6D /* PlanSummaryCard.swift */,
 				C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */,
+				016BE8196E49B913F0050A0F /* ScheduleStripView.swift */,
 				FFAA6A3A9295F34782002C64 /* SignInView.swift */,
 				14F6A58B35CC45E975FBC588 /* TimelineView.swift */,
 				53B03D40B2468D26075E6590 /* TournamentCreateView.swift */,
@@ -263,13 +278,18 @@
 				D80D0DD80AA05237B50B4F1E /* KeychainStore.swift in Sources */,
 				3E6C828C968501222BF5227C /* Match.swift in Sources */,
 				B140B06C66624EEFECF166DD /* MatchCreateView.swift in Sources */,
+				7BCACE5DEF66F8FC3EA7A502 /* MatchType.swift in Sources */,
+				D9232DFF26652638DC77BAEE /* NextAction.swift in Sources */,
+				2920D9C0EC80DD967DC708AE /* NextActionCard.swift in Sources */,
 				6115DE510C6D96BC011BF18C /* Plan.swift in Sources */,
+				66FFF482497A46309998BE6A /* PlanEnvelope.swift in Sources */,
 				5547E735DB3706C7244A7034 /* PlanExplanation.swift in Sources */,
 				9F13CB35D1297C00EF2B82E7 /* PlanSummaryCard.swift in Sources */,
 				5C3C77FEAE066B90F5AB2AAB /* PlayFuelApp.swift in Sources */,
 				78A360B065D2EED8FA426E92 /* Repository.swift in Sources */,
 				87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */,
 				B612304F8385D746BAB63507 /* ScenarioPlan.swift in Sources */,
+				0C94EC3417661DD54515D1C7 /* ScheduleStripView.swift in Sources */,
 				1C14B6E345DEBE8847E9C5B8 /* SignInView.swift in Sources */,
 				ADF44C64562D35C64E107F79 /* TimelineEvent.swift in Sources */,
 				00858D2D2AAAB084FAE5B6F1 /* TimelineView.swift in Sources */,

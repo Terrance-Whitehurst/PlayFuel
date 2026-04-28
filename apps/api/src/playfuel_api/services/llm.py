@@ -143,13 +143,25 @@ class TemplateProvider:
         round_part = f"a {inp.match_round_label} match" if inp.match_round_label else "a match"
         time_part = _fmt_iso_to_display(inp.match_start_iso)
         heat_note = " Extreme heat conditions are expected today." if inp.extreme_heat_risk else ""
+        is_doubles = getattr(inp, "match_type", "singles") == "doubles"
+
+        # Derive normal-scenario duration from scenarios (avoids hardcoding 120 min).
+        normal_s = next((s for s in inp.scenarios if s.scenario == "normal"), None)
+        normal_min = normal_s.duration_min if normal_s else (90 if is_doubles else 120)
+
+        if is_doubles:
+            subject = "Your child's doubles team"
+            match_desc = f"{round_part}"
+        else:
+            subject = "Your player's tournament day"
+            match_desc = f"includes {round_part}"
 
         return (
-            f"Your player's tournament day at {venue} includes {round_part} "
+            f"{subject} at {venue} {match_desc} "
             f"scheduled to start at {time_part}. "
             f"We've prepared three scenarios—short, normal, and long—to cover "
             f"different match durations. "
-            f"The normal scenario (~120 min) is used as the primary planning reference."
+            f"The normal scenario (~{normal_min} min) is used as the primary planning reference."
             f"{heat_note}"
         )
 
@@ -157,6 +169,8 @@ class TemplateProvider:
     def _build_scenario_explanations(
         inp: "PlanExplanationInput",  # noqa: F821
     ) -> dict[str, str]:
+        is_doubles = getattr(inp, "match_type", "singles") == "doubles"
+        subject = "your doubles team" if is_doubles else "you"
         result: dict[str, str] = {}
         for s in inp.scenarios:
             gap = _gap_status_text(s.gap_status)
@@ -164,7 +178,7 @@ class TemplateProvider:
             pickup = _pickup_bucket_text(s.pickup_bucket)
             result[s.scenario] = (
                 f"In the {s.scenario} scenario ({s.duration_min} min match): "
-                f"you'll have a {gap}. "
+                f"{subject}'ll have a {gap}. "
                 f"For food: {food}. "
                 f"For parent pickup: {pickup}."
             )
@@ -434,6 +448,11 @@ def build_explanation_input(
             weather_flags.append("rain_risk")
         extreme_heat_risk = snapshot.flag_extreme_heat_risk
 
+    # Derive match_type from match.format (doubles-spec §C.2).
+    match_type_val = (match.format or "singles").lower()
+    if match_type_val not in ("singles", "doubles"):
+        match_type_val = "singles"
+
     return PlanExplanationInput(
         venue_name=venue_name,
         match_start_iso=match.scheduled_start.isoformat(),
@@ -450,4 +469,5 @@ def build_explanation_input(
         bag_fallback_only=plan.bag_fallback_only,
         heat_emergency_text=HEAT_EMERGENCY_TEXT if extreme_heat_risk else None,
         user_disclaimer=USER_DISCLAIMER,
+        match_type=match_type_val,
     )

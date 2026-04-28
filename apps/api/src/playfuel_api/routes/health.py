@@ -16,6 +16,6 @@ def health() -> dict:
     """Return API liveness and the active rules constants version.
 
     Response shape:
-        {"status": "ok", "rules_version": "1.0.0"}
+        {"status": "ok", "rules_version": "1.1.0"}
     """
     return {"status": "ok", "rules_version": RULES_CONSTANTS_VERSION}

@@ -48,4 +48,29 @@ struct Plan: Codable, Identifiable {
     /// NO stored-property default — all call sites must pass explicitly
     /// (see Session 2 lesson: stored-property defaults break synthesised memberwise init).
     let llmSummary: PlanExplanation?
+
+    // MARK: - Phase 7 additions (Doubles spec)
+
+    /// Match type this plan was generated for.
+    /// Added in DOUBLES_SPEC_V1.md §D.3 — stored in `plans.match_type` column.
+    /// NO stored-property default — all call sites must pass explicitly.
+    let matchType: MatchType
+
+    // MARK: - Phase 8 additions (Nutrition-First IA — NUTRITION_FIRST_IA_V1.md)
+
+    /// The match UUID this plan was generated for.
+    /// Added in migration 0008_per_match_plans.sql — one plan row per match.
+    /// NO stored-property default — all call sites must pass explicitly.
+    let matchId: UUID
+
+    /// The next actionable item for the parent, computed deterministically at
+    /// plan-generation time from the timeline events.
+    /// Nil when the backend produces no future events within the 6-hour lookahead
+    /// window and no recovery_fallback can be constructed.
+    let nextAction: NextAction?
+
+    /// The scheduled start time for the match this plan covers.
+    /// Used by ScheduleStripView for chip ordering and status derivation.
+    /// Stored as ISO 8601 string (matches generatedAt pattern); parsed on demand.
+    let scheduledStart: String?
 }

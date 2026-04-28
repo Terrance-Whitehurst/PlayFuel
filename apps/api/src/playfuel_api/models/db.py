@@ -72,6 +72,8 @@ class MatchRow(BaseModel):
     round_label: Optional[str] = None
     opponent_label: Optional[str] = None
     court_label: Optional[str] = None
+    # Doubles-spec extension — migration 0007_doubles_support.sql
+    doubles_format: Optional[str] = None  # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
     created_at: datetime
     updated_at: datetime
 
@@ -121,5 +123,9 @@ class PlanRow(BaseModel):
     rules_constants_version: str
     warnings: list[str]
     schedule_confidence: ScheduleConfidence
+    # Doubles-spec extension — migration 0007_doubles_support.sql
+    match_type: Optional[str] = None  # 'singles' | 'doubles'; null = legacy (treat as 'singles')
+    # Nutrition-first IA — migration 0008_per_match_plans.sql
+    match_id: Optional[UUID] = None   # FK to matches.id; null = legacy per-tournament plan
     created_at: datetime
     updated_at: datetime

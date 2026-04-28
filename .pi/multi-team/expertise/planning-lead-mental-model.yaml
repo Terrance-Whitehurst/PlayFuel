@@ -37,6 +37,21 @@
 - **`docs/` doesn't exist at repo root yet.** PM flagged this — Engineering needs to `mkdir docs/` when scribing INDEX.md. Worth surfacing in the scribe brief.
 - **Don't fake screenshots / badges / licenses.** Spec'd `_(TBD)_` placeholders explicitly; preserved trust.
 
+## 2026-04-27 — DOUBLES_SPEC_V1.md shipped (extension to RULES_CONSTANTS_V1)
+
+- Doc at `.pi/multi-team/expertise/DOUBLES_SPEC_V1.md` — 538 lines, 26 KB.
+- Single PM delegate, single pass, zero iteration. Used the Lead-authors-Member-scribes pattern with pre-baked decisions in the brief (§B duration table, response shape `{singlesPlan, doublesPlan}`, segmented Picker for tabs, separate column not JSONB).
+- **Verification-before-scribing rule paid off again.** Brief specified "add a new `match_type` column NOT NULL DEFAULT 'singles' on matches." PM read 0002_tables.sql first and caught that `matches.format` already exists with example values `"singles", "doubles"` — the brief would have created a redundant column. Resolved in-spec as OQ-DBL-3 (use existing `format`, add only `doubles_format`). Confirmed against 0002_tables.sql line 145.
+- 6 new OQs surfaced (OQ-DBL-1..6), all with severity tags. OQ-DBL-1 (duration values pending coach validation) is the only pre-launch validation blocker; OQ-DBL-3 (column reuse) is a build-time blocker that's already resolved in the spec; OQ-DBL-5 (`RULES_CONSTANTS_VERSION` minor bump to 1.1.0 because nested dict structure change) is a Phase-3 invariant we'd have hit at runtime.
+- Doubles scenario durations (DRAFT — OQ-DBL-1): doubles+best_of_3 = 60/90/135; doubles+pro_set_8 = 45/70/100. Derived from observed USTA junior tournament norms (25–35% faster than singles due to no-ad + 10-pt match tiebreak in lieu of 3rd set).
+
+## Lessons (this round)
+
+- **Pre-baking decisions in the brief is faster than asking PM to debate them**, AS LONG AS verification-against-disk is mandatory. PM's job becomes: scribe the decisions, but flag any that don't match reality. This caught the `match_type`/`format` collision that would have wasted a migration round-trip.
+- **Cite "derived from observed norms" when you can't cite a published source.** This matches the `[DRAFT — OQ-A]` pattern from RULES_CONSTANTS_V1 §C (hydration cadence) — keeps the trail honest. Don't invent numbers and call them canonical; flag them as DRAFT and explain the derivation.
+- **For envelope-shape decisions (singlesPlan/doublesPlan vs. list), name fields beat positional.** iOS optional-unwrap is cleaner with named fields; the PM-spec'd `PlanEnvelope` reads directly into SwiftUI conditionals.
+- **Whenever you propose changing a frozen constants dict's shape, plan the version bump in the same delegate.** OQ-DBL-5 surfaced because §J.2 of RULES_CONSTANTS_V1 mandates `1.0.x → 1.1.0` for any structural change. PM caught it; would have been a runtime assert failure otherwise.
+
 ## Open patterns to watch
 
 - The "second delegate goes silent" pattern (FE2/BE2/BE1, plus EL3 once) is now confirmed at the *member-and-lead-per-session* level. My team (PM, UX) only used 1 delegate this session — if Task #12 needed iteration I would've burnt the second delegate. Don't iterate; author offline, then scribe.

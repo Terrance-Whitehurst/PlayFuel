@@ -31,16 +31,22 @@ _TABLE = "matches"
 
 # ── Request bodies ────────────────────────────────────────────────────────────
 
+# Valid doubles format values
+_VALID_DOUBLES_FORMATS = {"best_of_3", "pro_set_8"}
+
+
 class MatchCreate(BaseModel):
     scheduled_start: datetime
     estimated_duration_minutes: Optional[int] = None
     surface: Optional[str] = None
-    format: Optional[str] = None
+    format: Optional[str] = None            # 'singles' | 'doubles'
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
     round_label: Optional[str] = None
     opponent_label: Optional[str] = None
     court_label: Optional[str] = None
+    # Doubles-spec extension — migration 0007_doubles_support.sql
+    doubles_format: Optional[str] = None   # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
 
 
 class MatchUpdate(BaseModel):
@@ -48,12 +54,14 @@ class MatchUpdate(BaseModel):
     estimated_duration_minutes: Optional[int] = None
     actual_end_at: Optional[datetime] = None
     surface: Optional[str] = None
-    format: Optional[str] = None
+    format: Optional[str] = None            # 'singles' | 'doubles'
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
     round_label: Optional[str] = None
     opponent_label: Optional[str] = None
     court_label: Optional[str] = None
+    # Doubles-spec extension
+    doubles_format: Optional[str] = None   # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -76,6 +84,33 @@ def list_matches(
     return result.data
 
 
+def _validate_doubles_format(format_val: Optional[str], doubles_format: Optional[str]) -> None:
+    """Validate that doubles_format is consistent with the match format field.
+
+    Rules (DOUBLES_SPEC_V1.md §A.2):
+    - format == 'doubles' → doubles_format MUST be 'best_of_3' or 'pro_set_8'
+    - format != 'doubles' → doubles_format MUST be null
+    """
+    if format_val == "doubles":
+        if doubles_format not in _VALID_DOUBLES_FORMATS:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"doubles_format must be one of {sorted(_VALID_DOUBLES_FORMATS)} "
+                    "when format is 'doubles'. "
+                    f"Got: {doubles_format!r}"
+                ),
+            )
+    elif doubles_format is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=(
+                "doubles_format must be null when format is not 'doubles'. "
+                f"Got format={format_val!r}, doubles_format={doubles_format!r}"
+            ),
+        )
+
+
 @router.post("/{tid}/matches", status_code=status.HTTP_201_CREATED,
              summary="Create match")
 def create_match(
@@ -85,6 +120,7 @@ def create_match(
     client: Client = Depends(authed_client),
 ) -> dict[str, Any]:
     """Create a match under a tournament. RLS verifies tournament ownership."""
+    _validate_doubles_format(body.format, body.doubles_format)
     payload = body.model_dump(exclude_none=True)
     payload["tournament_id"] = str(tid)
     # datetime → ISO string for PostgREST
@@ -127,6 +163,7 @@ def update_match(
     client: Client = Depends(authed_client),
 ) -> dict[str, Any]:
     """Update a match. RLS enforces ownership."""
+    _validate_doubles_format(body.format, body.doubles_format)
     payload = body.model_dump(exclude_none=True)
     if not payload:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,

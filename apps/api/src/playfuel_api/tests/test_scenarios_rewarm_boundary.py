@@ -37,7 +37,7 @@ from playfuel_api.rules.scenarios import generate_match_scenarios
 
 # ── Constants ─────────────────────────────────────────────────────────────────
 
-_NORMAL_DURATION = SCENARIO_DURATIONS_MIN["normal"]  # 120 min
+_NORMAL_DURATION = SCENARIO_DURATIONS_MIN[("singles", None)]["normal"]  # 120 min — singles defaults
 _TS = datetime(2026, 4, 27, 0, 0, tzinfo=timezone.utc)
 _MATCH_START = datetime(2026, 6, 1, 9, 0, tzinfo=timezone.utc)
 

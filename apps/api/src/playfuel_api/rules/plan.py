@@ -33,6 +33,9 @@ from playfuel_api.models.enums import GapStatus, ScheduleConfidence, TimelineEve
 from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION
 from playfuel_api.rules.hard_coded_strings import HEAT_EMERGENCY_TEXT
 
+# Optional import to avoid circular at module level — imported inline inside function
+_next_action_mod = None
+
 
 def derive_schedule_confidence(scenarios: list[ScenarioPlan]) -> ScheduleConfidence:
     """Derive schedule_confidence from gap_status values across all scenarios.
@@ -73,8 +76,13 @@ def build_timeline(
     one `matchEnd` event per match using the *normal* scenario's estimated
     end. Future versions will splice meal/warmUp/wakeUp events.
 
+    v1.1 (doubles-spec): emits a `partnerCoordination` event at T−60m before
+    the first doubles match when any match in the list has format == 'doubles'.
+    See DOUBLES_SPEC_V1.md §C.1.
+
     Args:
-        matches:   All match rows for the tournament, ordered by display_order.
+        matches:   Match rows for the plan type (singles or doubles group),
+                   ordered by display_order.
         scenarios: Output of generate_match_scenarios() for the first match.
 
     Returns:
@@ -87,7 +95,26 @@ def build_timeline(
         (s for s in scenarios if s.scenario.value == "normal"), None
     )
 
+    # Doubles-spec §C.1: emit partnerCoordination at T−60m for doubles matches.
+    is_doubles = any(m.format == "doubles" for m in matches)
+
     for idx, match in enumerate(matches, start=1):
+        # Doubles only: partner coordination reminder at T−60m (first match only).
+        if is_doubles and idx == 1:
+            partner_time = match.scheduled_start - timedelta(minutes=60)
+            events.append(
+                TimelineEventOut(
+                    id=str(uuid.uuid4()),
+                    time=partner_time.isoformat(),
+                    title="Confirm with your doubles partner",
+                    detail=(
+                        "Agree on warm-up time, court arrival, and pre-match strategy "
+                        "with your partner."
+                    ),
+                    kind=TimelineEventKind.partnerCoordination,
+                )
+            )
+
         events.append(
             TimelineEventOut(
                 id=str(uuid.uuid4()),
@@ -114,7 +141,9 @@ def build_timeline(
                 )
             )
 
-    return events
+    # Sort chronologically — partnerCoordination fires before match, so this ensures
+    # deterministic ordering even if matches are passed in display_order order.
+    return sorted(events, key=lambda e: e.time)
 
 
 def build_plan_envelope(
@@ -126,6 +155,8 @@ def build_plan_envelope(
     timeline: Optional[list[TimelineEventOut]] = None,
     food_options: Optional[list[FoodOption]] = None,
     bag_fallback_only: bool = False,
+    match_type: str = "singles",
+    match_id: Optional[uuid.UUID] = None,
 ) -> Plan:
     """Assemble the top-level Plan envelope from engine output.
 
@@ -173,4 +204,6 @@ def build_plan_envelope(
         timeline=timeline or [],
         food_options=food_options,
         bag_fallback_only=bag_fallback_only,
+        match_type=match_type,
+        match_id=match_id,
     )

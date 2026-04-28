@@ -161,25 +161,40 @@ def generate_match_scenarios(
     match: MatchRow,
     next_match: Optional[MatchRow],
     *,
+    match_type: str = "singles",
+    doubles_format: Optional[str] = None,
     duration_overrides: Optional[dict[str, int]] = None,
 ) -> list[ScenarioPlan]:
     """Generate short / normal / long ScenarioPlan objects for a match pair.
 
-    §A.2 — duration_overrides is reserved for v1.1; in v1.0.0 it is unused and
-    SCENARIO_DURATIONS_MIN defaults are always used regardless of the kwarg value.
+    v1.1.0 (doubles-spec): match_type and doubles_format select the correct duration
+    row from SCENARIO_DURATIONS_MIN. See DOUBLES_SPEC_V1.md §B.1.
 
     Args:
         match:             Match whose scheduled_start anchors all durations.
         next_match:        Following match, or None (triggers §G.5 no_next_match).
-        duration_overrides: Reserved; unused in v1.0.0.
+        match_type:        'singles' or 'doubles'. Defaults to 'singles'.
+        doubles_format:    'best_of_3' or 'pro_set_8'. Required when match_type='doubles'.
+        duration_overrides: Reserved; unused in v1.1.0.
 
     Returns:
         list[ScenarioPlan] — [short, normal, long] in ScenarioKind definition order.
+
+    Raises:
+        ValueError: if (match_type, doubles_format) is not a valid combination.
     """
-    # duration_overrides is reserved (§A.2 v1.1 hook); ignored in this version.
+    # duration_overrides is reserved; ignored.
     _ = duration_overrides
 
+    key = (match_type, doubles_format)
+    if key not in SCENARIO_DURATIONS_MIN:
+        raise ValueError(
+            f"Unknown (match_type, doubles_format) combination: {key!r}. "
+            f"Valid keys: {list(SCENARIO_DURATIONS_MIN.keys())}"
+        )
+    durations = SCENARIO_DURATIONS_MIN[key]
+
     return [
-        _make_scenario(kind, match, next_match, SCENARIO_DURATIONS_MIN[kind.value])
+        _make_scenario(kind, match, next_match, durations[kind.value])
         for kind in ScenarioKind
     ]

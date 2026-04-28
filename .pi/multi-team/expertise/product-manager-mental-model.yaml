@@ -115,7 +115,67 @@ prioritization_rationale:
     - "Weather adjustment — high impact, low engineering cost once weather API is wired up."
     - "Bag-food fallback — handles the zero-nearby-options edge case with zero extra cost."
 
+open_questions_doubles:
+  - id: OQ-DBL-1
+    doc: DOUBLES_SPEC_V1.md §B
+    issue: "Doubles scenario durations (60/90/135 best_of_3; 45/70/100 pro_set_8) are derived from observed junior norms — not a published source."
+    blocking: Phase 7 cutover
+    owner: Planning Lead / USTA coach validation
+  - id: OQ-DBL-2
+    doc: DOUBLES_SPEC_V1.md §C
+    issue: "Hydration cadence parity for doubles — kept same as singles for v1 pending OQ-A sports medicine resolution."
+    blocking: Phase 7+
+    owner: Planning / Sports medicine
+  - id: OQ-DBL-3
+    doc: DOUBLES_SPEC_V1.md §A.2
+    issue: "matches.format already exists (0002_tables.sql) and semantically equals match_type. Brief specified adding a new match_type column — redundant. Resolved: use format, add only doubles_format to matches."
+    blocking: Engineering 0007 migration
+    owner: Engineering Lead (confirmed in spec)
+  - id: OQ-DBL-4
+    doc: DOUBLES_SPEC_V1.md §E.4
+    issue: "AppState.currentPlan → currentPlanEnvelope is a broad iOS refactor. Engineering to decide clean-replace vs. parallel-property approach."
+    blocking: iOS
+    owner: Engineering Lead
+  - id: OQ-DBL-5
+    doc: DOUBLES_SPEC_V1.md §G
+    issue: "SCENARIO_DURATIONS_MIN flat→nested dict change is breaking; requires RULES_CONSTANTS_VERSION bump to 1.1.0 per §J.2."
+    blocking: API rules tests
+    owner: Engineering Lead
+  - id: OQ-DBL-6
+    doc: DOUBLES_SPEC_V1.md §G
+    issue: "GET /plans/latest should return envelope shape when both match types exist."
+    blocking: API
+    owner: Engineering Lead
+
+open_questions_ia:
+  - id: OQ-IA-1
+    doc: NUTRITION_FIRST_IA_V1.md §I
+    issue: "ScheduleStrip status indicator uses device-local time; tournament timezone not stored. Same-day same-city assumption holds for MVP."
+    blocking: Post-MVP
+    owner: Engineering Lead
+  - id: OQ-IA-2
+    doc: NUTRITION_FIRST_IA_V1.md §I
+    issue: "NextAction lookahead window = 0-6 hours. May need tuning based on parent usage patterns."
+    blocking: Post-MVP
+    owner: Planning Lead
+  - id: OQ-IA-6
+    doc: NUTRITION_FIRST_IA_V1.md §I
+    issue: "NextAction 'now' = server now() at generate time. iOS does NOT recompute client-side. Known staleness if dashboard is open across event boundary."
+    blocking: Phase 8+
+    owner: Engineering Lead
+  - id: OQ-IA-8
+    doc: NUTRITION_FIRST_IA_V1.md §J
+    issue: "plans.match_id did not exist in 0002 (PM verified). Migration 0008 must ADD COLUMN, not just add index. plans.match_type is nullable (0007) — index uses WHERE match_id IS NOT NULL."
+    blocking: Engineering 0008 migration
+    owner: Engineering Lead
+
 observations:
+  - date: "2026-04-27"
+    note: "NUTRITION_FIRST_IA_V1.md authored (693 lines). Key verification catch: plans.match_id does NOT exist in 0002_tables.sql — Planning Lead assumed 'probably exists; migration adds only index.' Wrong. Must ADD COLUMN first. plans.match_type is nullable (0007). Unique index uses WHERE match_id IS NOT NULL. Pattern: always read both 0002 AND latest migration before scribing any DDL."
+  - date: "2026-04-27"
+    note: "User product steer: nutrition + schedule are the hero surfaces. Weather data demoted from #2 to #8 (compact pill). EmergencyBanner at #0 is the ONLY safety exception — never moved regardless of visual pivot. ScheduleStripView + NextActionCard are new hero components. Dashboard card order locked in NUTRITION_FIRST_IA_V1.md §B."
+  - date: "2026-04-27"
+    note: "DOUBLES_SPEC_V1.md authored (538 lines, 26KB). Key verification catch: matches.format column already existed in 0002_tables.sql — brief-specified new match_type column would have been redundant. Resolved in-spec as OQ-DBL-3. Demonstrates value of reading migrations before scribing column decisions."
   - date: "2026-04-26"
     note: "Spec is unusually complete and specific — rules, pseudocode, schema, and prompts all present. Phase 0 job was distillation and gap-flagging, not design."
   - date: "2026-04-26"

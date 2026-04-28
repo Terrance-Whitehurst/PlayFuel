@@ -74,7 +74,7 @@ apps/ios/PlayFuel/
 |---|---|---|
 | **SignIn** | `SignInView.swift` | Centered `SignInWithAppleButton` (native look, fake auth); "usage guidelines" link → DisclaimerView |
 | **Tournament List** | `TournamentListView.swift` | 3 tournament cards (Dallas / Austin / Houston); "Plan Ready" badge on Dallas; tap → Dashboard |
-| **Tournament Dashboard** | `TournamentDashboardView.swift` | Hub: red EmergencyBanner (Dallas, extreme_heat_risk=true) → WeatherCard → horizontal Scenario scroll → FoodCard → "Full Timeline" button → §A footer link |
+| **Tournament Dashboard** | `TournamentDashboardView.swift` | Hub (Phase 8 order): EmergencyBanner → PlanSummaryCard → ScheduleStrip → NextActionCard → FoodCard → Scenarios → Timeline btn → WeatherPill (compact, demoted) → §A footer |
 | **Weather Card** | `WeatherCardView.swift` | 88°F / 72% humidity, "EXTREME HEAT" pill, hot+humid flag pills, §E.3 adjustment bullets |
 | **Scenario Cards** | `ScenarioCardView.swift` | Short (75m/165m gap/light_meal), Normal (120m/120m gap/quick_pickup), Long (180m/60m gap/portable), gap pill color-coded by status |
 | **Food Card** | `FoodCardView.swift` | 3 Dallas options: Chipotle (confirmed §F.3 order), Jimmy John's [DRAFT], Central Market [DRAFT]; empty-state shows bag fallback |
@@ -197,3 +197,113 @@ The app now supports on-device deployment via a proper Xcode project with the `S
 > **App icon:** A placeholder 1024×1024 PNG (PlayFuel green `#227F52`) is at  
 > `Resources/Assets.xcassets/AppIcon.appiconset/icon-1024.png`.  
 > Replace with a production-quality icon before TestFlight / App Store submission.
+
+---
+
+## Doubles Support (Phase 7)
+
+Doubles integration shipped in the doubles-spec build (DOUBLES_SPEC_V1.md).
+
+### MatchCreateView
+
+Two new form sections appear **above** Estimated Duration:
+
+1. **Match Type** — segmented picker: `Singles | Doubles` (default: Singles).
+2. **Doubles Format** — segmented picker: `Best of 3 | 8-Game Pro Set` (default: Best of 3). Visible **only** when Doubles is selected.
+
+The Estimated Duration picker labels update dynamically to reflect the selected format’s short/normal/long minute values:
+
+| Type | Format | Short | Normal | Long |
+|---|---|---|---|---|
+| Singles | — | 75 min | 120 min | 180 min |
+| Doubles | Best of 3 | 60 min | 90 min | 135 min |
+| Doubles | 8-game pro set | 45 min | 70 min | 100 min |
+
+> All doubles values are `[DRAFT — OQ-DBL-1]`: derived from USTA junior tournament norms, not validated by a coach.
+
+### TournamentDashboardView
+
+The dashboard adapts based on which match types are present:
+
+| Tournament state | Dashboard behaviour |
+|---|---|
+| Singles only | Existing layout — no tab picker |
+| Doubles only | Existing layout showing the doubles plan — no tab picker |
+| Both types | Segmented `Singles | Doubles` picker appears **above** the EmergencyBanner |
+
+Selecting a segment switches all dashboard cards (scenarios, food, LLM summary, etc.) to show the corresponding plan. Selection persists for the session in `AppState.selectedMatchType`.
+
+### New model types (Phase 7)
+
+- `MatchType.swift` — `MatchType` + `DoublesFormat` enums
+- `PlanEnvelope.swift` — wraps `singlesPlans: [Plan]` + `doublesPlans: [Plan]`; `AppState.currentPlanEnvelope` replaces the old `currentPlan`
+
+---
+
+## Nutrition-First IA (Phase 8)
+
+Dashboard re-ordered per user feedback and `NUTRITION_FIRST_IA_V1.md`.
+Nutrition and schedule are the hero surfaces; weather is demoted to a compact pill.
+
+### Dashboard Card Order (locked)
+
+| # | Card | Condition |
+|---|---|---|
+| 0 | `EmergencyBanner` (red) | `extreme_heat_risk == true` — **IMMOVABLE** |
+| 1 | Singles / Doubles picker | `hasBothTypes == true` only |
+| 2 | `PlanSummaryCard` (LLM coach voice) | `llmSummary != nil` |
+| 3 | `ScheduleStripView` (multi-match strip) | always (empty-CTA when 0 matches) |
+| 4 | `NextActionCard` (next thing to do) | always (fallback copy when no future events) |
+| 5 | `FoodCardView` | `foodOptions` non-empty |
+| 6 | Scenario cards (short/normal/long) | always |
+| 7 | "Full Day Timeline" button | `timeline` non-empty |
+| 8 | `WeatherCardView` (compact pill, demoted) | always |
+| 9 | Disclaimer footer | always |
+
+**Why:** Parents are already outside feeling the heat. The weather card was the
+first thing they saw but isn't actionable. Nutrition timing and the match schedule
+are the surfaces they actually use. Safety logic is **unchanged** — `extreme_heat_risk`
+still fires `EmergencyBanner` at position #0 regardless of weather demotion.
+
+### Multi-Match Schedule Strip (`ScheduleStripView`)
+
+- Horizontally scrollable strip of `MatchChip` views, one per plan
+- Each chip shows: match number, scheduled time, status (upcoming/in-progress/done), type pill
+- Tap any chip → updates `AppState.selectedMatchId` → all cards below show that match's plan
+- **Default selection:** next upcoming match by clock; fallback = most-recently-completed
+- **Empty state:** full-width CTA card with "Add your first match" button
+
+### Next Up Card (`NextActionCard`)
+
+- Single hero card surfacing the most immediately actionable item
+- Derived deterministically by the backend rules engine (`rules/next_action.py`) — never LLM
+- Shows: event title, parent-friendly detail, "In N min" badge, scheduled time
+- **Fallback** when `nextAction == nil`: "All set — enjoy the day"
+
+### Weather Pill (WeatherCardView compact mode)
+
+- Demoted from position #2 to position #8
+- Renders as a 1-line pill: `🌡 88°F · humid, hot  ›`
+- Tap to expand inline → existing full card body revealed
+- Collapses on second tap; state is per-session, default collapsed
+- `WeatherCardView(weather:, compact: true)` — `compact: false` (default) is unchanged
+
+### New files (Phase 8)
+
+| File | Description |
+|---|---|
+| `Models/NextAction.swift` | `Codable` struct for the next actionable timeline item |
+| `Views/ScheduleStripView.swift` | Horizontal strip + `MatchChip` sub-view + empty-state CTA |
+| `Views/NextActionCard.swift` | "NEXT UP" hero card with fallback copy |
+
+### Changed files (Phase 8)
+
+| File | Change |
+|---|---|
+| `Models/Plan.swift` | Added `matchId: UUID`, `nextAction: NextAction?`, `scheduledStart: String?` |
+| `Models/PlanEnvelope.swift` | Arrays: `singlesPlans: [Plan]`, `doublesPlans: [Plan]`; new `plan(for matchId:)` + `nextUpcomingPlan(now:)` |
+| `Networking/DTOs.swift` | `PlanEnvelopeDTO` → arrays; `PlanCoreDTO` + `matchId`/`nextAction`/`scheduledStart`; `NextActionDTO` |
+| `State/AppState.swift` | Added `selectedMatchId: UUID?` + `defaultMatchId(from:now:)` helper |
+| `Views/WeatherCardView.swift` | Added `compact: Bool = false` mode with expand-in-place toggle |
+| `Views/TournamentDashboardView.swift` | Reordered per §B; wired strip + next-action card |
+| `Data/FakeData.swift` | Multi-match envelope: 2 singles + 1 doubles plan; each Plan has `matchId`+`nextAction`+`scheduledStart` |
