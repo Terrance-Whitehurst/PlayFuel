@@ -4,13 +4,16 @@ Auth required on all endpoints. Ownership enforced by RLS (one-hop).
 
 Generate flow (POST /v1/tournaments/{tid}/plans/generate):
     1. Load matches for tournament ordered by display_order / scheduled_start.
+       0 matches → 200 with empty {singlesPlans: [], doublesPlans: []} (not 404).
     2. Load tournament for venue coords (lat/lng).
     3. Fetch or read weather from cache (async, Open-Meteo; None if no coords).
-    4. Call generate_match_scenarios(match_1, match_2) → list[ScenarioPlan].
-    5. Build timeline from matches + scenarios.
-    6. Call build_plan_envelope(tid, scenarios, weather_block, timeline) → Plan.
-    7. Persist plan_json (camelCase JSONB via model_dump(by_alias=True)) to plans table.
-    8. Return GeneratePlanResponse (HTTP 200 always — see OQ-14 / §G).
+    4. For EACH match: run scenarios → timeline → food → plan envelope → LLM → persist.
+    5. Derive NextAction deterministically via rules/next_action.py.
+    6. Persist one plan row per (match_id, match_type) via UPSERT on
+       conflict(match_id, match_type) — idempotent re-generate (OQ-IA-9 fix).
+    7. Return GeneratePlanResponse {singlesPlans, doublesPlans} arrays.
+
+NUTRITION_FIRST_IA_V1.md §E: one Plan per match (was one per match-type group).
 
 Endpoints:
     POST   /v1/tournaments/{tid}/plans/generate   generate and persist plan
@@ -19,6 +22,7 @@ Endpoints:
 """
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
@@ -31,6 +35,7 @@ from playfuel_api.db import authed_client
 from playfuel_api.models.api import GeneratePlanResponse, WeatherBlock
 from playfuel_api.models.db import MatchRow, WeatherSnapshotRow
 from playfuel_api.rules.food import assemble_food_options
+from playfuel_api.rules.next_action import derive_next_action
 from playfuel_api.rules.plan import build_plan_envelope, build_timeline
 from playfuel_api.rules.scenarios import generate_match_scenarios
 from playfuel_api.services.llm import build_explanation_input, get_llm_provider
@@ -41,6 +46,8 @@ from playfuel_api.weather import get_or_fetch_weather
 from playfuel_api.weather.service import WeatherService
 
 router = APIRouter(prefix="/v1/tournaments", tags=["plans"])
+
+logger = logging.getLogger(__name__)
 
 _PLANS_TABLE = "plans"
 _MATCHES_TABLE = "matches"
@@ -58,11 +65,12 @@ async def generate_plan(
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> GeneratePlanResponse:
-    """Load matches + weather, run rules engine, persist plan_json, return Plan.
+    """Load matches + weather, run rules engine, persist plan_json, return envelope.
 
+    NUTRITION_FIRST_IA_V1 §E: Generates one Plan per match (not per match-type group).
+    Returns GeneratePlanResponse {singlesPlans: [Plan], doublesPlans: [Plan]}.
+    Either array may be empty when no matches of that type exist.
     HTTP response is always 200 regardless of gap_status (§G / OQ-14).
-    OVERRUN_MESSAGE is embedded in ScenarioPlan.overrun_warning when applicable.
-    weather and timeline blocks added in Phase 4 (Task #7 / OQ-API-2).
     """
     # 1. Load matches ordered by display_order, then scheduled_start.
     matches_result = (
@@ -74,14 +82,11 @@ async def generate_plan(
         .execute()
     )
     if not matches_result.data:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No matches found for tournament — add matches before generating a plan",
-        )
+        # Return empty envelope — 0 matches is valid (parent hasn't added any yet).
+        # NUTRITION_FIRST_IA_V1 §H.2 / hotfix: was erroneously 404.
+        return GeneratePlanResponse(singles_plans=[], doubles_plans=[])
 
     match_rows = [MatchRow(**m) for m in matches_result.data]
-    match = match_rows[0]
-    next_match = match_rows[1] if len(match_rows) > 1 else None
 
     # 2. Load tournament venue coords + name for weather fetch and LLM input.
     tournament_result = (
@@ -154,76 +159,142 @@ async def generate_plan(
             provider=snapshot.provider,
         )
 
-    # 5. Rules engine — pure Python, no LLM (§10 / Phase 6 deferred).
-    scenarios = generate_match_scenarios(match, next_match)
-
-    # 6. Build timeline from all match rows + scenarios.
-    timeline = build_timeline(match_rows, scenarios)
-
-    # 7. Phase 5: food / places lookup (non-critical — never raises).
+    # 5. Phase 5: food / places lookup (non-critical; shared across all matches — same venue).
     raw_places = find_nearby_food(
         venue_lat if venue_lat is not None else 0.0,
         venue_lng if venue_lng is not None else 0.0,
     ) if (venue_lat is not None and venue_lng is not None) else []
 
-    # Collect unique food buckets from all scenarios.
-    food_buckets: list[str] = sorted({
-        s.food_strategy.bucket.value
-        for s in scenarios
-        if s.food_strategy is not None
-    })
-    food_options, bag_fallback_only = assemble_food_options(raw_places, food_buckets)
+    # 6. Provider is the same for all plans in this request.
+    llm_provider = get_llm_provider()
+    now_utc = datetime.now(tz=timezone.utc)
 
-    # 8. Assemble plan envelope (Phase 4: weather_block + timeline; Phase 5: food).
-    plan = build_plan_envelope(
-        tid,
-        scenarios,
-        weather_flags=weather_flags,
-        weather_block=weather_block,
-        timeline=timeline,
-        food_options=food_options,
-        bag_fallback_only=bag_fallback_only,
-    )
+    singles_plans: list["Plan"] = []  # noqa: F821
+    doubles_plans: list["Plan"] = []  # noqa: F821
 
-    # 9. LLM explanation layer (Phase 6 / Task #9) — TemplateProvider by default.
-    #    Never raises: sanitize_or_fallback() falls back to TemplateProvider on any violation.
-    try:
-        exp_input = build_explanation_input(
-            plan=plan,
-            match=match,
-            next_match=next_match,
-            snapshot=snapshot,
-            food_options_list=food_options,
-            venue_name=venue_name,
-        )
-        raw_explanation = get_llm_provider().explain_plan(exp_input)
-        explanation = sanitize_or_fallback(raw_explanation, exp_input)
-        plan.llm_summary = explanation
-    except Exception:  # noqa: BLE001
-        # LLM is non-critical — never fail the plan on explanation errors.
-        import logging
-        logging.getLogger(__name__).warning(
-            "LLM explanation failed; plan will be returned without llmSummary.",
-            exc_info=True,
+    # NUTRITION_FIRST_IA_V1 §E: one Plan per match in the tournament.
+    # match_rows is already ordered by display_order ASC, scheduled_start ASC.
+    for match_idx, match in enumerate(match_rows):
+        match_type_key: str = (match.format or "singles").lower()
+        if match_type_key not in ("singles", "doubles"):
+            match_type_key = "singles"
+
+        # Doubles format (only meaningful for doubles matches).
+        doubles_format_val: Optional[str] = None
+        if match_type_key == "doubles":
+            doubles_format_val = match.doubles_format
+
+        # The "next match" for scenario gap computation: the globally next match
+        # in the ordered list, regardless of type.
+        next_match: Optional[MatchRow] = (
+            match_rows[match_idx + 1] if match_idx + 1 < len(match_rows) else None
         )
 
-    # 10. Persist — camelCase JSONB per iOS contract (models/api.py alias_generator=to_camel).
-    plan_dict = plan.model_dump(by_alias=True, mode="json")
-    llm_summary_dict = (
-        plan.llm_summary.model_dump(by_alias=True, mode="json")
-        if plan.llm_summary is not None else None
-    )
-    client.table(_PLANS_TABLE).insert({
-        "id": str(plan.plan_id),
-        "tournament_id": str(plan.tournament_id),
-        "plan_json": plan_dict,
-        "llm_summary": llm_summary_dict,
-        "rules_constants_version": plan.rules_constants_version,
-        "warnings": plan.warnings,
-        "schedule_confidence": plan.schedule_confidence.value,
-    }).execute()
+        # 7. Rules engine — generate scenarios for this match.
+        scenarios = generate_match_scenarios(
+            match,
+            next_match,
+            match_type=match_type_key,
+            doubles_format=doubles_format_val,
+        )
 
-    return GeneratePlanResponse(plan=plan)
+        # 8. Build timeline (single-match context; partnerCoordination fires for doubles).
+        timeline = build_timeline([match], scenarios)
+
+        # 9. Food options (same raw_places; bucket selection per this match's scenarios).
+        food_buckets: list[str] = sorted({
+            s.food_strategy.bucket.value
+            for s in scenarios
+            if s.food_strategy is not None
+        })
+        food_options, bag_fallback_only = assemble_food_options(raw_places, food_buckets)
+
+        # 10. Assemble plan envelope.
+        plan = build_plan_envelope(
+            tid,
+            scenarios,
+            weather_flags=weather_flags,
+            weather_block=weather_block,
+            timeline=timeline,
+            food_options=food_options,
+            bag_fallback_only=bag_fallback_only,
+            match_type=match_type_key,
+            match_id=match.id,
+        )
+
+        # 11. Derive NextAction deterministically — rules engine, never LLM.
+        extreme_heat = (
+            weather_flags.get("flag_extreme_heat_risk", False)
+            if weather_flags else False
+        )
+        try:
+            plan.next_action = derive_next_action(
+                plan.timeline,
+                now=now_utc,
+                extreme_heat_risk=extreme_heat,
+            )
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "derive_next_action failed for match %s; nextAction will be None.",
+                str(match.id),
+                exc_info=True,
+            )
+
+        # 12. LLM explanation layer — TemplateProvider by default.
+        #     Non-critical: sanitize_or_fallback() catches all provider errors.
+        try:
+            exp_input = build_explanation_input(
+                plan=plan,
+                match=match,
+                next_match=next_match,
+                snapshot=snapshot,
+                food_options_list=food_options,
+                venue_name=venue_name,
+            )
+            raw_explanation = llm_provider.explain_plan(exp_input)
+            explanation = sanitize_or_fallback(raw_explanation, exp_input)
+            plan.llm_summary = explanation
+        except Exception:  # noqa: BLE001
+            logger.warning(
+                "LLM explanation failed for match %s (%s); llmSummary will be null.",
+                str(match.id),
+                match_type_key,
+                exc_info=True,
+            )
+
+        # 13. Persist — camelCase JSONB per iOS contract.
+        #     OQ-IA-9 fix: upsert (not insert) so re-generate is idempotent.
+        #     Conflict target matches migration 0008's partial unique index:
+        #       plans_match_id_match_type_uq ON (match_id, match_type)
+        #       WHERE match_id IS NOT NULL
+        plan_dict = plan.model_dump(by_alias=True, mode="json")
+        llm_summary_dict = (
+            plan.llm_summary.model_dump(by_alias=True, mode="json")
+            if plan.llm_summary is not None else None
+        )
+        client.table(_PLANS_TABLE).upsert(
+            {
+                "id": str(plan.plan_id),
+                "tournament_id": str(plan.tournament_id),
+                "match_id": str(match.id),
+                "plan_json": plan_dict,
+                "llm_summary": llm_summary_dict,
+                "rules_constants_version": plan.rules_constants_version,
+                "warnings": plan.warnings,
+                "schedule_confidence": plan.schedule_confidence.value,
+                "match_type": match_type_key,
+            },
+            on_conflict="match_id,match_type",
+        ).execute()
+
+        if match_type_key == "singles":
+            singles_plans.append(plan)
+        else:
+            doubles_plans.append(plan)
+
+    # Plans are already in display_order / scheduled_start ASC order
+    # (match_rows was fetched that way).
+    return GeneratePlanResponse(singles_plans=singles_plans, doubles_plans=doubles_plans)
 
 
 @router.get("/{tid}/plans", summary="List plans")

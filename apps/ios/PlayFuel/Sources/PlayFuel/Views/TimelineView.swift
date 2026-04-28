@@ -93,10 +93,12 @@ private struct TimelineEventRow: View {
         case .match:     return "tennis.racket"
         case .recovery:  return "heart.fill"
         case .hydration: return "drop.fill"
-        case .gap:        return "clock"
-        case .foodWindow: return "fork.knife"
-        case .pickup:     return "figure.wave"
-        case .matchEnd:   return "flag.checkered"
+        case .gap:                   return "clock"
+        case .foodWindow:            return "fork.knife"
+        case .pickup:                return "figure.wave"
+        case .matchEnd:              return "flag.checkered"
+        // Phase 7: doubles partner coordination event (DOUBLES_SPEC_V1.md §C.1)
+        case .partnerCoordination:   return "person.2.fill"
         }
     }
 
@@ -109,10 +111,12 @@ private struct TimelineEventRow: View {
         case .match:     return .yellow
         case .recovery:  return .red
         case .hydration: return .teal
-        case .gap:        return .secondary
-        case .foodWindow: return .green
-        case .pickup:     return .purple
-        case .matchEnd:   return .gray
+        case .gap:                   return .secondary
+        case .foodWindow:            return .green
+        case .pickup:                return .purple
+        case .matchEnd:              return .gray
+        // Phase 7: doubles partner coordination event
+        case .partnerCoordination:   return .cyan
         }
     }
 }

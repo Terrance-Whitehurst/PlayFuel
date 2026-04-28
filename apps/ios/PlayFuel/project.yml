@@ -52,7 +52,7 @@ schemes:
       config: Debug
       environmentVariables:
         - variable: PLAYFUEL_API_BASE_URL
-          value: http://localhost:8000
+          value: http://127.0.0.1:8000
           isEnabled: true
         - variable: SUPABASE_URL
           value: http://127.0.0.1:54321

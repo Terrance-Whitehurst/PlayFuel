@@ -90,14 +90,46 @@ struct MatchDTO: Decodable {
     let roundLabel: String?    // round_label → roundLabel
     let opponentLabel: String? // opponent_label → opponentLabel
     let courtLabel: String?    // court_label → courtLabel
+
+    // Doubles spec (Phase 7 — 0007_doubles_support.sql). Decoded via .convertFromSnakeCase.
+    // `format` is pre-existing in the DB (0002_tables.sql) but was omitted from MatchDTO
+    // until this spec — add it here alongside the new doubles_format column.
+    let doublesFormat: String?  // doubles_format → doublesFormat (migration 0007)
 }
 
 // MARK: - POST /v1/tournaments/{tid}/plans/generate
+//
+// BREAKING CHANGE (Phase 7 Doubles spec):
+// The API now returns { "singlesPlan": Plan|null, "doublesPlan": Plan|null }.
+// The old `{ "plan": Plan }` envelope (GeneratePlanResponseDTO) is replaced by
+// PlanEnvelopeDTO. Repository.generatePlan() decodes PlanEnvelopeDTO.
+//
+// Decoded with camelDecoder (no key conversion). API uses Pydantic alias_generator=to_camel.
 
-/// Outer envelope: {"plan": PlanCoreDTO}.
-/// Decoded with camelDecoder (no key conversion). API uses Pydantic alias_generator=to_camel.
-struct GeneratePlanResponseDTO: Decodable {
-    let plan: PlanCoreDTO
+/// Phase 8 envelope: { singlesPlans: [PlanCoreDTO], doublesPlans: [PlanCoreDTO] }.
+/// BREAKING CHANGE from Phase 7 (which used singular singlesPlan/doublesPlan).
+/// Both arrays default to [] when the key is absent (backwards-compat with Phase 7 API).
+struct PlanEnvelopeDTO: Decodable {
+    let singlesPlans: [PlanCoreDTO]
+    let doublesPlans: [PlanCoreDTO]
+
+    enum CodingKeys: String, CodingKey {
+        case singlesPlans, doublesPlans
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        singlesPlans = try c.decodeIfPresent([PlanCoreDTO].self, forKey: .singlesPlans) ?? []
+        doublesPlans = try c.decodeIfPresent([PlanCoreDTO].self, forKey: .doublesPlans) ?? []
+    }
+
+    /// Map wire-format envelope → iOS PlanEnvelope domain model.
+    func toModel() -> PlanEnvelope {
+        PlanEnvelope(
+            singlesPlans: singlesPlans.map { $0.toModel() },
+            doublesPlans: doublesPlans.map { $0.toModel() }
+        )
+    }
 }
 
 /// Core plan fields returned by the rules engine.
@@ -120,11 +152,21 @@ struct PlanCoreDTO: Decodable {
     let timeline: [TimelineEventDTO]    // empty list when engine produces none
     let bagFallbackOnly: Bool           // true when all scenarios use bag_only bucket
     let llmSummary: PlanExplanationDTO? // nil for pre-Phase-6 plans or when provider unavailable
+    // Phase 7 — match type for which this plan was generated (DOUBLES_SPEC_V1.md §D.3)
+    let matchType: String               // "singles" | "doubles"; decodeIfPresent defaults to "singles"
+    // Phase 8 — per-match anchoring (NUTRITION_FIRST_IA_V1.md §E)
+    let matchId: UUID?                  // nil for legacy plans pre-migration-0008
+    let nextAction: NextActionDTO?      // nil when no future events in 6h lookahead window
+    let scheduledStart: String?         // ISO 8601 timestamp of the match start; for strip ordering
 
     enum CodingKeys: String, CodingKey {
         case planId, tournamentId, generatedAt, rulesConstantsVersion
         case scheduleConfidence, heatEmergencyText, warnings, scenarioPlans
         case weather, foodOptions, timeline, bagFallbackOnly, llmSummary
+        case matchType
+        case matchId
+        case nextAction
+        case scheduledStart
     }
 
     // Custom init: normalise generatedAt to String; use decodeIfPresent for
@@ -144,6 +186,12 @@ struct PlanCoreDTO: Decodable {
         self.timeline              = try c.decodeIfPresent([TimelineEventDTO].self, forKey: .timeline) ?? []
         self.bagFallbackOnly       = try c.decodeIfPresent(Bool.self, forKey: .bagFallbackOnly) ?? false
         self.llmSummary            = try c.decodeIfPresent(PlanExplanationDTO.self, forKey: .llmSummary)
+        // Phase 7: match_type defaults to "singles" for legacy plans that predate migration 0007.
+        self.matchType             = try c.decodeIfPresent(String.self, forKey: .matchType) ?? "singles"
+        // Phase 8: per-match fields; all optional for backwards-compat with Phase 7 API.
+        self.matchId               = try c.decodeIfPresent(UUID.self,   forKey: .matchId)
+        self.nextAction            = try c.decodeIfPresent(NextActionDTO.self, forKey: .nextAction)
+        self.scheduledStart        = try c.decodeIfPresent(String.self, forKey: .scheduledStart)
         // `generated_at` is a Python `datetime` → Pydantic serialises as ISO 8601 string in JSON.
         self.generatedAt = try c.decode(String.self, forKey: .generatedAt)
     }
@@ -161,7 +209,11 @@ struct PlanCoreDTO: Decodable {
             foodOptions: (foodOptions ?? []).map { $0.toModel() },
             timeline: timeline.map { $0.toModel() },
             bagFallbackOnly: bagFallbackOnly,
-            llmSummary: llmSummary?.toModel()
+            llmSummary: llmSummary?.toModel(),
+            matchType: MatchType(rawValue: matchType) ?? .singles,
+            matchId: matchId ?? UUID(),   // Phase 8: fallback UUID for legacy plans
+            nextAction: nextAction?.toModel(),
+            scheduledStart: scheduledStart
         )
     }
 }
@@ -311,6 +363,7 @@ struct TournamentCreateRequest: Encodable {
 /// Request body for POST /v1/tournaments/{tid}/matches.
 /// NOTE: `estimated_next_match_time` is NOT a DB column — it is derived from the match list
 /// (next match's scheduledStart). The iOS form collects it for UX but it is not sent to the API.
+/// Phase 7: `format` and `doublesFormat` added per DOUBLES_SPEC_V1.md §A.2.
 struct MatchCreateRequest: Encodable {
     let scheduledStart: Date            // → scheduled_start (ISO 8601 datetime)
     let estimatedDurationMinutes: Int?  // → estimated_duration_minutes
@@ -318,6 +371,9 @@ struct MatchCreateRequest: Encodable {
     let opponentLabel: String?          // → opponent_label
     let courtLabel: String?             // → court_label
     let displayOrder: Int?              // → display_order
+    // Phase 7 — match type + doubles format
+    let format: String                  // → format ("singles" | "doubles")
+    let doublesFormat: String?          // → doubles_format ("best_of_3" | "pro_set_8" | null)
 }
 
 // MARK: - MatchDTO.toModel()
@@ -327,6 +383,8 @@ extension MatchDTO {
     /// `scheduledTime` is a display string formatted in the device's local timezone.
     /// `estimatedNextMatchTime` is nil — it is derived from multi-row match context,
     /// not stored in the DB. Views that need it must compute it from the ordered match list.
+    /// Phase 7: `format` and `doublesFormat` are passed explicitly so the doubles-spec
+    /// fields round-trip through the match card UI without loss.
     func toModel() -> Match {
         let fmt = DateFormatter()
         fmt.dateFormat = "h:mm a"
@@ -339,8 +397,11 @@ extension MatchDTO {
             estimatedNextMatchTime: nil,
             round: roundLabel,
             opponent: opponentLabel,
-            court: courtLabel
+            court: courtLabel,
             // roundLabel / opponentLabel / courtLabel use their `= nil` stored-property defaults
+            // Phase 7: pass format + doublesFormat explicitly from the DB row
+            format: format,
+            doublesFormat: doublesFormat
         )
     }
 }
@@ -382,6 +443,44 @@ struct ScenarioPlanDTO: Decodable {
             rewarmUp: rewarmUp,
             overrunWarning: overrunWarning,
             warnings: warnings
+        )
+    }
+}
+
+// MARK: - Phase 8 — NextActionDTO
+//
+// Decoded from the `nextAction` field of PlanCoreDTO (camelCase wire format).
+// Maps to the iOS `NextAction` domain model.
+// Produced by `rules/next_action.py` on the backend — never from the LLM.
+
+struct NextActionDTO: Decodable {
+    let title: String
+    let detail: String
+    let scheduledFor: Date?   // decoded via camelDecoder .iso8601 strategy; nil on recovery_fallback
+    let kind: String
+    let minsUntil: Int?       // nil on recovery_fallback
+
+    enum CodingKeys: String, CodingKey {
+        case title, detail, scheduledFor, kind, minsUntil
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        title        = try c.decode(String.self,  forKey: .title)
+        detail       = try c.decode(String.self,  forKey: .detail)
+        scheduledFor = try c.decodeIfPresent(Date.self, forKey: .scheduledFor)
+        kind         = try c.decode(String.self,  forKey: .kind)
+        minsUntil    = try c.decodeIfPresent(Int.self,  forKey: .minsUntil)
+    }
+
+    /// Map API NextAction → iOS NextAction domain model.
+    func toModel() -> NextAction {
+        NextAction(
+            title: title,
+            detail: detail,
+            scheduledFor: scheduledFor,
+            kind: kind,
+            minsUntil: minsUntil
         )
     }
 }

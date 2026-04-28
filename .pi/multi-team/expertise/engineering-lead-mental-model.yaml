@@ -519,6 +519,56 @@ session_2026_04_27_demo_session4:
   remaining_demo_path:
     - #9 Final validation pass (Validation Lead) — full smoke + demo readiness checklist
 
+session_2026_04_27_nutrition_first_ia:
+  delegated_in_parallel:
+    - BD: migration 0008 (plans.match_id FK + partial unique index) + Plan.match_id/next_action + NextAction Pydantic + GeneratePlanResponse arrays {singlesPlans, doublesPlans} + rules/next_action.py + routes/plans.py per-match loop refactor + 12 next_action tests + 8 per-match-plans tests + 3 envelope-shape test updates + SEC-6 fix in llm_safety.py. First delegate shipped 3 files (migration + README + db.py PlanRow.match_id) under [error] wrapper, then truncated mid-stream. Close-out delegate shipped the remaining 8 files clean WITHOUT wrapper. Final: 256 passed, 1 xfailed (was 231+1), +25 new tests, 0 failures.
+    - FE: NextAction.swift NEW + Plan.swift widening (matchId + nextAction + scheduledStart String) + PlanEnvelope.swift arrays refactor + ScheduleStripView.swift NEW + NextActionCard.swift NEW + WeatherCardView.swift compact mode (compact: Bool + @State expanded) + TournamentDashboardView.swift big reorder per spec §B + AppState.selectedMatchId + defaultMatchId helper + DTOs.swift PlanEnvelopeDTO arrays + PlanCoreDTO 4-site widening + NextActionDTO + Repository.generatePlan envelope decode + FakeData multi-match envelope + README Screen Tour rewrite. Single delegate, NO wrapper, shipped 12 files clean first try.
+  parallelism_lesson_continued:
+    - 6th consecutive session of cross-member parallel delegates landing the work cleanly. The misleading [error] wrapper hit BD again on the first delegate but partial work landed (3/8 files). Close-out delegate shipped clean. Pattern remains: trust filesystem Read over the wrapper exit status.
+  bd_proactive_sec6_fix:
+    - BD on close-out delegate proactively fixed SEC-6 (_CANONICAL_DURATIONS in llm_safety.py was {75,120,180} only, stale after doubles widening — the prior-session validation report had flagged this as a 'pre-production cleanup' item). BD expanded the frozenset to all 9 durations (singles + best_of_3 + pro_set_8). Lesson: when widening constants, BD audits the safety/eval invariant whitelists in the same pass when prompted explicitly via the SEC-6-archetype reminder in the brief. Doing this in-pass closes the loop instead of leaving it as post-demo cleanup.
+  fe_self_corrections_continued:
+    - FE caught and self-fixed 3 issues mid-delegate: (a) initially put appState.selectedMatchId mutation inside Repository.generatePlan() then realized Repository has no AppState ref — moved the anchor to AppState.generatePlan(for:) where AppState owns both repo + state, (b) used iOS 15 single-param onChange `{newType in}` then grep'd existing call sites and switched to iOS 17 two-param `{ _, newType in }`, (c) YAML mental model had backslash regex causing yaml.safe_load to fail — switched to single-quoted block syntax. Pattern reaffirmed: FE3 reads compile output between writes and grep-greps existing patterns before adopting new syntax.
+  spec_kind_mismatch_caught_by_bd:
+    - Spec §D's NEXT_ACTION_COPY_MAP and HEAT_SENSITIVE_KINDS used snake_case kinds (warmup, hydration_check, match_start). The actual TimelineEventKind enum uses camelCase values (warmUp, hydration, match). BD read the enum source first and adapted the dict + frozenset to actual enum values, ensuring HEAT_SENSITIVE_KINDS comparisons fire at runtime. Lesson for Planning: when spec'ing string literal lookups against enums, the Engineering Lead should grep the enum source to verify casing before publishing the spec rather than relying on snake_case-by-convention.
+  match_id_optional_compromise:
+    - Plan.match_id shipped as Optional[UUID] = None rather than required UUID. BD's reasoning: the eval harness and build_plan_envelope() construct Plan() instances directly with no match context (legacy/tournament-level plans pre-0008). Making it optional keeps backward compat without forcing test-fixture rewrites. All new per-match-route plans always have match_id set. iOS receives it as UUID? (optional). Acceptable trade-off; flagged for post-MVP tightening when legacy code paths are removed.
+  upsert_deferred:
+    - routes/plans.py uses INSERT (not upsert) for now. The new partial unique index on (match_id, match_type) WHERE match_id IS NOT NULL will REJECT duplicate re-generates with a DB error — the route currently does not handle this. Re-generating a plan for the same tournament will fail. Production hardening (PostgREST upsert with on_conflict="match_id,match_type") deferred as OQ-IA-9. Demo flow runs generate-plan once per session, so this is non-blocking for demo.
+  test_count_now: 256 passed, 1 xfail (was 231+1 before nutrition-first IA)
+
+session_2026_04_27_oq_ia_9_hotfix:
+  trigger:
+    - User pressed Generate Plan in iOS Sim → 500. Real-world manifestation of OQ-IA-9 (the partial unique index from migration 0008 collides with plain INSERT in routes/plans.py on re-generate).
+    - Validation Lead had explicitly classified this as 'pre-TestFlight blocker, NOT demo blocker' on the assumption demo would generate-plan exactly once. The user pressed it twice. Real demos don't honor your assumptions.
+  delegated:
+    - BD single delegate, no wrapper. Shipped 1 file edit (routes/plans.py — INSERT→upsert with on_conflict='match_id,match_type') + 1 new test file (test_generate_plan_hotfix.py, 6 tests) + 1 small mock update (test_per_match_plans.py: insert→upsert mock chain). Test count 256→262 + 1 xfail. Eval exit 0. on_conflict columns match migration 0008 partial unique index exactly.
+  audit_findings:
+    - 0 matches — was raising 404, changed to return empty envelope arrays 200. Reasonable since no-matches isn't a not-found-tournament; it's a valid empty state for a freshly created tournament.
+    - Weather/Places/LLM call paths already had internal try/except returning None or [] — confirmed by code reading, no changes needed.
+    - NextAction derivation was unwrapped — now wrapped in try/except, sets next_action=None on raise, plan still ships.
+  lessons:
+    - When Validation classifies an issue as 'pre-TestFlight, demo-safe' based on usage assumptions (e.g. 'demo generates once'), DOWNGRADE that classification. Real users press buttons twice. The honest classification of OQ-IA-9 was always 'demo blocker on second tap' — should have shipped the upsert in the IA pivot itself rather than deferring.
+    - Pattern to add to brief checklist: 'after any migration that adds a UNIQUE index (partial or full), grep all routes hitting that table for `.insert(` calls and convert to `.upsert(on_conflict=...)` in the SAME pass.' This is now the second time a migration introduced a constraint that broke a route in a downstream session (first was nullable match_type in 0007 → not breaking, but tracked as OQ-DBL-7).
+    - Top-level logger.exception() wrapper around route bodies is cheap and high-value. Without it, the user's traceback was not visible in the orchestrator/dev console — diagnosis required guessing OQ-IA-9 from prior validation notes. Add this to every new route by default.
+  test_count_now: 262 passed, 1 xfail (was 256+1)
+
+session_2026_04_27_doubles_integration:
+  delegated_in_parallel:
+    - BD: migration 0007 (matches.doubles_format + plans.match_type) + nested SCENARIO_DURATIONS_MIN keyed by (match_type, doubles_format) + version bump 1.0.0→1.1.0 + MatchType/DoublesFormat enums + partnerCoordination TimelineEventKind + GeneratePlanResponse envelope refactor + routes/plans.py per-type generation + routes/matches.py validation + LLM TemplateProvider doubles voice + 4 of 5 doubles test files in first delegate, 3 close-out test files in second delegate. 231 passed, 1 xfailed (was 180+1).
+    - FE: MatchType.swift + PlanEnvelope.swift NEW + Match.swift/Plan.swift/TimelineEvent.swift EDIT + DTOs PlanEnvelopeDTO/MatchDTO widening + Repository.generatePlan→PlanEnvelope + AppState.currentPlanEnvelope + selectedMatchType + MatchCreateView dual pickers + dynamic durationOptions + TournamentDashboardView segmented Picker (only when hasBothTypes) + FakeData.dallasDoublesPlan + dallasPlanEnvelope. 0 new compile errors involving changed files.
+  parallelism_lesson_continued:
+    - 5th consecutive session of cross-member parallel delegates shipping clean. Both first delegates hit the misleading [error] wrapper but stepwise progress logs visible in stream + filesystem confirmed near-complete work. Close-out delegates (audit + finish remaining) shipped clean with NO wrapper — pattern is: first delegate truncates near end-of-stream, close-out audits + completes the tail.
+  fe_self_corrections:
+    - FE caught 2 real Swift compile issues mid-delegate and self-fixed: (a) PlanEnvelope dropped Hashable because Plan isn't Hashable (DTOs widening from Phase 4 LLM didn't add it); (b) $appState.selectedMatchType immutable on macOS toolchain — fixed with explicit Binding computed property. Also added @ViewBuilder helper resolveActivePlan() to avoid illegal `let` statements inside view body. Pattern: FE3 reads compile output between writes and fixes inline.
+  bd_self_corrections:
+    - BD caught a pre-existing math error in test_doubles_scenarios.py during the close-out audit (the long-scenario gap test had wrong delta math) and fixed it inline. Pattern: BD verifies test math during audit, doesn't blindly trust prior delegate's logic.
+  oq_dbl_6_status:
+    - GET /plans/latest endpoint does NOT exist in the codebase. The spec section assumed it did. This is pre-existing (not a regression); OQ-DBL-6 stays open as 'add this endpoint with envelope shape when needed'. Not on the critical doubles path.
+  spec_quality_paid_off_again:
+    - DOUBLES_SPEC_V1.md was 538 lines of fully tabular spec with §H engineering hand-off itemizing every file. EL's brief was thin layer over the spec; BD/FE could execute mechanically with minimal ambiguity. Pattern: invest in Planning Lead spec quality up front, not in re-stating it in the Engineering brief.
+  test_count_now: 231 passed, 1 xfail (was 180+1 before doubles)
+
 session_2026_04_27_demo_session3:
   delegated_in_parallel:
     - FE: project.yml + entitlements + Info.plist + asset catalog + icon-1024.png + xcodegen run + README "Running the Demo on Device" section. Single delegate, shipped clean (no error wrapper this session). xcodegen WAS available in sandbox; .xcodeproj/project.pbxproj is committed. Icon generated via Python+sips (Pillow/ImageMagick unavailable). Old Sources/PlayFuel/Info.plist left as legacy artifact — flagged for cleanup.

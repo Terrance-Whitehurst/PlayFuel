@@ -38,4 +38,33 @@ struct Match: Codable, Identifiable, Hashable {
 
     /// Human-readable court designation from the API, e.g. "Court 7". Optional.
     let courtLabel: String? = nil
+
+    // MARK: - Doubles spec fields (Phase 7 — DOUBLES_SPEC_V1.md §A.2 / §E.5)
+    //
+    // Both use `= nil` defaults (same pattern as roundLabel above) so existing
+    // FakeData / MatchDTO.toModel() call sites are unaffected unless they want to
+    // explicitly supply a value.
+
+    /// Match type: "singles" or "doubles". Nil for pre-doubles-spec matches
+    /// (treat as singles via the `matchType` computed accessor).
+    /// Maps to `matches.format` DB column (pre-existing — 0002_tables.sql).
+    let format: String?
+
+    /// Doubles format string: "best_of_3" or "pro_set_8".
+    /// Nil when format != "doubles". Maps to `matches.doubles_format` (migration 0007).
+    let doublesFormat: String?
+
+    // MARK: - Typed Accessors
+
+    /// Typed MatchType derived from `format`. Defaults to `.singles` when nil
+    /// (pre-doubles-spec matches, or explicit singles matches).
+    var matchType: MatchType {
+        MatchType(rawValue: format ?? "singles") ?? .singles
+    }
+
+    /// Typed DoublesFormat, or nil when not a doubles match.
+    var doublesFormatTyped: DoublesFormat? {
+        guard matchType == .doubles, let df = doublesFormat else { return nil }
+        return DoublesFormat(rawValue: df)
+    }
 }

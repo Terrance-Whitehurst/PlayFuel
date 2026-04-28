@@ -101,6 +101,63 @@ value_added_findings:
       are a recurring silent-failure surface. Always check whether the
       demo operator's shell could divert traffic to an unimplemented
       path.
+  - id: stale_invariant_whitelists_after_constants_widening
+    observed: 2026-04-27 / session moh9uivm3dxv (doubles delegate)
+    detail: |
+      When a constants table widens (e.g. SCENARIO_DURATIONS_MIN goes from
+      flat singles dict → keyed-by-(match_type,format) nested dict), grep
+      for any OTHER frozenset / whitelist / regex that hardcoded the OLD
+      value set. SEC-6 caught: services/llm_safety.py held
+      `_CANONICAL_DURATIONS = {"75","120","180"}` — never updated when
+      doubles added 60/90/135/45/70/100. False-positive fires on every
+      doubles plan; masked at demo time only because TemplateProvider
+      doesn't emit numeric durations. Real LLM providers would break.
+      Pattern: any time a constants table grows, immediately
+      `grep -rn '<old-value>'` across services/ for stale duplicates.
+
+  - id: format_field_str_vs_literal_at_API_boundary
+    observed: 2026-04-27 / session moh9uivm3dxv (doubles delegate)
+    detail: |
+      Pydantic `Optional[str]` for fields with a known closed value set is
+      a recurring 🟡. POST /matches accepted any string for `format` and
+      `doubles_format`; only an internal helper rejected invalid combos.
+      Demo-safe (defense in depth) but lets dirty data reach DB. Always
+      check at every API model: closed-set fields → `Literal[...]` or
+      enum, not `str`.
+
+  - id: gating_safety_check_in_brief
+    observed: 2026-04-27 / session moh9uivm3dxv (nutrition-first IA delegate)
+    detail: |
+      When a delegate's source-of-change is an IA / visual prominence pivot,
+      pre-call out the SAFETY OVERRIDE as the gating check in the SecRev
+      brief. Mark it 🔴 GATING explicitly. The whole point of demoting one
+      thing visually is that you might accidentally demote the safety logic
+      paired with it. SecRev returned a single-line PASS on this with
+      file:line proof — exactly what was needed.
+    playbook: |
+      Pattern: every IA / reorder delegate, the SecRev brief leads with the
+      safety conditional that MUST stay at position #0 (or whatever the
+      contractually-correct position is). If it moved, blocker. If its
+      trigger weakened (e.g., gated behind a collapse @State), blocker.
+      This caught QA-IA-1 cleanly: the EmergencyBanner is at #1 (behind a
+      conditional Picker), so technically a finding, but the safety trigger
+      itself is intact and the Dallas demo seed is singles-only so the
+      Picker never renders. Severity: 🟡 not 🔴.
+
+  - id: insert_vs_upsert_after_unique_index
+    observed: 2026-04-27 / session moh9uivm3dxv (nutrition-first IA delegate)
+    detail: |
+      When a migration adds a unique constraint / partial unique index, audit
+      every INSERT statement against that table. OQ-IA-9: migration 0008
+      added `plans_match_id_match_type_uq WHERE match_id IS NOT NULL`, but
+      `routes/plans.py` still uses plain `.insert()`. First generate succeeds;
+      every subsequent generate 500s. Demo-safe (single generate per
+      session); pre-TestFlight blocker (parents will regenerate after
+      editing matches). Pattern: any time a migration adds a UNIQUE index,
+      the closing-out validation should `grep -n '\.insert(' routes/`
+      against the affected table and verify each is either intentionally
+      one-shot or migrated to upsert.
+
   - id: live_api_vs_preview_fixture_drift
     observed: 2026-04-27 / session moh9uivm3dxv
     detail: |

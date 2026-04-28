@@ -35,7 +35,21 @@ final class AppState: ObservableObject {
     // MARK: - Loadable Data
 
     @Published var tournaments: LoadState<[Tournament]> = .idle
-    @Published var currentPlan: LoadState<Plan> = .idle
+
+    // Phase 7 — replaced `currentPlan: LoadState<Plan>` with the doubles-spec envelope.
+    // Both singles and doubles plans are carried together; views resolve the active plan
+    // using `currentPlanEnvelope.plan(for: selectedMatchType)`.
+    @Published var currentPlanEnvelope: LoadState<PlanEnvelope> = .idle
+
+    /// Which match type is currently selected on the dashboard segmented picker.
+    /// Used for the Singles | Doubles type-level picker when hasBothTypes == true.
+    /// Persisted in-session only (not UserDefaults). Defaults to .singles.
+    @Published var selectedMatchType: MatchType = .singles
+
+    /// The specific match ID selected in ScheduleStripView.
+    /// Drives planContent — the dashboard renders the plan for this match.
+    /// Set by AppState.defaultMatchId(from:now:) on envelope arrival.
+    @Published var selectedMatchId: UUID? = nil
 
     // MARK: - Dependencies
 
@@ -75,17 +89,34 @@ final class AppState: ObservableObject {
         }
     }
 
-    /// Run the rules engine for a tournament and assemble the hybrid Plan.
+    /// Run the rules engine for a tournament and populate `currentPlanEnvelope`.
+    /// Phase 8 (Nutrition-First IA): generatePlan returns a PlanEnvelope with
+    /// per-match plan arrays (one Plan per match). After the envelope arrives,
+    /// `selectedMatchId` is anchored to the most actionable match (next upcoming
+    /// by scheduledStart, or most-recently-completed, or first available).
     func generatePlan(for tournamentId: UUID) async {
-        currentPlan = .loading
+        currentPlanEnvelope = .loading
         do {
-            let plan = try await repository.generatePlan(tournamentId: tournamentId)
-            currentPlan = .loaded(plan)
+            let envelope = try await repository.generatePlan(tournamentId: tournamentId)
+            currentPlanEnvelope = .loaded(envelope)
+            // Anchor strip selection to the most actionable match.
+            selectedMatchId = defaultMatchId(from: envelope)
         } catch {
-            currentPlan = .failed(
+            currentPlanEnvelope = .failed(
                 (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
             )
         }
+    }
+
+    // MARK: - Sign Out
+
+    // MARK: - Match Selection Helper
+
+    /// Returns the matchId to use as the default selection for a given envelope.
+    /// Priority: next upcoming match → most-recently-completed → any plan.
+    /// `now` is injectable for test determinism.
+    func defaultMatchId(from envelope: PlanEnvelope, now: Date = .now) -> UUID? {
+        envelope.nextUpcomingPlan(now: now)?.matchId ?? envelope.anyPlan?.matchId
     }
 
     // MARK: - Sign Out
@@ -94,6 +125,8 @@ final class AppState: ObservableObject {
         authService.signOut()
         selectedTournamentId = nil
         tournaments = .idle
-        currentPlan = .idle
+        currentPlanEnvelope = .idle
+        selectedMatchType = .singles
+        selectedMatchId = nil
     }
 }

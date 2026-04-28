@@ -123,6 +123,10 @@ final class Repository: ObservableObject {
     /// `estimatedNextMatchTime` is collected by the iOS form for UX (pre-filling next match
     /// time) but is NOT a DB column — it is derived from match ordering. It is omitted from
     /// the encoded request body.
+    ///
+    /// Phase 7: `matchType` and `doublesFormat` added per DOUBLES_SPEC_V1.md §A.2.
+    /// Validation (singles + non-nil doublesFormat, doubles + nil doublesFormat) is
+    /// enforced by the API — iOS sends what the user selected in MatchCreateView.
     func createMatch(
         tournamentId: UUID,
         scheduledStart: Date,
@@ -131,7 +135,9 @@ final class Repository: ObservableObject {
         opponentLabel: String?,
         courtLabel: String?,
         estimatedNextMatchTime: Date?,
-        displayOrder: Int
+        displayOrder: Int,
+        matchType: MatchType = .singles,
+        doublesFormat: DoublesFormat? = nil
     ) async throws -> Match {
         let body = MatchCreateRequest(
             scheduledStart: scheduledStart,
@@ -139,7 +145,9 @@ final class Repository: ObservableObject {
             roundLabel: roundLabel,
             opponentLabel: opponentLabel,
             courtLabel: courtLabel,
-            displayOrder: displayOrder
+            displayOrder: displayOrder,
+            format: matchType.rawValue,
+            doublesFormat: doublesFormat?.rawValue
         )
         let bodyData = try postEncoder.encode(body)
         let dto = try await api.send(
@@ -152,17 +160,18 @@ final class Repository: ObservableObject {
 
     // MARK: - Plans
 
-    /// Generate a plan for a tournament via the rules engine and return a full `Plan`
-    /// mapped directly from the API response (weather, food options, and timeline
-    /// are all real data as of Phase 5).
+    /// Generate a plan for a tournament via the rules engine.
+    ///
+    /// Phase 8 (Nutrition-First IA): returns a `PlanEnvelope` with arrays of plans
+    /// keyed by match type — one Plan per match in the tournament.
     ///
     /// HTTP 200 always (the backend returns 200 even for overrun scenarios per OQ-14/§G).
-    func generatePlan(tournamentId: UUID) async throws -> Plan {
-        let envelope = try await api.send(
+    func generatePlan(tournamentId: UUID) async throws -> PlanEnvelope {
+        let dto = try await api.send(
             Endpoints.generatePlan(baseURL: api.baseURL, tournamentId: tournamentId),
             as: .camel,
-            expecting: GeneratePlanResponseDTO.self
+            expecting: PlanEnvelopeDTO.self
         )
-        return envelope.plan.toModel()
+        return dto.toModel()
     }
 }

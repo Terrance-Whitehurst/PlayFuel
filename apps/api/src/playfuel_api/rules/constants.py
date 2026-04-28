@@ -8,14 +8,18 @@ No runtime code may mutate these constants; changes require a version bump (§J)
 
 # ─── Version (§J.1) ──────────────────────────────────────────────────────────
 
-RULES_CONSTANTS_VERSION = "1.0.0"
+RULES_CONSTANTS_VERSION = "1.1.0"  # bumped from 1.0.0 — SCENARIO_DURATIONS_MIN nested for doubles-spec
 
-# ─── Scenario durations (§A.1) ────────────────────────────────────────────────
+# ─── Scenario durations (§A.1 + DOUBLES_SPEC_V1.md §B.1) ─────────────────────────────────────────
+#
+# v1.1.0: CHANGED from flat dict[str,int] to nested dict keyed by (match_type, doubles_format).
+# Callers: rules/scenarios.py uses SCENARIO_DURATIONS_MIN[(match_type, doubles_format)][kind].
+# All doubles values are DRAFT — OQ-DBL-1 (validate with USTA junior coach before Phase 7).
 
-SCENARIO_DURATIONS_MIN: dict[str, int] = {
-    "short": 75,    # minutes
-    "normal": 120,  # minutes
-    "long": 180,    # minutes
+SCENARIO_DURATIONS_MIN: dict[tuple[str, str | None], dict[str, int]] = {
+    ("singles", None):          {"short": 75,  "normal": 120, "long": 180},  # v1.0.0 — FROZEN
+    ("doubles", "best_of_3"):   {"short": 60,  "normal": 90,  "long": 135},  # [DRAFT — OQ-DBL-1]
+    ("doubles", "pro_set_8"):   {"short": 45,  "normal": 70,  "long": 100},  # [DRAFT — OQ-DBL-1]
 }
 
 # ─── Gap-bucket boundaries (§B.2 / §B.3) ─────────────────────────────────────

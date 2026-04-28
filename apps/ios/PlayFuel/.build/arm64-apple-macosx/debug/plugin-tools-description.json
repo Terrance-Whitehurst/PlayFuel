@@ -44,7 +44,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/MatchType.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Plan.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanEnvelope.swift"
         },
         {
           "kind" : "file",
@@ -85,6 +93,10 @@
         {
           "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DTOs.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DebugAuth.swift"
         },
         {
           "kind" : "file",
@@ -172,7 +184,9 @@
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/HardCodedStrings.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/FoodOption.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Match.swift.o",
+        "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.swift.o",
+        "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanExplanation.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/ScenarioPlan.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/TimelineEvent.swift.o",
@@ -183,6 +197,7 @@
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/APIError.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/AuthService.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DTOs.swift.o",
+        "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Endpoints.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/KeychainStore.swift.o",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Repository.swift.o",
@@ -274,7 +289,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.swift.o"
         },
         {
           "kind" : "file",
@@ -315,6 +338,10 @@
         {
           "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DTOs.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.swift.o"
         },
         {
           "kind" : "file",
@@ -396,7 +423,9 @@
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Data/HardCodedStrings.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/FoodOption.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Match.swift",
+        "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/MatchType.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Plan.swift",
+        "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanEnvelope.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanExplanation.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/ScenarioPlan.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/TimelineEvent.swift",
@@ -407,6 +436,7 @@
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/APIError.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/AuthService.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DTOs.swift",
+        "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DebugAuth.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Endpoints.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/KeychainStore.swift",
         "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Repository.swift",
@@ -445,7 +475,9 @@
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Data/HardCodedStrings.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/FoodOption.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Match.swift",
+      "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/MatchType.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Plan.swift",
+      "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanEnvelope.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanExplanation.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/ScenarioPlan.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/TimelineEvent.swift",
@@ -456,6 +488,7 @@
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/APIError.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/AuthService.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DTOs.swift",
+      "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DebugAuth.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Endpoints.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/KeychainStore.swift",
       "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/Repository.swift",
@@ -586,7 +619,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/MatchType.swift"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/Plan.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Models/PlanEnvelope.swift"
         },
         {
           "kind" : "file",
@@ -627,6 +668,10 @@
         {
           "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DTOs.swift"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/Sources/PlayFuel/Networking/DebugAuth.swift"
         },
         {
           "kind" : "file",
@@ -732,6 +777,10 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DebugAuth.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/DisclaimerView.swift.o"
         },
         {
@@ -772,7 +821,15 @@
         },
         {
           "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/MatchType.swift.o"
+        },
+        {
+          "kind" : "file",
           "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/Plan.swift.o"
+        },
+        {
+          "kind" : "file",
+          "name" : "/Users/twhitehurst3/Documents/twhitehurst3/Studying/Projects/PlayFuel/apps/ios/PlayFuel/.build/arm64-apple-macosx/debug/PlayFuel.build/PlanEnvelope.swift.o"
         },
         {
           "kind" : "file",
