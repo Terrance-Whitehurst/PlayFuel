@@ -273,10 +273,36 @@ struct WeatherBlockDTO: Decodable {
     }
 }
 
+// MARK: FoodSuggestionsDTO
+//
+// Decoded from the `suggestions` field of FoodOptionDTO (camelCase wire format).
+// Maps to iOS `FoodSuggestions` domain model.
+// FOOD_DECK_AND_MAP_V1.md §A.1
+struct FoodSuggestionsDTO: Decodable {
+    let mainOptions: [String]
+    let addOns: [String]
+    let drinks: [String]
+    let avoid: [String]
+    let notes: [String]
+
+    func toModel() -> FoodSuggestions {
+        FoodSuggestions(
+            mainOptions: mainOptions,
+            addOns: addOns,
+            drinks: drinks,
+            avoid: avoid,
+            notes: notes
+        )
+    }
+}
+
 // MARK: FoodOptionDTO
 //
 // Decoded from each element of PlanCoreDTO.foodOptions (camelCase wire format).
 // Maps to iOS `FoodOption` domain model.
+//
+// FOOD_DECK_AND_MAP_V1.md §I-3: `driveTimeMin` is now `Int?` on the iOS model.
+// The previous `?? 0` shim has been removed — nil passes through cleanly.
 struct FoodOptionDTO: Decodable {
     let name: String
     let category: String
@@ -286,6 +312,10 @@ struct FoodOptionDTO: Decodable {
     let distanceMeters: Int?
     let placeId: String?
     let provider: String
+    // Phase 9 additions — FOOD_DECK_AND_MAP_V1.md
+    let suggestions: FoodSuggestionsDTO?  // nil for pre-Phase-9 plans
+    let lat: Double?                       // venue latitude for map pins
+    let lng: Double?                       // venue longitude for map pins
 
     /// Map API FoodOption → iOS FoodOption domain model.
     /// A fresh `UUID()` is injected for SwiftUI list identity (no server-side ID).
@@ -294,12 +324,15 @@ struct FoodOptionDTO: Decodable {
             id: UUID(),
             name: name,
             category: category,
-            driveTimeMin: driveTimeMinutes ?? 0,
+            driveTimeMin: driveTimeMinutes,   // nil-safe: no ?? 0 shim
             recommendedOrder: recommendedOrder,
             isDraft: isDraft,
             distanceMeters: distanceMeters,
             placeId: placeId,
-            provider: provider
+            provider: provider,
+            suggestions: suggestions?.toModel(),
+            lat: lat,
+            lng: lng
         )
     }
 }

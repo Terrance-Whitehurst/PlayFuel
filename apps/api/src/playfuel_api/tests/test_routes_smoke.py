@@ -142,5 +142,17 @@ def test_generate_plan_food_options_not_null(client_with_auth, mock_db):
     assert "recommendedOrder" in opt
     assert "provider" in opt
     assert opt["provider"] == "mock"
+    # FOOD_DECK_AND_MAP_V1: structured suggestions + lat/lng must surface
+    assert "suggestions" in opt, "FoodOption must carry structured suggestions (FOOD_DECK_AND_MAP_V1)"
+    sugg = opt["suggestions"]
+    assert isinstance(sugg.get("mainOptions"), list), "suggestions.mainOptions must be a list"
+    assert len(sugg["mainOptions"]) >= 1, "suggestions.mainOptions must have ≥1 item for non-bag options"
+    # All Dallas mock fixtures have lat/lng — at least one must be non-None
+    lats = [fo.get("lat") for fo in plan["foodOptions"]]
+    assert any(lat is not None for lat in lats), "At least one FoodOption must have a non-None lat"
+    # Chipotle is the only confirmed (is_draft=False) template
+    chipotle_opts = [fo for fo in plan["foodOptions"] if fo["category"] == "fast_casual_bowl"]
+    assert chipotle_opts, "Expected at least one fast_casual_bowl option (Chipotle mock fixture)"
+    assert chipotle_opts[0]["isDraft"] is False, "fast_casual_bowl option must have isDraft=False"
     # doublesPlans must be empty (no doubles matches in this test fixture)
     assert body["doublesPlans"] == [], "doublesPlans must be [] for a singles-only tournament"

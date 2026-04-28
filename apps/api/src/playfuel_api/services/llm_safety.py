@@ -45,21 +45,33 @@ PROHIBITED_PHRASES: list[str] = [
     "solves injury risk",
 ]
 
-# Canonical match durations (§F / RULES_CONSTANTS_V1.md + DOUBLES_SPEC_V1.md §B).
-# Any digit sequence representing minutes NOT in this set is flagged as fabricated.
+# Canonical match durations as total minutes (§F / RULES_CONSTANTS_V1.md + DOUBLES_SPEC_V1.md §B).
+# Stored as integers so we can handle both "75 min" and "1 hr 15 min" display forms.
 # Singles: 75, 120, 180 (v1.0)
 # Doubles best_of_3: 60, 90, 135 (v1.1 DOUBLES_SPEC_V1.md)
 # Doubles pro_set_8:  45, 70, 100 (v1.1 DOUBLES_SPEC_V1.md)
 # SEC-6 fix: expanded from singles-only {75,120,180} to include all doubles values.
-_CANONICAL_DURATIONS: frozenset[str] = frozenset({
-    "75", "120", "180",   # singles
-    "60", "90", "135",   # doubles best_of_3
-    "45", "70", "100",   # doubles pro_set_8
+_CANONICAL_DURATIONS_INT: frozenset[int] = frozenset({
+    75, 120, 180,   # singles
+    60, 90, 135,    # doubles best_of_3
+    45, 70, 100,    # doubles pro_set_8
 })
 
-# Regex to extract standalone duration-like numbers (e.g. "90 min", "95 minutes")
-# We only flag numbers that appear adjacent to "min" / "minute" / "minutes".
-_DURATION_RE = re.compile(r"\b(\d{2,3})\s*(?:min(?:utes?)?)\b", re.IGNORECASE)
+# Keep the legacy string alias for any callers that imported it by name.
+# (No external tests import this; kept for defensive backward-compat.)
+_CANONICAL_DURATIONS: frozenset[str] = frozenset(str(d) for d in _CANONICAL_DURATIONS_INT)
+
+# Regex to extract duration expressions in two forms:
+#   (A) hr-based  — group 1 & 2: "2 hr" or "1 hr 15 min" (friendly_duration output)
+#   (B) standalone — group 3:     "75 min" / "95 minutes"  (legacy / hardcoded test strings)
+# For each match we compute total minutes and validate against _CANONICAL_DURATIONS_INT.
+# Drive-time strings ("5 min drive") use single-digit numbers and are NOT matched by
+# the \d{2,3} standalone arm — preserving the pre-existing behaviour.
+_DURATION_RE = re.compile(
+    r"\b(\d{1,3})\s*hr(?:\s+(\d{1,2})\s*min(?:utes?)?)?"  # (A) hr-based
+    r"|\b(\d{2,3})\s*min(?:utes?)?",                        # (B) standalone ≥2-digit min
+    re.IGNORECASE,
+)
 
 
 def _all_text_fields(exp: "PlanExplanation") -> list[str]:
@@ -145,14 +157,20 @@ def validate_explanation(
                 "may indicate fabricated restaurant: %r", exp.food_note[:80]
             )
 
-    # 5. Fabricated match duration — only 75 / 120 / 180 allowed adjacent to "min".
+    # 5. Fabricated match duration — only canonical values allowed adjacent to "hr"/"min".
+    #    Handles both legacy "75 min" form and friendly_duration "1 hr 15 min" form.
     for text_field in all_text:
-        for match in _DURATION_RE.finditer(text_field):
-            num = match.group(1)
-            if num not in _CANONICAL_DURATIONS:
+        for m in _DURATION_RE.finditer(text_field):
+            if m.group(1) is not None:
+                # hr-based: e.g. "2 hr" → 120 min, or "1 hr 15 min" → 75 min
+                total_mins = int(m.group(1)) * 60 + (int(m.group(2)) if m.group(2) else 0)
+            else:
+                # standalone: e.g. "75 min" → 75 min
+                total_mins = int(m.group(3))
+            if total_mins not in _CANONICAL_DURATIONS_INT:
                 violations.append(
-                    f"Non-canonical duration found: {num} min. "
-                    "Only 75, 120, 180 are allowed."
+                    f"Non-canonical duration found: {m.group(0)!r} ({total_mins} min). "
+                    "Only canonical match durations are allowed."
                 )
 
     return (len(violations) == 0, violations)

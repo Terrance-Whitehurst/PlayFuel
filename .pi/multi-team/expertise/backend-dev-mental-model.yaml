@@ -1,6 +1,6 @@
 role: Backend Dev (Engineering3 team)
 session: moh9uivm3dxv
-last_updated: "2026-04-27"
+last_updated: "2026-04-28"
 
 task_completed:
   id: "Phase 2 Task #4"
@@ -235,6 +235,73 @@ hotfix_oq_ia9_moh9uivm3dxv:
     exception. When a function is documented as 'never raises' but is mocked to raise
     in tests, the test is testing the wrong contract; mock its documented return
     value (None) instead.
+
+duration_format_session_moh9uivm3dxv:
+  date: '2026-04-28'
+  description: 'Human-readable duration formatter — friendly_duration() + LLM safety regex update'
+  files_written:
+    - rules/duration_format.py (NEW — friendly_duration() pure function)
+    - tests/test_duration_format.py (NEW — 15 tests, all boundaries + all 9 canonicals)
+  files_edited:
+    - rules/plan.py
+    - services/llm.py
+    - services/llm_safety.py
+  test_counts:
+    before: '262 passed, 1 xfailed'
+    after: '277 passed, 1 xfailed, 0 failed'
+  critical_finding: >
+    If you change LLM template strings from "75 min" to "1 hr 15 min", the old
+    _DURATION_RE regex would match "15 min" (the minute component) and check
+    if 15 is canonical -> FALSE POSITIVE. Fix: update _DURATION_RE to handle
+    both hr-based (group 1 = hr, group 2 = optional min) and standalone
+    (group 3 = min) patterns. Convert each match to total_mins for validation
+    against _CANONICAL_DURATIONS_INT (int frozenset, not string frozenset).
+  regex_design:
+    pattern: 'two-arm alternation: hr-based arm (groups 1+2) then standalone-min arm (group 3)'
+    property: 'hr-arm consumes full X-hr-Y-min before standalone arm can match Y-min separately'
+    drive_times_safe: '1-digit drive times (5 min, 3 min) excluded by 2-digit minimum on standalone arm'
+  strings_left_alone:
+    - 'rules/next_action.py copy_map: "30 min" — sub-60, friendly_duration(30) == "30 min" already'
+    - 'rules/hard_coded_strings.py: no minute counts in the safety/disclaimer strings'
+    - 'LLM safety test _clean_explanation: fixed strings "75 min match" still canonical'
+  no_test_updates_needed: >
+    Existing test assertions use fixed canonical strings (75, 120, 180 min) that still
+    pass the updated validator. test_non_canonical_duration_is_caught still triggers on
+    95 min. No test assertions check the exact narrative prose from TemplateProvider.
+
+food_deck_and_map_session_moh9uivm3dxv:
+  date: '2026-04-28'
+  description: 'Food Deck + Venue Map — backend slice (FOOD_DECK_AND_MAP_V1.md §G.1-5)'
+  files_written:
+    - tests/test_food_suggestions.py (NEW — 14 named tests, all boundaries)
+  files_edited:
+    - models/api.py
+    - services/places.py
+    - rules/food.py
+    - tests/test_routes_smoke.py
+  test_counts:
+    before: '277 passed, 1 xfailed'
+    after: '291 passed, 1 xfailed, 0 failed'
+  eval_harness: 'exit 0 — 4 PASS, 1 XFAIL'
+  key_findings_from_pm:
+    - RawPlace had NO lat/lng fields — added with defaults (frozen dataclass allows defaults at end)
+    - FoodOption Pydantic had NO lat/lng — added Optional[float] = None
+    - food.py _TEMPLATES authoritative (§F.3 doc stale per finding I-5)
+    - All 4 Dallas mock fixtures now surface lat/lng in FoodOption
+  no_existing_test_failures: >
+    recommended_order_for() shim now delegates to derive_recommended_order(suggestions_for()).
+    Derived string content changes from verbatim template to bucketed form, but all
+    test assertions are content-based (not exact string match), so zero test updates needed.
+    Exception: test_fast_casual_bowl_mentions_protein checks for chicken/steak — resolved
+    by putting protein in main_options[0] directly.
+  circular_import_pattern: >
+    suggestions_for() lazy-imports FoodSuggestions from models.api inside the function body.
+    Same pattern as assemble_food_options() lazy-importing FoodOption. Never import at
+    module level in rules/ that imports from models/.
+  getattr_pattern: >
+    assemble_food_options() uses getattr(place, 'lat', None) to safely access RawPlace.lat.
+    This future-proofs against any RawPlace subclass or stub that lacks the field.
+    After the dataclass widening, getattr is redundant but cost-free and safe.
 
 new_oqs:
   - id: "OQ-H"

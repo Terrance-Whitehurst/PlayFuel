@@ -62,13 +62,15 @@ struct MatchCreateView: View {
     //   doubles best_of_3:    60 /  90 / 135 [DRAFT — OQ-DBL-1]
     //   doubles pro_set_8:    45 /  70 / 100 [DRAFT — OQ-DBL-1]
     private var durationOptions: [(label: String, minutes: Int)] {
+        let values: [Int]
         switch (matchType, doublesFormat) {
-        case (.doubles, .proSet8):
-            return [("Short (45)", 45), ("Normal (70)", 70), ("Long (100)", 100)]
-        case (.doubles, .bestOf3):
-            return [("Short (60)", 60), ("Normal (90)", 90), ("Long (135)", 135)]
-        default: // .singles (or any future unrecognized combo)
-            return [("Short (75)", 75), ("Normal (120)", 120), ("Long (180)", 180)]
+        case (.doubles, .proSet8):  values = [45, 70, 100]
+        case (.doubles, .bestOf3):  values = [60, 90, 135]
+        default:                    values = [75, 120, 180]  // .singles
+        }
+        let names = ["Short", "Normal", "Long"]
+        return zip(names, values).map { name, min in
+            (label: "\(name) (\(DurationFormatting.friendly(minutes: min)))", minutes: min)
         }
     }
 
@@ -259,4 +261,17 @@ struct MatchCreateView: View {
         existingMatchCount: 0
     )
     .environmentObject(state)
+}
+
+#Preview("Dark") {
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    return MatchCreateView(
+        tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
+        existingMatchCount: 0
+    )
+    .environmentObject(state)
+    .preferredColorScheme(.dark)
 }

@@ -74,13 +74,19 @@ apps/ios/PlayFuel/
 |---|---|---|
 | **SignIn** | `SignInView.swift` | Centered `SignInWithAppleButton` (native look, fake auth); "usage guidelines" link → DisclaimerView |
 | **Tournament List** | `TournamentListView.swift` | 3 tournament cards (Dallas / Austin / Houston); "Plan Ready" badge on Dallas; tap → Dashboard |
-| **Tournament Dashboard** | `TournamentDashboardView.swift` | Hub (Phase 8 order): EmergencyBanner → PlanSummaryCard → ScheduleStrip → NextActionCard → FoodCard → Scenarios → Timeline btn → WeatherPill (compact, demoted) → §A footer |
+| **Tournament Dashboard** | `TournamentDashboardView.swift` | Hub (Phase 9 order): EmergencyStrip (extreme heat only) → [Picker] → HeaderBubbleRow [Plan Summary] [Weather] [Map] → ScheduleStrip → NextActionCard → FoodOptionDeck → Scenarios → Timeline btn → §A footer |
 | **Weather Card** | `WeatherCardView.swift` | 88°F / 72% humidity, "EXTREME HEAT" pill, hot+humid flag pills, §E.3 adjustment bullets |
 | **Scenario Cards** | `ScenarioCardView.swift` | Short (75m/165m gap/light_meal), Normal (120m/120m gap/quick_pickup), Long (180m/60m gap/portable), gap pill color-coded by status |
-| **Food Card** | `FoodCardView.swift` | 3 Dallas options: Chipotle (confirmed §F.3 order), Jimmy John's [DRAFT], Central Market [DRAFT]; empty-state shows bag fallback |
+| **Food Option Deck** | `Views/FoodOptionDeck.swift` | Scroll-snap deck: Chipotle, Jimmy John’s [DRAFT], Central Market [DRAFT], Starbucks [DRAFT]; bag-fallback card when empty |
+| **Food Detail Sheet** | `Views/Sheets/FoodOptionDetailSheet.swift` | Per-restaurant structured suggestions: What to order / Add-ons / Drinks / Avoid / Notes; “Open in Maps” footer |
+| **Venue Map Sheet** | `Views/Sheets/VenueMapSheet.swift` | MapKit: blue venue pin + orange food pins; tap pin → FoodOptionDetailSheet |
+| **Food Card (preview-only)** | `Views/FoodCardView.swift` | Legacy inline list — not on dashboard as of Phase 9; kept for #Preview blocks
 | **Timeline** | `TimelineView.swift` | 12 events 6:00 AM → recovery, icon+color per kind, vertical connector line |
 | **Disclaimer** | `DisclaimerView.swift` | §A verbatim, §B verbatim (OQ-11 draft note), "What this app does NOT do" prohibited-claims list |
-| **Emergency Banner** | `EmergencyBanner.swift` | Persistent red banner at dashboard top when `extremeHeatRisk`; §B text verbatim; OQ-11 draft caveat |
+| **Emergency Strip** | `EmergencyStrip.swift` | 1-line red strip at dashboard top #0 when `extremeHeatRisk`; tap → `HeatGuidanceSheet` with verbatim §B + §A text; `EmergencyBanner.swift` preserved for other contexts |
+| **Plan Summary Sheet** | `Views/Sheets/PlanSummarySheet.swift` | Full LLM coach voice in a sheet; opened via Plan bubble in HeaderBubbleRow |
+| **Weather Sheet** | `Views/Sheets/WeatherSheet.swift` | Full `WeatherCardView(compact: false)` in a sheet; opened via Weather bubble |
+| **Heat Guidance Sheet** | `Views/Sheets/HeatGuidanceSheet.swift` | Verbatim §B + §A text; opened by tapping EmergencyStrip |
 
 ---
 
@@ -245,25 +251,25 @@ Selecting a segment switches all dashboard cards (scenarios, food, LLM summary, 
 Dashboard re-ordered per user feedback and `NUTRITION_FIRST_IA_V1.md`.
 Nutrition and schedule are the hero surfaces; weather is demoted to a compact pill.
 
-### Dashboard Card Order (locked)
+### Dashboard Card Order (locked — Phase 8.1 / HEADER_BUBBLES_V1.md)
 
 | # | Card | Condition |
 |---|---|---|
-| 0 | `EmergencyBanner` (red) | `extreme_heat_risk == true` — **IMMOVABLE** |
+| 0 | `EmergencyStrip` (1-line red strip) | `extreme_heat_risk == true` — **IMMOVABLE**, rendered ABOVE Picker |
 | 1 | Singles / Doubles picker | `hasBothTypes == true` only |
-| 2 | `PlanSummaryCard` (LLM coach voice) | `llmSummary != nil` |
+| 2 | `HeaderBubbleRow` — [Plan Summary] [Weather] | always when plan loaded |
 | 3 | `ScheduleStripView` (multi-match strip) | always (empty-CTA when 0 matches) |
 | 4 | `NextActionCard` (next thing to do) | always (fallback copy when no future events) |
 | 5 | `FoodCardView` | `foodOptions` non-empty |
 | 6 | Scenario cards (short/normal/long) | always |
 | 7 | "Full Day Timeline" button | `timeline` non-empty |
-| 8 | `WeatherCardView` (compact pill, demoted) | always |
-| 9 | Disclaimer footer | always |
+| 8 | Disclaimer footer | always |
 
-**Why:** Parents are already outside feeling the heat. The weather card was the
-first thing they saw but isn't actionable. Nutrition timing and the match schedule
-are the surfaces they actually use. Safety logic is **unchanged** — `extreme_heat_risk`
-still fires `EmergencyBanner` at position #0 regardless of weather demotion.
+**Why (Phase 8.1):** User steer — parents don’t need to scroll past a plan summary
+and a weather report to reach the schedule and food info they actually act on.
+PlanSummaryCard and WeatherCard are moved one tap deep into sheets (HeaderBubbleRow
+bubbles), making the dashboard glance-test pass instantly. Safety logic is
+**unchanged** — `extreme_heat_risk` still fires `EmergencyStrip` at position #0.
 
 ### Multi-Match Schedule Strip (`ScheduleStripView`)
 
@@ -307,3 +313,50 @@ still fires `EmergencyBanner` at position #0 regardless of weather demotion.
 | `Views/WeatherCardView.swift` | Added `compact: Bool = false` mode with expand-in-place toggle |
 | `Views/TournamentDashboardView.swift` | Reordered per §B; wired strip + next-action card |
 | `Data/FakeData.swift` | Multi-match envelope: 2 singles + 1 doubles plan; each Plan has `matchId`+`nextAction`+`scheduledStart` |
+
+---
+
+## Header Bubbles (Phase 8.1)
+
+Dashboard re-ordered per user feedback and `HEADER_BUBBLES_V1.md`.
+PlanSummaryCard and WeatherCard are moved one tap deep into sheet overlays,
+keeping the above-strip area minimal and immediately actionable.
+
+### What changed
+
+`PlanSummaryCard` and `WeatherCardView` are no longer inline in the dashboard
+scroll. They are accessible via two small circle buttons (`HeaderBubbleRow`) that
+appear just below the Singles/Doubles picker and above the schedule strip.
+
+`EmergencyBanner` is replaced by a 1-line `EmergencyStrip` that is hoisted
+into `envelopeContent()` ABOVE the type picker, fixing QA-IA-1 (the prior
+banner rendered below the picker when hasBothTypes=true). When extreme heat is
+not active, nothing appears at the top — zero screen tax on normal days.
+
+### New files (Phase 8.1)
+
+| File | Description |
+|---|---|
+| `Views/HeaderBubble.swift` | Reusable 44×44pt circle button with optional badge overlay |
+| `Views/HeaderBubbleRow.swift` | HStack of Plan Summary + Weather bubbles; each opens a sheet |
+| `Views/EmergencyStrip.swift` | 1-line red strip at position #0; taps to `HeatGuidanceSheet` |
+| `Views/Sheets/PlanSummarySheet.swift` | Full plan summary (summary, weatherNote, foodNote, safetyNote) in a sheet |
+| `Views/Sheets/WeatherSheet.swift` | Full `WeatherCardView` embedded in a sheet |
+| `Views/Sheets/HeatGuidanceSheet.swift` | Verbatim §B + §A text; sourced exclusively from `HardCodedStrings` |
+
+### Changed files (Phase 8.1)
+
+| File | Change |
+|---|---|
+| `Views/TournamentDashboardView.swift` | Removed inline `EmergencyBanner`, `PlanSummaryCard`, `WeatherCardView`; hoisted `EmergencyStrip` into `envelopeContent()` above Picker; inserted `HeaderBubbleRow` at position #2 |
+| `Views/WeatherCardView.swift` | Doc comment updated — `compact: true` mode preserved in code but no longer wired to dashboard |
+
+### Safety compliance (Phase 8.1)
+
+| Requirement | Status |
+|---|---|
+| §B emergency text shown when `extreme_heat_risk` | ✅ `EmergencyStrip` renders at position #0 (above picker) |
+| §B text verbatim | ✅ `HeatGuidanceSheet` sources `HardCodedStrings.heatEmergencyText` only |
+| Emergency strip not suppressible by WeatherCard state | ✅ `EmergencyStrip` trigger is `plan.weather.extremeHeatRisk` (model-driven), zero coupling to `isExpanded` in `WeatherCardView` |
+| `EmergencyBanner.swift` preserved | ✅ Untouched; `#Preview` and other consumers unaffected |
+| OQ-11 caveat present | ✅ In `HeatGuidanceSheet.swift` source comment |

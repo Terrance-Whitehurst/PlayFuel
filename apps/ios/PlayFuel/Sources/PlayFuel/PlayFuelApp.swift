@@ -1,9 +1,44 @@
 import SwiftUI
 
+// MARK: - Appearance Mode
+
+/// User-selectable appearance override.
+/// Stored in UserDefaults so it persists across launches.
+/// Default: .system (honours iOS Display & Brightness setting).
+enum AppearanceMode: String, CaseIterable {
+    case system = "system"
+    case light  = "light"
+    case dark   = "dark"
+
+    var displayName: String {
+        switch self {
+        case .system: return "System"
+        case .light:  return "Light"
+        case .dark:   return "Dark"
+        }
+    }
+
+    /// Maps to SwiftUI's `ColorScheme?`. `nil` means "follow the system".
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light:  return .light
+        case .dark:   return .dark
+        }
+    }
+}
+
 @main
 struct PlayFuelApp: App {
 
     @StateObject private var appState: AppState
+
+    /// Persisted appearance preference. Defaults to system.
+    @AppStorage("appearance_mode") private var appearanceModeRaw: String = AppearanceMode.system.rawValue
+
+    private var activeColorScheme: ColorScheme? {
+        AppearanceMode(rawValue: appearanceModeRaw)?.colorScheme
+    }
 
     init() {
         // Wire the dependency graph at app launch.
@@ -18,6 +53,7 @@ struct PlayFuelApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
+                .preferredColorScheme(activeColorScheme)
         }
     }
 }

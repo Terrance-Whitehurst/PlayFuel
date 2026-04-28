@@ -349,6 +349,122 @@
 
 ---
 
+## US-DASH-5 · Background Info One Tap Away (NEW)
+
+> Source: `HEADER_BUBBLES_V1.md §E` · Added: 2026-04-27
+
+**As a** parent opening the app in the venue parking lot,
+**I want** to see the actionable schedule and next step immediately on the dashboard,
+**so that** I'm not buried in explanatory text before I can act.
+
+### Acceptance Criteria
+
+**Given** the dashboard has loaded a plan,
+**When** I open the Tournament Dashboard,
+**Then** the area above the match schedule strip shows only a row of two small icon buttons (Plan Summary, Weather) — no inline text cards.
+
+**Given** I want to read the coach voice summary,
+**When** I tap the Plan Summary bubble (pencil-and-bubble icon),
+**Then** a sheet presents with title "Today's Plan" showing the full summary, weather note, food note, and safety disclaimer — without leaving the dashboard.
+
+**Given** I want to see detailed weather data,
+**When** I tap the Weather bubble (cloud-and-sun icon),
+**Then** a sheet presents with title "Conditions" showing the full weather card (temperature, humidity, flags, adjustments).
+
+**Given** I dismiss either sheet,
+**When** I drag the sheet down (iOS standard),
+**Then** the sheet closes and I return to the dashboard scroll position I was at before.
+
+---
+
+## US-DASH-6 · Extreme Heat Warning — Unavoidable but Not Overwhelming (NEW)
+
+> Source: `HEADER_BUBBLES_V1.md §E` · Added: 2026-04-27
+
+**As a** parent whose child is playing in extreme heat,
+**I want** to see an unmissable heat warning without having to navigate to it,
+**so that** I am never unaware of a heat emergency even if I don't read the dashboard carefully.
+
+### Acceptance Criteria
+
+**Given** `extreme_heat_risk == true`,
+**When** the dashboard renders,
+**Then** a full-width red 1-line strip appears at the very top reading "⚠️ Extreme heat — tap for guidance" — before any match schedule, picker, or bubble row.
+
+**Given** I tap the red EmergencyStrip,
+**When** the sheet opens,
+**Then** it displays `HardCodedStrings.heatEmergencyText` verbatim (never paraphrased) followed by `HardCodedStrings.userDisclaimer` verbatim.
+
+**Given** `extreme_heat_risk == false`,
+**When** the dashboard renders,
+**Then** the red strip is not shown — the dashboard top begins with the segmented picker (if both match types exist) or the bubble row directly.
+
+**Given** `extreme_heat_risk == true` AND `envelope.hasBothTypes == true`,
+**When** the dashboard renders,
+**Then** the EmergencyStrip appears ABOVE the Singles/Doubles segmented picker (not below it) — heat warning is always the topmost visible element.
+
+---
+
+## US-FOOD-1 · Food Deck Glanceability (Phase 8.3)
+
+**As a** parent at a tennis tournament,
+**I want** to see nearby food options as a swipeable deck of cards (not a wall of text),
+**so that** I can see multiple options at a glance without scrolling through a long list.
+
+**Given** the plan has at least 1 non-bag-only food option,
+**When** I scroll to the food section of the dashboard,
+**Then** I see a horizontal scroll-snap deck of cards, each showing restaurant name, category, and drive time. The edge of the next card is visible, signaling more options.
+
+**Given** the plan has no nearby food (bag_fallback_only),
+**When** I scroll to the food section,
+**Then** I see a single full-width bag-food fallback card with the verbatim HardCodedStrings.bagFoodFallback text.
+
+---
+
+## US-FOOD-2 · Per-Restaurant Structured Suggestions (Phase 8.3)
+
+**As a** parent deciding what to order at Starbucks or any nearby restaurant,
+**I want** to tap the card and see structured suggestions — what to order, what to drink, what to avoid, and timing notes,
+**so that** I do not have to parse a single wall of text.
+
+**Given** I tap a food option card in the deck,
+**When** the detail sheet opens,
+**Then** I see structured sections for what to order, add-ons, drinks, and items to avoid. Empty sections are hidden. A timing note and allergy disclaimer appear at the bottom.
+
+**Given** the food option is a DRAFT template (e.g. Starbucks, Jimmy John's),
+**When** the detail sheet opens,
+**Then** a grey pill reading "Suggestions in development — confirm with your athlete" is visible at the top of the sheet.
+
+---
+
+## US-MAP-1 · Venue Map Overview (Phase 8.3)
+
+**As a** parent unfamiliar with the tournament venue and surrounding area,
+**I want** to tap a Map bubble to see a real interactive map centered on the tournament location with food option pins,
+**so that** I can orient myself and see where food is relative to the courts.
+
+**Given** I tap the Map bubble (third bubble in the header row),
+**When** the map sheet opens,
+**Then** I see a MapKit map centered on the tournament venue with a blue tennis-ball pin at the venue and orange fork-and-knife pins at nearby food locations.
+
+**Given** no food options have coordinates,
+**When** the map sheet opens,
+**Then** only the venue pin is shown — no error state required.
+
+---
+
+## US-MAP-2 · Food Pin Drill and Directions (Phase 8.3)
+
+**As a** parent who sees a food pin on the venue map,
+**I want** to tap the pin to see that restaurant's structured suggestions, and then optionally get turn-by-turn directions,
+**so that** I can decide and navigate without leaving the context I am in.
+
+**Given** I tap an orange food pin on the venue map,
+**When** the food detail sheet opens,
+**Then** I see the same structured suggestions as tapping the card in the deck. An "Open in Maps" button at the bottom launches Apple Maps with directions to that restaurant.
+
+---
+
 ## Open Questions
 
 1. **Multiple player profiles**: The spec shows a `player_profiles` table but does not specify whether the MVP UI supports creating more than one profile per user. The monetization tiers in §29 imply free = 1 profile, paid = multiple. Needs explicit scoping for Phase 2.

@@ -9,6 +9,7 @@ struct TournamentListView: View {
 
     @EnvironmentObject var appState: AppState
     @State private var showingCreateTournament = false
+    @State private var showProfile = false
 
     var body: some View {
         Group {
@@ -47,10 +48,24 @@ struct TournamentListView: View {
                     Image(systemName: "plus")
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showProfile = true
+                } label: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.title3)
+                }
+                .accessibilityLabel("Profile")
+            }
         }
         .sheet(isPresented: $showingCreateTournament) {
             TournamentCreateView()
                 .environmentObject(appState)
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileMenuSheet()
+                .presentationDetents([.height(280), .medium])
+                .presentationDragIndicator(.visible)
         }
         .task {
             // Load on first appear only — .loaded state is cached for the session.
@@ -148,7 +163,6 @@ private struct TournamentRowView: View {
 }
 
 #Preview {
-    // Preview uses FakeData via a stub AppState; previews don't hit the network.
     let auth  = AuthService()
     let api   = APIClient(authService: auth)
     let repo  = Repository(api: api)
@@ -158,4 +172,17 @@ private struct TournamentRowView: View {
         TournamentListView()
     }
     .environmentObject(state)
+}
+
+#Preview("Dark") {
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    state.tournaments = .loaded(FakeData.tournaments)
+    return NavigationStack {
+        TournamentListView()
+    }
+    .environmentObject(state)
+    .preferredColorScheme(.dark)
 }

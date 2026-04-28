@@ -2,6 +2,9 @@ import SwiftUI
 
 /// US-08 — Nearby food options card.
 ///
+/// Kept for previews; not rendered on the dashboard as of FOOD_DECK_AND_MAP_V1.
+/// The dashboard uses `FoodOptionDeck` (scroll-snap cards + detail sheets).
+///
 /// Renders a list of FoodOption items from the plan.
 /// Falls back to bag-food content (§F.4 / §H.3) when `foodOptions` is empty.
 /// Does NOT make performance claims — per SAFETY_DISCLAIMERS §C / US-08 AC.
@@ -92,7 +95,7 @@ private struct FoodOptionRow: View {
                 HStack(spacing: 4) {
                     Image(systemName: "car")
                         .font(.caption)
-                    Text("~\(option.driveTimeMin) min")
+                    Text("~\(DurationFormatting.friendly(minutes: option.driveTimeMin ?? 0))")
                         .font(.caption.weight(.medium))
                 }
                 .foregroundStyle(.secondary)
@@ -133,8 +136,19 @@ private struct FoodOptionRow: View {
     ScrollView {
         VStack(spacing: 20) {
             FoodCardView(foodOptions: FakeData.dallasFoodOptions)
-            FoodCardView(foodOptions: []) // empty state — bag fallback
+            FoodCardView(foodOptions: [])
         }
         .padding(.vertical)
     }
+}
+
+#Preview("Dark") {
+    ScrollView {
+        VStack(spacing: 20) {
+            FoodCardView(foodOptions: FakeData.dallasFoodOptions)
+            FoodCardView(foodOptions: [])
+        }
+        .padding(.vertical)
+    }
+    .preferredColorScheme(.dark)
 }

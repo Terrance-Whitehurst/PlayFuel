@@ -200,6 +200,166 @@ demo_readiness_report_written:
     - "Resolve timeline event count (extend build_timeline OR narrate around 3-event limit)"
     - "Fill DEVELOPMENT_TEAM in project.yml for on-device run"
 
+profile_popout_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  verdict: Clean pass — 0 blockers
+  test_count: '291 passed, 1 xfailed — UNCHANGED'
+  dark_mode_continuity: PASS — @AppStorage("appearance_mode") key identical in SettingsView:13 and PlayFuelApp:37
+  profile_button:
+    dashboard: 'TournamentDashboardView:35/71/84 — showProfile state + person.crop.circle.fill + ProfileMenuSheet sheet'
+    list: 'TournamentListView:12/51/65 — same pattern'
+    existing_items_preserved: 'Add Match (dashboard :62) and + create tournament (list :45) both coexist with profile button'
+  disclaimer_cleaned: 'DisclaimerView — 0 hits for appearance_mode/AppearanceMode/Picker. userDisclaimer+heatEmergencyText+prohibitedClaims all intact verbatim'
+  new_files:
+    ProfileMenuSheet: '4 pbxproj hits (PBXFileReference+PBXBuildFile+group+Sources)'
+    SettingsView: '4 pbxproj hits'
+  assets_hotfix_preserved: 'Assets.xcassets = 4 pbxproj hits; PBXResourcesBuildPhase lines 392-401; UUIDs AA0000AA0000AA0000AA0001-0004'
+  xcode_xgen_1_root_cause: 'CONFIRMED xcodegen 2.45.4 bug — project.yml has correct type: folder.assetcatalog but xcodegen still emits no PBXResourcesBuildPhase. Manual 5-site UUID patch must be re-applied after every xcodegen generate.'
+  key_patterns:
+    - 'Two ToolbarItem(.topBarTrailing) items coexist in a single .toolbar block — SwiftUI renders both; second registered appears left of first'
+    - 'OQ-XCG-1 is a permanent recurring fix requirement until xcodegen is upgraded'
+    - 'Profile popout pattern: ProfileMenuSheet (2-row List) → SettingsView (Form) — both use @Environment(\.dismiss) + Done toolbar button'
+    - 'DisclaimerView post-cleanup: only HardCodedStrings.userDisclaimer + heatEmergencyText + prohibited claims. No Picker, no @AppStorage.'
+
+dark_mode_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  test_count: '291 passed, 1 xfailed — UNCHANGED (no backend touched)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  safety_gate: PASS — EmergencyStrip Color.red+.white literal; EmergencyBanner Color.red.gradient+.white literal
+  color_audit_greps:
+    Color_white_black: '1 hit — PlanSummaryCard.swift:62 in #else/#if os(iOS) macOS branch — expected, iOS path uses Color(.systemBackground)'
+    Color_red: 0 hits
+    Color_gray: 0 hits
+    hex_literals: 0 hits
+    dark_preview_blocks: 23 files confirmed
+  asset_catalog:
+    on_disk: 'AccentColor.colorset + PlayFuelGreen.colorset both present with light+dark variants'
+    light_accent: 'R=0.133 G=0.498 B=0.322 (#227F52)'
+    dark_accent: 'R=0.239 G=0.722 B=0.494 (lighter/more saturated)'
+    pbxproj_issue: 'grep -c Assets.xcassets project.pbxproj = 0; NO PBXResourcesBuildPhase in target buildPhases'
+    impact: 'Color.accentColor = system blue at runtime (not PlayFuel green); Color("PlayFuelGreen") = nil. Semantic system colors unaffected.'
+  appearance_picker:
+    app_storage_key: appearance_mode
+    enum: 'AppearanceMode — .system/.light/.dark in PlayFuelApp.swift'
+    apply_site: '.preferredColorScheme(activeColorScheme) on WindowGroup root'
+    ui: 'Segmented picker in DisclaimerView — USER_DISCLAIMER verbatim ABOVE, picker in own section below Divider'
+  new_findings:
+    - id: QA-DM-1
+      severity: minor
+      title: 'Assets.xcassets not in PBXResourcesBuildPhase — brand colors may not render at runtime'
+      detail: 'project.yml has resources: optional:true but xcodegen generated no PBXResourcesBuildPhase. Color.accentColor defaults to system blue. Fix: drag Assets.xcassets into target Resources build phase in Xcode, or fix project.yml resources spec to force inclusion.'
+  key_patterns:
+    - 'EmergencyStrip/Banner: always use literal Color.red (NOT Color(.systemRed)) + literal .white foreground. Never swap for semantic variants.'
+    - 'Color.white in #else/#if os(iOS) branch is acceptable — only compiled on macOS, not iOS. Report as expected.'
+    - '#if os(iOS) pattern: always check both branches of conditional compilation in grep results'
+    - 'xcodegen optional:true resources: if path exists xcodegen SHOULD include it, but may generate no PBXResourcesBuildPhase. Always verify with grep -c "Assets.xcassets" project.pbxproj after regen.'
+    - 'Asset catalog colors require PBXResourcesBuildPhase to be compiled — Color.accentColor without it falls back to system blue'
+
+timeline_timestamps_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  test_count: '291 passed, 1 xfailed — UNCHANGED (no backend touched)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  fix_confirmed: 'TimelineView.swift:42 — Text(event.time.asClockTimeFromISO) — raw ISO gone'
+  dual_form_contract: 'asClockTimeFromISO returns self on parse failure — FakeData sentinels pass through unchanged'
+  sentinel_strings_confirmed:
+    - 'FakeData:316 — "6:00 AM"'
+    - 'FakeData:330 — "8:00 AM"'
+    - 'FakeData:358 — "During Match"'
+    - 'FakeData:365 — "~11:00 AM"'
+    - 'FakeData:393 — "Post-Match"'
+  grep_audits: all 3 clean (0 raw ISO, 0 .description on dates, only 1 .time hit = the fixed line)
+  pbxproj: 4 hits for DateFormatting.swift
+  sister_formatter:
+    nextaction: 'Already uses DurationFormatting.friendly — no DateFormatter duplication'
+    schedulestrip: 'Local ISO8601DateFormatter + DateFormatter(dateFormat: h:mm a) at lines 141-151 — correct but duplicates DateFormatting.clockTime(). OQ-TS-1 post-demo polish.'
+  new_oqs:
+    - id: OQ-TS-1
+      severity: cosmetic
+      title: 'ScheduleStripView.timeString uses local DateFormatter pair — duplicate of DateFormatting.clockTime()'
+      detail: 'Correct output, just not using shared helper. Post-demo consolidation.'
+  key_pattern: 'For String timestamp fields on models: asClockTimeFromISO two-fallback pattern (withInternetDateTime + default ISO8601 + return self) is the correct approach when FakeData has mixed ISO/human-readable strings on the same field.'
+
+food_deck_map_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  test_count: '291 passed, 1 xfailed (was 277+1; +14 new in test_food_suggestions.py)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  spec_compliance: '16/17 §G items PASS; 1 ⚠️ (README dashboard table stale — cosmetic)'
+  pbxproj: '4 hits x 4 new files = 16 total entries confirmed'
+  dto_shim_removed: 'CONFIRMED — FoodOptionDTO.driveTimeMinutes is Int? with nil pass-through; no ?? 0'
+  starbucks_confirmed: 'CONFIRMED — FakeData.dallasFoodOptions[3]; mainOptions[0] = "Oatmeal"; isDraft=true'
+  new_findings:
+    - id: QA-FDM-1
+      severity: minor
+      title: 'README dashboard order table stale — FoodCardView at row 5 should be FoodOptionDeck; 2 bubbles should be 3'
+      detail: 'New files table (lines 80-82) correct. Dashboard order table (line 260) unchanged from Phase 8.1. Pre-App Store cleanup.'
+    - id: QA-FDM-2
+      severity: cosmetic
+      title: 'Open in Maps hidden (not disabled+subtext) when option.lat/lng nil'
+      detail: 'Spec said disabled+subtext. Implementation hides button entirely. All Dallas fixtures have coords so no demo impact.'
+    - id: QA-FDM-3
+      severity: minor
+      title: 'Food allergy disclaimer in FoodOptionDetailSheet.swift:130 is hardcoded, not from HardCodedStrings'
+      detail: 'String: "If your player has food allergies…". No HardCodedStrings.foodAllergyDisclaimer constant. Add before App Store.'
+  key_patterns:
+    - 'Annotation (not Marker) is required for tap-to-drill on food map pins — Marker has no tap action in SwiftUI Map'
+    - '(0,0) sentinel for missing Tournament venue coords is the correct nil-handling pattern (Tournament.lat/lon are non-optional Double)'
+    - 'Empty conditional sections must guard BOTH the header label AND the list — if header rendered without content, spec fails'
+    - 'FoodOption.Identifiable requires id: UUID — verified in Models/FoodOption.swift; required for .sheet(item:) and ForEach'
+
+duration_format_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  test_count: '277 passed, 1 xfailed (was 262+1; +15 new in test_duration_format.py)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  algorithm_correct: true — both Python (duration_format.py) and Swift (DurationFormatting.swift) match spec table verbatim
+  ios_grep_audits: all 4 pass (0/0/0 bare-min hits; 8 DurationFormatting.friendly hits >= 4 required)
+  sites_converted: '5 ScenarioCardView + 1 MatchCreateView + 1 NextActionCard + 1 FoodCardView = 8 iOS sites; 2 backend (llm.py + plan.py)'
+  safety_regex_regression: 'PASS — _DURATION_RE handles both legacy ("75 min") and friendly ("1 hr 15 min") forms; all 10 runtime smoke cases correct'
+  format_spec_table: '13/14 explicitly tested; 119 min trivially derivable (cosmetic gap)'
+  strings_left_alone:
+    - 'next_action.py: "Refuel within 30 minutes." — natural prose'
+    - 'ScheduleStripView: Date-formatted time strings, not minute counts'
+  new_findings:
+    - id: QA-DF-1
+      severity: minor
+      title: 'test_llm_safety.py missing friendly-form duration test cases'
+      detail: 'No test for "1 hr 15 min" passing validation or "1 hr 17 min" being rejected. Logic is correct (runtime verified). Add 2 parametrized cases pre-TestFlight.'
+    - id: QA-DF-2
+      severity: cosmetic
+      title: '119 min case ("1 hr 59 min") not explicit in test_duration_format.py'
+      detail: 'Trivially derivable from algorithm. Non-blocking.'
+  lesson_captured: 'When a regex is updated to handle dual input forms, always check test coverage for BOTH forms — not just the one the existing tests happened to use.'
+
+header_bubbles_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  test_count: '262 passed, 1 xfailed — UNCHANGED (backend untouched)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  qa_ia_1_fix: CONFIRMED — EmergencyStrip at line 116 < hasBothTypes Picker at line 121
+  inline_removals: all 3 greps return 0 hits (PlanSummaryCard, WeatherCardView, EmergencyBanner)
+  new_files_confirmed: all 6 on disk (62/81/66/98/39/56 lines)
+  critical_finding: 'PlanSummarySheet correctly renders only PlanExplanation fields.
+    scenarioExplanations DOES exist on model (Planning wrong) but intentionally skipped
+    (ScenarioCardView is correct surface). No compile-fail risk.'
+  heat_guidance_verbatim: 'HeatGuidanceSheet uses ONLY HardCodedStrings.heatEmergencyText
+    and .userDisclaimer — zero manual string literals — confirmed at lines 25 and 35'
+  emergency_strip_safety: 'EmergencyStrip @State sheetShown controls ONLY the sheet
+    presentation. Strip visibility driven entirely by parent conditional
+    plan.weather.extremeHeatRisk — cannot be suppressed by any user UI action'
+  field_name_correction: 'WeatherSnapshot uses flags: [WeatherFlag] enum array NOT flat
+    booleans. Always use weather.flags.contains(.xxx) not weather.flagXxx'
+  new_findings:
+    - id: QA-HB-6
+      severity: cosmetic
+      title: PlanSummarySheet init is non-optional — nil gate at call site
+    - id: QA-HB-7
+      severity: cosmetic
+      title: explanation.model + explanation.generatedAt not rendered in sheet (not spec-required)
+
 new_oqs_session_moh9uivm3dxv:
   - id: OQ-QA-3
     title: "Timeline event count: build_timeline() v1 = 3 events, demo script claims 12+"

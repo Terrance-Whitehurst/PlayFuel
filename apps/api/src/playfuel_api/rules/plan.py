@@ -31,6 +31,7 @@ from playfuel_api.models.api import FoodOption, Plan, ScenarioPlan, TimelineEven
 from playfuel_api.models.db import MatchRow
 from playfuel_api.models.enums import GapStatus, ScheduleConfidence, TimelineEventKind
 from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION
+from playfuel_api.rules.duration_format import friendly_duration
 from playfuel_api.rules.hard_coded_strings import HEAT_EMERGENCY_TEXT
 
 # Optional import to avoid circular at module level — imported inline inside function
@@ -134,7 +135,7 @@ def build_timeline(
                     time=end_dt.isoformat(),
                     title=f"Match {idx} estimated end",
                     detail=(
-                        f"Based on normal duration ({normal.duration_min} min). "
+                        f"Based on normal duration ({friendly_duration(normal.duration_min)}). "
                         "Actual time may vary."
                     ),
                     kind=TimelineEventKind.matchEnd,

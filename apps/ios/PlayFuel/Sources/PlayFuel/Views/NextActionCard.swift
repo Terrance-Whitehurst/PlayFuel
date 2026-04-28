@@ -40,7 +40,7 @@ struct NextActionCard: View {
                 .tracking(1.2)
             Spacer()
             if let mins = nextAction?.minsUntil, mins >= 0 {
-                Text("In \(mins) min")
+                Text("In \(DurationFormatting.friendly(minutes: mins))")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.white)
                     .padding(.horizontal, 10)
@@ -114,12 +114,20 @@ struct NextActionCard: View {
 #Preview {
     ScrollView {
         VStack(spacing: 16) {
-            // With a next action
             NextActionCard(nextAction: FakeData.dallasSinglesPlan1.nextAction)
-
-            // Fallback
             NextActionCard(nextAction: nil)
         }
         .padding(.vertical, 16)
     }
+}
+
+#Preview("Dark") {
+    ScrollView {
+        VStack(spacing: 16) {
+            NextActionCard(nextAction: FakeData.dallasSinglesPlan1.nextAction)
+            NextActionCard(nextAction: nil)
+        }
+        .padding(.vertical, 16)
+    }
+    .preferredColorScheme(.dark)
 }

@@ -6,21 +6,25 @@ import SwiftUI
 /// Weather / food / timeline are FakeData splices until Phase 4 (Task #7) and
 /// Phase 5 (Task #8) replace them with real API data.
 ///
-/// Layout (when plan is loaded — NUTRITION_FIRST_IA_V1.md §B locked order):
-///   0. EmergencyBanner       — when extreme_heat_risk == true (IMMOVABLE per §A.3)
+/// Layout (when plan is loaded — HEADER_BUBBLES_V1.md §D locked order):
+///   0. EmergencyStrip        — when extreme_heat_risk == true (IMMOVABLE per §A.3)
+///                              Rendered in envelopeContent(), ABOVE the Picker (fixes QA-IA-1)
 ///   1. Singles|Doubles Picker— only when envelope.hasBothTypes
-///   2. PlanSummaryCard       — when llmSummary present
+///   2. HeaderBubbleRow       — [Plan Summary bubble] [Weather bubble] (always when plan loaded)
 ///   3. ScheduleStripView     — always (empty-CTA when no plans)
 ///   4. NextActionCard        — always (fallback copy when nextAction nil)
-///   5. FoodCardView          — when foodOptions non-empty
+///   5. FoodOptionDeck         — always (handles bag-fallback state internally)
 ///   6. Scenario cards        — horizontal scroll
 ///   7. Full Day Timeline btn — when timeline non-empty
-///   8. WeatherCardView       — compact pill, collapsed by default (demoted)
-///   9. Footer disclaimer link
+///   8. Footer disclaimer link
 ///
-/// Weather demotion rationale (user steer 2026-04-27): parents already feel the
-/// heat. The weather card was the first thing parents saw but it is not actionable.
-/// Safety logic is UNCHANGED — extreme_heat_risk still fires EmergencyBanner at #0.
+/// Bubble pattern rationale (user steer 2026-04-27, HEADER_BUBBLES_V1.md):
+/// PlanSummaryCard and WeatherCard are moved one tap deep into sheets opened
+/// by HeaderBubbleRow bubbles. Dashboard scroll above ScheduleStrip contains
+/// only the safety strip, type picker, and 2 small icon buttons.
+///
+/// Safety logic is UNCHANGED — extreme_heat_risk still fires EmergencyStrip at #0.
+/// EmergencyBanner.swift is preserved untouched (used in other contexts + previews).
 struct TournamentDashboardView: View {
 
     let tournament: Tournament
@@ -28,6 +32,7 @@ struct TournamentDashboardView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingDisclaimer = false
     @State private var showingCreateMatch = false
+    @State private var showProfile = false
 
     var body: some View {
         ScrollView {
@@ -63,9 +68,23 @@ struct TournamentDashboardView: View {
                     Label("Add Match", systemImage: "plus")
                 }
             }
+            ToolbarItem(placement: .topBarTrailing) {
+                Button {
+                    showProfile = true
+                } label: {
+                    Image(systemName: "person.crop.circle.fill")
+                        .font(.title3)
+                }
+                .accessibilityLabel("Profile")
+            }
         }
         .sheet(isPresented: $showingDisclaimer) {
             DisclaimerView()
+        }
+        .sheet(isPresented: $showProfile) {
+            ProfileMenuSheet()
+                .presentationDetents([.height(280), .medium])
+                .presentationDragIndicator(.visible)
         }
         .sheet(isPresented: $showingCreateMatch) {
             MatchCreateView(
@@ -84,21 +103,35 @@ struct TournamentDashboardView: View {
         }
     }
 
-    // MARK: - Envelope Content (Phase 8 — per-match plans + schedule strip)
+    // MARK: - Envelope Content (Phase 8.1 — bubble header pattern)
     //
     // Resolves the active Plan from the PlanEnvelope:
+    //   - EmergencyStrip rendered FIRST (above Picker) — fixes QA-IA-1.
     //   - Singles|Doubles segmented picker rendered only when hasBothTypes == true.
+    //   - HeaderBubbleRow rendered just below picker (Phase 8.1 bubble pattern).
     //   - Active plan = plan matching appState.selectedMatchId (set by strip tap or
     //     defaulted on envelope arrival via AppState.defaultMatchId(from:)).
     //
-    // See NUTRITION_FIRST_IA_V1.md §B and §H.14 for the full UX specification.
+    // See HEADER_BUBBLES_V1.md §D and §F.7 for the full UX specification.
+    //
+    // NOTE: resolveActivePlan(from:) is called multiple times in this builder to
+    // avoid illegal `let` bindings in @ViewBuilder on older macOS toolchains.
+    // The function is trivial (property accesses only) so repeated calls are fine.
     //
     // NOTE on macOS toolchain: `@EnvironmentObject` projected-value binding
     // ($appState.xxx) is immutable. Use explicit Binding computed vars instead.
 
     @ViewBuilder
     private func envelopeContent(envelope: PlanEnvelope) -> some View {
-        // Segmented picker — only when both plan types are present.
+        // #0 IMMOVABLE — EmergencyStrip rendered ABOVE the Picker (fixes QA-IA-1).
+        // Hoisting here ensures the strip is at visual position #0 even when
+        // hasBothTypes == true and the Picker is visible.
+        // SAFETY_DISCLAIMERS.md §B · HEADER_BUBBLES_V1.md §C (option b) · §F.7
+        if let plan = resolveActivePlan(from: envelope), plan.weather.extremeHeatRisk {
+            EmergencyStrip()
+        }
+
+        // #1 Segmented picker — only when both plan types are present.
         // When user switches type, also reset selectedMatchId to that type's first match.
         if envelope.hasBothTypes {
             Picker("Match Type", selection: matchTypeBinding) {
@@ -117,9 +150,18 @@ struct TournamentDashboardView: View {
                 appState.selectedMatchId = firstPlan?.matchId
             }
         }
-        // Resolve active plan via selectedMatchId first; fall back to anyPlan.
-        // Uses resolveActivePlan() helper to avoid illegal `let` in @ViewBuilder bodies
-        // on older macOS Swift toolchains (Session 5 lesson).
+
+        // #2 Bubble header row — Plan Summary + Weather + Map bubbles.
+        // Only rendered when a plan is available (envelope non-empty).
+        // HEADER_BUBBLES_V1.md §D position 2 · §F.7
+        // FOOD_DECK_AND_MAP_V1.md §I-6: `tournament` added for Map bubble.
+        if let plan = resolveActivePlan(from: envelope) {
+            HeaderBubbleRow(plan: plan, tournament: tournament)
+        }
+
+        // #3–8 Plan content (ScheduleStrip, NextActionCard, FoodCard, Scenarios,
+        // Timeline button, Disclaimer footer — stripped of EmergencyBanner,
+        // PlanSummaryCard, WeatherCardView per HEADER_BUBBLES_V1.md §D).
         if let plan = resolveActivePlan(from: envelope) {
             planContent(plan: plan, envelope: envelope)
         } else {
@@ -154,33 +196,28 @@ struct TournamentDashboardView: View {
         )
     }
 
-    // MARK: - Plan Content (NUTRITION_FIRST_IA_V1.md §B locked order)
+    // MARK: - Plan Content (HEADER_BUBBLES_V1.md §D locked order)
     //
-    // Order (top → bottom):
-    //   0. EmergencyBanner   (extreme_heat_risk — IMMOVABLE)
-    //   2. PlanSummaryCard   (LLM coach voice)
+    // EmergencyStrip, HeaderBubbleRow, and the Picker are rendered by
+    // envelopeContent() — they are NOT in this builder.
+    //
+    // Order (top → bottom, positions 3–8):
     //   3. ScheduleStripView (multi-match schedule strip)
     //   4. NextActionCard    (next actionable item)
-    //   5. FoodCardView      (food options)
+    //   5. FoodOptionDeck    (food deck — bag fallback handled inside)
     //   6. Scenario cards    (horizontal scroll)
     //   7. Timeline button
-    //   8. WeatherCardView   (compact pill, demoted)
-    //   9. Disclaimer footer
+    //   8. Disclaimer footer
+    //
+    // Removed from this builder (moved to bubbles / strip):
+    //   EmergencyBanner  → replaced by EmergencyStrip in envelopeContent()
+    //   PlanSummaryCard  → accessible via HeaderBubbleRow "Today's Plan" bubble
+    //   WeatherCardView  → accessible via HeaderBubbleRow weather bubble
     //
     // The envelope is passed so ScheduleStripView gets allPlans for the strip.
 
     @ViewBuilder
     private func planContent(plan: Plan, envelope: PlanEnvelope) -> some View {
-        // #0 — Emergency banner (IMMOVABLE: see SAFETY_DISCLAIMERS.md §B)
-        if plan.weather.extremeHeatRisk {
-            EmergencyBanner()
-        }
-
-        // #2 — LLM/template plan summary (coach voice)
-        if let llmSummary = plan.llmSummary {
-            PlanSummaryCard(explanation: llmSummary)
-        }
-
         // #3 — Schedule strip (primary navigation control)
         ScheduleStripView(
             allPlans: envelope.allPlans,
@@ -191,10 +228,9 @@ struct TournamentDashboardView: View {
         // #4 — Next action card (glance-test: parent knows "what's next" in 2 sec)
         NextActionCard(nextAction: plan.nextAction)
 
-        // #5 — Food card (only when options available; bag fallback rendered inside)
-        if !plan.foodOptions.isEmpty {
-            FoodCardView(foodOptions: plan.foodOptions)
-        }
+        // #5 — Food option deck (replaces FoodCardView inline per FOOD_DECK_AND_MAP_V1.md §E)
+        // FoodOptionDeck handles its own empty/bag-fallback state — always rendered.
+        FoodOptionDeck(foodOptions: plan.foodOptions, bagFallbackOnly: plan.bagFallbackOnly)
 
         // #6 — Scenario cards (horizontal scroll)
         scenariosSection(plan: plan)
@@ -211,12 +247,7 @@ struct TournamentDashboardView: View {
             .padding(.horizontal, 16)
         }
 
-        // #8 — Weather card (compact pill, demoted — parents already feel the heat)
-        // SAFETY NOTE: demotion of visual weight does NOT disable extreme_heat_risk
-        // logic. The EmergencyBanner at #0 fires independently.
-        WeatherCardView(weather: plan.weather, compact: true)
-
-        // #9 — §A Footer disclaimer link
+        // #8 — §A Footer disclaimer link
         footerDisclaimer
     }
 
@@ -319,10 +350,22 @@ struct TournamentDashboardView: View {
     let api   = APIClient(authService: auth)
     let repo  = Repository(api: api)
     let state = AppState(repository: repo, authService: auth)
-    // Phase 7: use the PlanEnvelope (both singles + doubles plans loaded for preview)
     state.currentPlanEnvelope = .loaded(FakeData.dallasPlanEnvelope)
     return NavigationStack {
         TournamentDashboardView(tournament: FakeData.dallasTournament)
     }
     .environmentObject(state)
+}
+
+#Preview("Dark") {
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    state.currentPlanEnvelope = .loaded(FakeData.dallasPlanEnvelope)
+    return NavigationStack {
+        TournamentDashboardView(tournament: FakeData.dallasTournament)
+    }
+    .environmentObject(state)
+    .preferredColorScheme(.dark)
 }

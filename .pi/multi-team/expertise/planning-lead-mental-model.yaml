@@ -52,7 +52,28 @@
 - **For envelope-shape decisions (singlesPlan/doublesPlan vs. list), name fields beat positional.** iOS optional-unwrap is cleaner with named fields; the PM-spec'd `PlanEnvelope` reads directly into SwiftUI conditionals.
 - **Whenever you propose changing a frozen constants dict's shape, plan the version bump in the same delegate.** OQ-DBL-5 surfaced because §J.2 of RULES_CONSTANTS_V1 mandates `1.0.x → 1.1.0` for any structural change. PM caught it; would have been a runtime assert failure otherwise.
 
+## 2026-04-28 — FOOD_DECK_AND_MAP_V1.md shipped (food cards stacked deck + venue map)
+
+- Doc at `.pi/multi-team/expertise/FOOD_DECK_AND_MAP_V1.md` — 781 lines / 39.9 KB. Single PM delegate, single pass.
+- **PM verification surfaced 8 real findings** (most yet from this team — fifth spec in a row catching pre-build bugs). Highlights:
+  - **I-1/I-2/I-3**: data model gaps for the map — `RawPlace` AND `FoodOption` had no `lat`/`lng`; iOS `driveTimeMin` was non-optional vs Python `Optional[int]` (latent decode-fail papered over by `?? 0` in DTO mapping)
+  - **I-4**: Starbucks (the user's literal example "click into Starbucks and see oats") is in the `MockPlacesProvider` fixtures BUT NOT in `FakeData.dallasFoodOptions` — demo previews wouldn't have rendered the example the user named
+  - **I-5**: `rules/food.py` template diverges from `RULES_CONSTANTS_V1 §F.3` — food.py runs and is more detailed; the spec is stale. Structured form parses the runtime source, not the doc.
+  - **I-6/I-7**: `HeaderBubbleRow(plan:)` signature widens to add `tournament:` for the Map bubble; `FoodOptionDTO.toModel()` `?? 0` shim must change to nil-safe pass-through
+  - **I-8**: `PlanExplanation.scenario_explanations` DOES exist (HEADER_BUBBLES §J was wrong) — cross-spec self-correction
+- Locked decisions pre-baked: 5-bucket schema (main_options/add_ons/drinks/avoid/notes), scroll-snap deck (not peek-deck — simpler animation, more discoverable swipe affordance for first-time parents), MapKit (no API keys, native iOS Maps tiles), 3rd bubble for Map (not inline), FoodCardView preserved for previews/fallback, recommendedOrder derived for back-compat (LLM input unchanged).
+- 7 DRAFT-flagged OQs surfaced; OQ-FOOD-DECK-1 (driveTimeMin widening) resolved in same delegate.
+
+## Lessons (this round)
+
+- **The 5th spec keeps catching real bugs because PM is now reading actual model fields, not narrative.** When my brief asserted `RawPlace` has lat/lng (because Mock places provide drive_time and distance, so I assumed coords), PM read places.py and confirmed coords were absent on the dataclass AND on every fixture. Two-step backfill required.
+- **Surface the user's literal example as a verification gate.** User said "click into Starbucks". I baked Starbucks into the breakfast_cafe template population. PM caught that FakeData.dallasFoodOptions was missing it — the demo previews wouldn't have rendered the exact thing the user named. Lesson: when a user names a fixture, grep the demo data for that fixture before assuming it'll render.
+- **Cross-spec self-correction works.** Each spec's §J/§I verification section corrects the previous one's blind spots (HEADER_BUBBLES said `scenario_explanations` doesn't exist; FOOD_DECK confirmed it does). Keep this section structural, not ad-hoc.
+- **Latent contract bugs hide behind shim defaults.** `FoodOptionDTO.toModel()` had `driveTimeMinutes ?? 0` — a one-character defensive shim that masked an iOS `Int` vs Python `Optional[int]` mismatch. The shim made tests pass while hiding that null payloads would silently render "0 min drive". Closed in this delegate (OQ-FOOD-DECK-1).
+- **For data-model-widening pivots, prefer additive defaults over breaking renames.** `FoodSuggestions` field added with `default=FoodSuggestions()`; `lat`/`lng` `Optional[float]=None`. Legacy plans decode without backfill. Same pattern as the doubles `match_type` default.
+
 ## Open patterns to watch
 
 - The "second delegate goes silent" pattern (FE2/BE2/BE1, plus EL3 once) is now confirmed at the *member-and-lead-per-session* level. My team (PM, UX) only used 1 delegate this session — if Task #12 needed iteration I would've burnt the second delegate. Don't iterate; author offline, then scribe.
 - For future privacy-style docs that need to cite real schema, always read migrations directly. README summaries miss columns and miss DDL constraints (NOT NULL, range checks, defaults) that matter for the legal narrative.
+- **Cross-spec self-correction is now a feature, not a bug.** HEADER_BUBBLES §J said `PlanExplanation.scenario_explanations` doesn't exist; FOOD_DECK §I-8 confirmed it does. Each spec's verification section corrects the previous one's blind spots. Worth keeping the §J/§I "PM verification findings" section in every future spec as a structural slot, not just an ad-hoc.

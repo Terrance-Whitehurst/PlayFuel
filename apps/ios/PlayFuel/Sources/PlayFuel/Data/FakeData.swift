@@ -185,7 +185,11 @@ enum FakeData {
     // MARK: - Food Options (Dallas)
     //
     // §F.3: fast_casual_bowl text is CONFIRMED per USER_STORIES.md US-08.
-    // sandwich_shop and grocery_prepared are [DRAFT — OQ-B].
+    // sandwich_shop, grocery_prepared, breakfast_cafe are [DRAFT — OQ-B].
+    //
+    // Phase 9: structured FoodSuggestions added per FOOD_DECK_AND_MAP_V1.md §A.3.
+    // Coordinates are best-guess for Uptown Dallas demo area (OQ-FOOD-DECK-3).
+    // Starbucks added per PM Verification Finding I-4 (user's literal example).
 
     static let dallasFoodOptions: [FoodOption] = [
         FoodOption(
@@ -197,20 +201,52 @@ enum FakeData {
             // Verbatim §F.3 / USER_STORIES US-08
             recommendedOrder: "Chicken rice bowl with light beans, mild toppings, sauce on the side",
             isDraft: false,
-            distanceMeters: nil,
+            distanceMeters: 600,
             placeId: nil,
-            provider: "fake"
+            provider: "fake",
+            suggestions: FoodSuggestions(
+                mainOptions: [
+                    "Rice bowl: brown or white rice base",
+                    "Add black beans, grilled chicken or steak",
+                    "Add fresh salsa and lettuce"
+                ],
+                addOns: [],
+                drinks: ["16–20 oz water"],
+                avoid: [
+                    "Sour cream",
+                    "Cheese",
+                    "Guacamole — keep fat and fiber low before competition"
+                ],
+                notes: ["Eat 60–90 min before next match"]
+            ),
+            lat: 32.7825,
+            lng: -96.7975
         ),
         FoodOption(
             id: UUID(uuidString: "CC000002-0000-0000-0000-000000000002")!,
             name: "Jimmy John's",
             category: "sandwich_shop",  // [DRAFT — OQ-B]
             driveTimeMin: 8,
-            recommendedOrder: "Turkey sandwich on French bread, no heavy sauces, add avocado if tolerated",  // [DRAFT — OQ-B]
+            recommendedOrder: "Turkey sandwich on French bread, no heavy sauces",  // [DRAFT — OQ-B]
             isDraft: true,
-            distanceMeters: nil,
+            distanceMeters: 900,
             placeId: nil,
-            provider: "fake"
+            provider: "fake",
+            suggestions: FoodSuggestions(
+                mainOptions: [
+                    "Turkey or chicken on whole-grain bread",
+                    "Add lettuce, tomato, mustard"
+                ],
+                addOns: ["Baked chips or pretzels if gap allows"],
+                drinks: ["Water or diluted sports drink"],
+                avoid: [
+                    "Heavy sauces and extra cheese",
+                    "Oil-based dressings"
+                ],
+                notes: ["Eat within 30 min of ordering. DRAFT — confirm with your athlete."]
+            ),
+            lat: 32.7820,
+            lng: -96.8025
         ),
         FoodOption(
             id: UUID(uuidString: "CC000003-0000-0000-0000-000000000003")!,
@@ -219,9 +255,53 @@ enum FakeData {
             driveTimeMin: 12,
             recommendedOrder: "Prepared deli chicken, plain rice, fruit cup from deli section",  // [DRAFT — OQ-B]
             isDraft: true,
-            distanceMeters: nil,
+            distanceMeters: 1400,
             placeId: nil,
-            provider: "fake"
+            provider: "fake",
+            suggestions: FoodSuggestions(
+                mainOptions: [
+                    "Rotisserie chicken with rice",
+                    "Prepared grain bowl — lean protein + complex carbs"
+                ],
+                addOns: ["Fresh fruit for post-match recovery"],
+                drinks: ["Water or electrolyte drink"],
+                avoid: ["Fried items", "Heavy cream-based dishes"],
+                notes: ["Eat 60–90 min before play. DRAFT — confirm with your athlete."]
+            ),
+            lat: 32.7755,
+            lng: -96.7920
+        ),
+        // PM Verification Finding I-4: Starbucks missing from FakeData despite being a
+        // MockPlacesProvider fixture. User's literal example ("click into Starbucks and see oats").
+        FoodOption(
+            id: UUID(uuidString: "CC000004-0000-0000-0000-000000000004")!,
+            name: "Starbucks",
+            category: "breakfast_cafe",  // [DRAFT — OQ-B]
+            driveTimeMin: 5,
+            recommendedOrder: "Oatmeal with banana, water",  // [DRAFT — OQ-B]
+            isDraft: true,
+            distanceMeters: 480,
+            placeId: nil,
+            provider: "fake",
+            suggestions: FoodSuggestions(
+                mainOptions: [
+                    "Oatmeal (plain or lightly sweetened)",
+                    "Whole-grain item with eggs if available"
+                ],
+                addOns: ["Banana or fruit cup — easy carb bridge"],
+                drinks: [
+                    "Water (primary)",
+                    "Small black coffee or tea if tolerated"
+                ],
+                avoid: [
+                    "Pastries and muffins — high sugar spike",
+                    "Large milk-based drinks close to match time",
+                    "High-sugar syrups and flavored drinks"
+                ],
+                notes: ["Eat ≥45 min before play. DRAFT — confirm with your athlete."]
+            ),
+            lat: 32.7805,
+            lng: -96.7990
         )
     ]
 

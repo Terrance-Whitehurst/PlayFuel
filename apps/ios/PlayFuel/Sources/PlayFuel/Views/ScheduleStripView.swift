@@ -242,16 +242,12 @@ private struct MatchChip: View {
     let state = AppState(repository: repo, authService: auth)
     return ScrollView {
         VStack(spacing: 16) {
-            // Multi-match strip
             ScheduleStripView(
                 allPlans: FakeData.dallasPlanEnvelope.allPlans,
                 selectedMatchId: .constant(FakeData.dallasPlanEnvelope.allPlans.first?.matchId),
                 onAddMatch: {}
             )
-
             Divider()
-
-            // Empty state
             ScheduleStripView(
                 allPlans: [],
                 selectedMatchId: .constant(nil),
@@ -261,4 +257,23 @@ private struct MatchChip: View {
         .padding(.vertical, 16)
     }
     .environmentObject(state)
+}
+
+#Preview("Dark") {
+    let auth  = AuthService()
+    let api   = APIClient(authService: auth)
+    let repo  = Repository(api: api)
+    let state = AppState(repository: repo, authService: auth)
+    return ScrollView {
+        VStack(spacing: 16) {
+            ScheduleStripView(
+                allPlans: FakeData.dallasPlanEnvelope.allPlans,
+                selectedMatchId: .constant(FakeData.dallasPlanEnvelope.allPlans.first?.matchId),
+                onAddMatch: {}
+            )
+        }
+        .padding(.vertical, 16)
+    }
+    .environmentObject(state)
+    .preferredColorScheme(.dark)
 }
