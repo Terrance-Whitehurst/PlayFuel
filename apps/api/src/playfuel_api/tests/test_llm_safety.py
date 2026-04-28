@@ -170,19 +170,24 @@ def test_missing_heat_text_when_extreme_heat_is_caught() -> None:
 # ── Test: non-canonical duration in prose ─────────────────────────────────────
 
 def test_non_canonical_duration_is_caught() -> None:
-    """Duration '90 min' (not in {75, 120, 180}) is flagged as fabricated."""
+    """Duration '95 min' (not in any canonical set) is flagged as fabricated.
+
+    NOTE: 90 min was the original test value but it was added to
+    _CANONICAL_DURATIONS in the SEC-6 fix (doubles best_of_3 normal duration).
+    Updated to use 95 min, which is not a canonical duration for any match type.
+    """
     inp = _base_input()
     exp = _clean_explanation(inp)
     exp = exp.model_copy(update={
         "scenario_explanations": {
-            "short": "In the short scenario (90 min match): comfortable break.",
+            "short": "In the short scenario (95 min match): comfortable break.",
             "normal": "In the normal scenario (120 min match): comfortable break.",
             "long": "In the long scenario (180 min match): tight turnaround.",
         }
     })
     is_safe, violations = validate_explanation(exp, inp)
     assert not is_safe
-    assert any("90" in v for v in violations), (
+    assert any("95" in v for v in violations), (
         f"Expected non-canonical duration violation. Got: {violations}"
     )
 

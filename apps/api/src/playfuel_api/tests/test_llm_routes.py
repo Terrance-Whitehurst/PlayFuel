@@ -103,7 +103,11 @@ def test_generate_plan_response_has_llm_summary(client_with_auth, mock_db) -> No
 
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    plan = body["plan"]
+    # v2.0 (NUTRITION_FIRST_IA_V1): envelope has singlesPlans array
+    assert "singlesPlans" in body, f"Expected 'singlesPlans' in response. Keys: {list(body.keys())}"
+    assert len(body["singlesPlans"]) > 0, "singlesPlans must be non-empty for a singles-only tournament"
+    plan = body["singlesPlans"][0]
+    assert plan is not None, "singlesPlans[0] must not be null"
 
     # llmSummary must be present
     assert "llmSummary" in plan, (

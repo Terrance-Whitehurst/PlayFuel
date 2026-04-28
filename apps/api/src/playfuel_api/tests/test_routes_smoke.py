@@ -14,12 +14,12 @@ These tests use conftest.py fixtures:
 
 
 def test_healthz_unauthed_returns_200(client_no_auth):
-    """GET /healthz returns {"status":"ok","rules_version":"1.0.0"} without auth."""
+    """GET /healthz returns {"status":"ok","rules_version":"1.1.0"} without auth (v1.1.0 doubles-spec)."""
     resp = client_no_auth.get("/healthz")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
-    assert body["rules_version"] == "1.0.0"
+    assert body["rules_version"] == "1.1.0"
 
 
 def test_protected_route_without_token_returns_401(client_no_auth):
@@ -128,7 +128,11 @@ def test_generate_plan_food_options_not_null(client_with_auth, mock_db):
 
     assert resp.status_code == 200, resp.text
     body = resp.json()
-    plan = body["plan"]
+    # v2.0 (NUTRITION_FIRST_IA_V1): envelope has singlesPlans array
+    assert "singlesPlans" in body, f"Expected 'singlesPlans' in response. Keys: {list(body.keys())}"
+    assert len(body["singlesPlans"]) > 0, "singlesPlans must be non-empty for a singles-only tournament"
+    plan = body["singlesPlans"][0]
+    assert plan is not None, "singlesPlans[0] must not be null"
     assert plan["foodOptions"] is not None, "foodOptions must not be None after Phase 5"
     assert len(plan["foodOptions"]) >= 1, f"Expected ≥1 food option, got {len(plan['foodOptions'])}"
     # Sanity-check first option shape
@@ -138,3 +142,5 @@ def test_generate_plan_food_options_not_null(client_with_auth, mock_db):
     assert "recommendedOrder" in opt
     assert "provider" in opt
     assert opt["provider"] == "mock"
+    # doublesPlans must be empty (no doubles matches in this test fixture)
+    assert body["doublesPlans"] == [], "doublesPlans must be [] for a singles-only tournament"

@@ -80,7 +80,9 @@ enum FakeData {
         estimatedNextMatchTime: "1:00 PM",
         round: "Round of 16",
         opponent: "T. Anderson",
-        court: "Court 4"
+        court: "Court 4",
+        format: nil,
+        doublesFormat: nil
     )
 
     // MARK: - Weather (Dallas)
@@ -337,7 +339,45 @@ enum FakeData {
         generatedAt: Date(timeIntervalSince1970: 1745661600) // 2026-04-26T09:00:00Z
     )
 
-    // MARK: - Full Dallas Plan
+    // MARK: - Match IDs (Phase 8 — per-match plan anchoring)
+
+    /// Fixed match UUIDs for preview determinism — mirrors server-side match rows.
+    static let matchIdSingles1 = UUID(uuidString: "AAAA0001-0000-0000-0000-000000000001")!
+    static let matchIdSingles2 = UUID(uuidString: "AAAA0002-0000-0000-0000-000000000002")!
+    static let matchIdDoubles1 = UUID(uuidString: "AAAA0003-0000-0000-0000-000000000003")!
+
+    // MARK: - Next Actions (Phase 8)
+
+    /// Fake NextAction for Singles Plan 1 (R16, 9 AM — pre-match meal in window).
+    static let dallasNextAction1 = NextAction(
+        title: "Pre-match meal",
+        detail: "Light, easy carbs — see food options below",
+        scheduledFor: Date(timeIntervalSince1970: 1745647200),  // 6:30 AM CDT 2026-04-26
+        kind: "pre_match_meal",
+        minsUntil: 28
+    )
+
+    /// Fake NextAction for Singles Plan 2 (QF, 1 PM — match start in window).
+    static let dallasNextAction2 = NextAction(
+        title: "Match 2 Start",
+        detail: "Head to court for warm-up",
+        scheduledFor: Date(timeIntervalSince1970: 1745676000),  // 1:00 PM CDT 2026-04-26
+        kind: "match_start",
+        minsUntil: 45
+    )
+
+    /// Fake NextAction for Doubles Plan 1 (best_of_3, 3 PM).
+    static let dallasNextActionDoubles = NextAction(
+        title: "Confirm partner warm-up time",
+        detail: "Confirm warm-up time with your player's partner",
+        scheduledFor: Date(timeIntervalSince1970: 1745683200),  // 3:00 PM CDT 2026-04-26
+        kind: "partner_coordination",
+        minsUntil: 120
+    )
+
+    // MARK: - Full Dallas Plan (Singles — Match 1, R16 9 AM)
+    //
+    // Phase 8: now carries matchId + nextAction + scheduledStart.
 
     static let dallasPlan = Plan(
         id: UUID(uuidString: "EEEE0001-0000-0000-0000-000000000001")!,
@@ -354,7 +394,163 @@ enum FakeData {
         foodOptions: dallasFoodOptions,
         timeline: dallasTimeline,
         bagFallbackOnly: false,
-        llmSummary: dallasPlanExplanation
+        llmSummary: dallasPlanExplanation,
+        matchType: .singles,
+        matchId: matchIdSingles1,
+        nextAction: dallasNextAction1,
+        scheduledStart: "2026-04-26T09:00:00Z"
+    )
+
+    // MARK: - Dallas Singles Plan 2 (QF, 1:00 PM)
+    //
+    // The second singles match of the day. Uses the same scenarios/food/timeline
+    // as Plan 1 for prototype purposes.
+
+    static let dallasSinglesPlan2 = Plan(
+        id: UUID(uuidString: "EEEE0003-0000-0000-0000-000000000003")!,
+        planId: "dallas-2026-04-26-qf-v1",
+        tournamentId: dallasTournament.id,
+        generatedAt: "2026-04-26T09:00:00Z",
+        warnings: [],
+        scenarioPlans: [
+            dallasShortScenario,
+            dallasNormalScenario,
+            dallasLongScenario
+        ],
+        weather: dallasWeather,
+        foodOptions: dallasFoodOptions,
+        timeline: dallasTimeline,
+        bagFallbackOnly: false,
+        llmSummary: dallasPlanExplanation,
+        matchType: .singles,
+        matchId: matchIdSingles2,
+        nextAction: dallasNextAction2,
+        scheduledStart: "2026-04-26T13:00:00Z"
+    )
+
+    /// Alias for ScheduleStripView preview (Plan 1 = first singles match).
+    static var dallasSinglesPlan1: Plan { dallasPlan }
+
+    // MARK: - Dallas Doubles Plan (best_of_3)
+    //
+    // Fake plan mirroring what the backend would produce for a doubles best_of_3 match.
+    // Durations: short=60, normal=90, long=135 (DOUBLES_SPEC_V1.md §B.1 — [DRAFT OQ-DBL-1]).
+    // Gap math (9:00 AM match, 1:00 PM next):
+    //   short:  gap = 240−60  = 180 min → light_meal   + wait_until_end (≥120)
+    //   normal: gap = 240−90  = 150 min → light_meal   + wait_until_end (≥120)
+    //   long:   gap = 240−135 = 105 min → quick_pickup + pickup_during_match ([60,120))
+
+    static let dallasDoublesShortScenario = ScenarioPlan(
+        id: UUID(uuidString: "FFFF0001-0000-0000-0000-000000000001")!,
+        scenario: "short",
+        durationMin: 60,
+        estimatedEnd: "10:00 AM",
+        gapMinutes: 180,
+        gapStatus: .ok,
+        foodStrategy: FoodStrategy(
+            bucket: .light_meal,
+            text: "There is enough time for a light meal, but avoid heavy/greasy foods."
+        ),
+        pickupStrategy: PickupStrategy(
+            bucket: .wait_until_end,
+            text: "Parent can likely wait until the match ends before getting food."
+        ),
+        rewarmUp: RewarmUp(startOffsetMin: -30, durationMin: 20),
+        overrunWarning: nil,
+        warnings: []
+    )
+
+    static let dallasDoublesNormalScenario = ScenarioPlan(
+        id: UUID(uuidString: "FFFF0002-0000-0000-0000-000000000002")!,
+        scenario: "normal",
+        durationMin: 90,
+        estimatedEnd: "10:30 AM",
+        gapMinutes: 150,
+        gapStatus: .ok,
+        foodStrategy: FoodStrategy(
+            bucket: .light_meal,
+            text: "There is enough time for a light meal, but avoid heavy/greasy foods."
+        ),
+        pickupStrategy: PickupStrategy(
+            bucket: .wait_until_end,
+            text: "Parent can likely wait until the match ends before getting food."
+        ),
+        rewarmUp: RewarmUp(startOffsetMin: -30, durationMin: 20),
+        overrunWarning: nil,
+        warnings: []
+    )
+
+    static let dallasDoublesLongScenario = ScenarioPlan(
+        id: UUID(uuidString: "FFFF0003-0000-0000-0000-000000000003")!,
+        scenario: "long",
+        durationMin: 135,
+        estimatedEnd: "11:15 AM",
+        gapMinutes: 105,
+        gapStatus: .ok,
+        foodStrategy: FoodStrategy(
+            bucket: .quick_pickup,
+            text: "Use quick pickup food: turkey sandwich, rice bowl, grocery prepared meal."
+        ),
+        pickupStrategy: PickupStrategy(
+            bucket: .pickup_during_match,
+            text: "If match is trending long, parent should pick up food during the final portion of the match if another trusted adult is present."
+        ),
+        rewarmUp: RewarmUp(startOffsetMin: -30, durationMin: 20),
+        overrunWarning: nil,
+        warnings: []
+    )
+
+    // LLM summary for the doubles plan — uses doubles-team voice per §C.2.
+    static let dallasPlanExplanationDoubles = PlanExplanation(
+        summary: "Saturday doubles at Samuell Grand Tennis Center starts at 9:00 AM. Hot and humid conditions (88°F / 72% humidity) — you and your partner should plan extra hydration and shade between points. Most likely scenario: a normal-length doubles match (~90 min, best of 3) with a comfortable break before the next round at 1:00 PM.",
+        scenarioExplanations: [
+            "short": "If your doubles team wraps in ~60 minutes, you’ll have a 3-hour break. Plenty of time for a light meal — avoid heavy or greasy foods. Agree with your partner on a quick lunch spot before the match.",
+            "normal": "A typical ~90-minute doubles match leaves a comfortable 2.5-hour break. A fast-casual pickup is a solid choice for both you and your partner — Chipotle’s chicken rice bowl (~5 min drive) works well.",
+            "long": "A longer match (~135 min) leaves under 2 hours before the next round. Pre-bought portable food is the priority for your doubles team — coordinate with your partner before the match."
+        ],
+        weatherNote: "Expect 88°F with 72% humidity — heat index will feel higher for both players. Keep shade and cool water available at the court changeovers.",
+        foodNote: "Nearby options include Chipotle (~5 min) and Jimmy John’s (~8 min). Consider ordering for both players to save time.",
+        safetyNote: "If your player feels faint or confused, has chest pain, stops sweating in extreme heat, has severe cramps, vomits repeatedly, or shows signs of heat illness: stop play and seek medical help. Call 911 (or your local emergency number) in an emergency.\n\nThis app provides general tournament preparation guidance. It is not medical advice, nutrition therapy, or a substitute for a coach, physician, athletic trainer, or registered dietitian. For injuries, illness, heat symptoms, allergies, eating disorders, or medical conditions, consult a qualified professional.",
+        provider: "template",
+        model: nil,
+        generatedAt: Date(timeIntervalSince1970: 1745661600)
+    )
+
+    static let dallasDoublesPlan = Plan(
+        id: UUID(uuidString: "EEEE0002-0000-0000-0000-000000000002")!,
+        planId: "dallas-doubles-2026-04-26-v1",
+        tournamentId: dallasTournament.id,
+        generatedAt: "2026-04-26T09:00:00Z",
+        warnings: [],
+        scenarioPlans: [
+            dallasDoublesShortScenario,
+            dallasDoublesNormalScenario,
+            dallasDoublesLongScenario
+        ],
+        weather: dallasWeather,
+        foodOptions: dallasFoodOptions,
+        timeline: dallasTimeline,
+        bagFallbackOnly: false,
+        llmSummary: dallasPlanExplanationDoubles,
+        matchType: .doubles,
+        matchId: matchIdDoubles1,
+        nextAction: dallasNextActionDoubles,
+        scheduledStart: "2026-04-26T15:00:00Z"
+    )
+
+    /// Alias for multi-match envelope (Doubles Match 1 = first doubles plan).
+    static var dallasDoublesPlan1: Plan { dallasDoublesPlan }
+
+    // MARK: - Plan Envelope (Phase 8 — arrays, one plan per match)
+    //
+    // Multi-match Dallas envelope for preview:
+    //   singlesPlans: [R16 @ 9:00 AM, QF @ 1:00 PM]
+    //   doublesPlans: [Doubles QF @ 3:00 PM, best_of_3]
+    // Used by TournamentDashboardView #Preview to show the schedule strip + picker.
+
+    static let dallasPlanEnvelope = PlanEnvelope(
+        singlesPlans: [dallasSinglesPlan1, dallasSinglesPlan2],
+        doublesPlans: [dallasDoublesPlan1]
     )
 
     // MARK: - Plan Lookup

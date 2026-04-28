@@ -76,6 +76,145 @@ session_moh9uivm3dxv:
     decisions in pre_record_gotchas. Remaining work is post-demo: real LLM/Places provider
     integration, real icon artwork, OQ-API-4/5 API extensions, OQ-06/11/PRIV-2/3/4 legal review.
 
+# ----------------------------------------------------------------------------
+# Session moh9uivm3dxv (cont.) — Doubles integration (3-delegate sequence)
+# ----------------------------------------------------------------------------
+session_moh9uivm3dxv_doubles:
+  user_directive: |
+    Add doubles support: match-type aware creation (singles/doubles), doubles format
+    selector (best_of_3 / pro_set_8), per-type recommendations, dashboard tabs only
+    when both types exist (compact UX, not overloaded).
+  flow: Planning (spec) → Engineering (build) → Validation (smoke). 3 delegates total.
+  outcomes:
+    DOUBLES_SPEC_V1: SHIPPED ✅. 538-line canonical spec at .pi/multi-team/expertise/.
+    doubles_build: SHIPPED ✅. Migration 0007, RULES_CONSTANTS_VERSION 1.0.0→1.1.0,
+      envelope refactor {plan} → {singlesPlan, doublesPlan}, iOS conditional Picker.
+    doubles_validation: SHIPPED ✅. 231 passed / 1 xfail / 0 blockers / 3 minor findings.
+  test_growth: 180+1 → 231+1 (+51 doubles tests).
+  planning_verification_catch: |
+    PM read 0002_tables.sql before scribing and discovered matches.format column
+    already exists with comment '-- e.g. "singles", "doubles"'. Resolved in-spec
+    (OQ-DBL-3): reuse format, only add doubles_format. Saved a redundant column +
+    a follow-up migration. Reinforces the pattern: PM should ALWAYS read existing
+    schema before scribing migration specs.
+  spec_compliance_audit: |
+    Validation cross-referenced every §H item against disk, all ✅. Audit pattern
+    (parallel QA+SecRev → merge) repeated successfully.
+  new_findings:
+    SEC-6: |
+      services/llm_safety.py::_CANONICAL_DURATIONS = {"75","120","180"} — stale after
+      constants widening. Masked by TemplateProvider not emitting numeric durations,
+      but WILL break with real Anthropic/OpenAI providers. Fix when OQ-LLM-1/2 ship.
+    SEC-7: |
+      MatchCreate.format is Optional[str] not Literal["singles","doubles"] — closed-set
+      fields should be Literal/enum-typed at the API boundary. Combo helper is the
+      only safety net today. Cosmetic; tighten before public API exposure.
+    OQ-DBL-7: |
+      plans.match_type shipped nullable vs spec's NOT NULL DEFAULT 'singles'. Routes
+      always insert explicitly so non-blocking; adjust on next migration if desired.
+    OQ-DBL-1: still DRAFT — doubles duration values (60/90/135 + 45/70/100) need
+      USTA junior coach sign-off pre-launch.
+    OQ-DBL-6: GET /plans/latest endpoint doesn't exist; spec assumed it did. Add
+      with envelope shape when needed.
+  patterns_added:
+    stale_invariant_whitelist_after_constants_widening:
+      detail: |
+        When a constants table widens (new keys / new value combos), grep for the
+        OLD values across services/ — invariant checks, whitelists, validation lists
+        often hold stale subsets. SEC-6 (_CANONICAL_DURATIONS) is the canonical example.
+    format_field_str_vs_literal:
+      detail: |
+        Closed-set string fields on Pydantic Create models should always be
+        Literal[...] / Enum, not Optional[str]. Catches dirty input at the API
+        boundary instead of relying on downstream combo validators.
+    sequential_three_team_chain:
+      when: "Substantial product feature spanning spec → build → verify."
+      flow: "Planning (canonical spec) → Engineering (build to spec) → Validation (audit vs spec)"
+      why_it_worked: |
+        Each delegate has a clear input doc and exits with a clear output doc.
+        Engineering's brief was 90% the spec's §H, so discovery-overhead was zero.
+        Validation's compliance check was a checklist-walk against §H, also zero discovery.
+        This is the cleanest-shipping pattern observed to date. Three delegates,
+        zero silent drops, one real schema bug caught pre-build (matches.format reuse).
+  proven_total_delegate_count_in_this_session: |
+    Engineering: 6 substantive (4 demo path + 2 doubles primary)
+    Validation:  2 substantive
+    Planning:    1 substantive (doubles spec)
+    All without a single blocking silent drop. The 'one delegate per team per session'
+    rule is conclusively obsolete. Tight + spec'd + mechanical = ships at any ordinal.
+
+# ----------------------------------------------------------------------------
+# Session moh9uivm3dxv (cont.) — Nutrition-First IA pivot (3-delegate sequence)
+# ----------------------------------------------------------------------------
+session_moh9uivm3dxv_nutrition_first:
+  user_directive: |
+    Product steer: weather is NOT the hero — parents already feel the heat. NUTRITION
+    is the MVP value: parent puts in matches → sees schedule → gets scenarios per match
+    end → knows what to eat and where to go. These are PARENTS, not coaches/analysts —
+    they can't bring their coach. Calm guidance over data dashboards. Hydration insights
+    fold into post-MVP LLM fine-tuning.
+  flow: Planning (IA spec) → Engineering (build) → Validation (smoke + UX sniff). 3 delegates.
+  outcomes:
+    NUTRITION_FIRST_IA_V1: SHIPPED ✅. 693-line canonical spec at .pi/multi-team/expertise/.
+    IA_build: SHIPPED ✅. Migration 0008 (per-match plans), envelope arrays, NextAction,
+      ScheduleStripView, NextActionCard, WeatherCard compact pill, full dashboard reorder.
+    IA_validation: SHIPPED ✅. 256 passed / 1 xfail / safety override intact / UX glance-test passes.
+  test_growth: 231+1 → 256+1 (+25 IA tests).
+  planning_verification_catch_2: |
+    Second consecutive PM verification catch. Brief assumed plans.match_id existed;
+    PM read 0002_tables.sql first and confirmed it does NOT. Migration 0008 correctly
+    scoped to ADD COLUMN + partial unique index instead of an index-only no-op that
+    would have failed with 'column does not exist'. The 'PM reads existing schema
+    before scribing migration spec' rule is now battle-tested across 2 specs.
+  engineering_proactive_safety_fix: |
+    BD picked up the SEC-6 archetype reminder in the brief and proactively widened
+    `_CANONICAL_DURATIONS` from {75,120,180} to all 9 valid singles+doubles values
+    while doing the envelope-shape work. Stale-invariant-whitelist pattern recognition
+    is now embedded in BD's read of every constants-touching brief. Reinforced.
+  engineering_caught_spec_bug: |
+    Spec §D used snake_case event kinds (warmup, match_start, hydration_check) but
+    actual TimelineEventKind enum is camelCase (warmUp, match, hydration). BD read
+    enum source first and adapted both NEXT_ACTION_COPY_MAP and HEAT_SENSITIVE_KINDS
+    to real values. Otherwise heat-prepend would have silently failed at runtime
+    (no error, just no prepend ever firing).
+  validation_findings:
+    OQ-IA-9: 🔴 routes/plans.py uses plain INSERT after 0008 added unique index on
+      (match_id, match_type) WHERE match_id IS NOT NULL. Re-generate-plan will 500.
+      Demo-safe (single generate per session) but pre-TestFlight blocker.
+    QA-IA-1: 🟡 When envelope.hasBothTypes, segmented Picker renders above EmergencyBanner
+      pushing banner to visual position #1. Demo-safe (Dallas seed singles-only) but
+      cosmetic 5-line hoist needed post-demo to keep banner truly at #0.
+    SEC-8: ⚪ Stale violation message in llm_safety "Only 75, 120, 180 are canonical"
+      after the SEC-6 widening fix; cosmetic.
+  ux_sniff_test_passed: |
+    "Parent in parking lot at 8:45 AM sees EmergencyBanner (Dallas extreme heat),
+    immediately the calm coach summary, then match chip, then NextActionCard reading
+    'In 15 min — Pre-match meal / Light, easy carbs.' Glance-test passing: actionable
+    guidance in under 2 seconds. Weather is a small pill at the bottom; parent who
+    already feels 88°F can ignore it." — SecRev/QA synthesis.
+  patterns_added:
+    gating_safety_check_in_brief:
+      detail: |
+        When an IA / visual-prominence delegate touches anything safety-adjacent,
+        the SecRev brief MUST lead with an explicit 🔴 GATING conditional describing
+        what must stay put. Example here: 'EmergencyBanner at #0 when extreme_heat_risk
+        — if anywhere else, that's a blocker.' Avoids ambiguity about which findings
+        block recording.
+    insert_vs_upsert_after_unique_index:
+      detail: |
+        Any migration that adds a UNIQUE index (full or partial) should auto-trigger
+        a `grep '\.insert(' apps/api/` audit on every route hitting that table.
+        OQ-IA-9 was caused by 0008 adding the index without an upsert sweep.
+        Add to spec/migration checklist: "after UNIQUE index, audit INSERTs."
+  proven_total_delegate_count_through_session_so_far: |
+    Engineering: 8 substantive (4 demo path + 2 doubles + 2 IA pivot)
+    Validation:  3 substantive (each parallel-then-merge)
+    Planning:    2 substantive (doubles spec + IA spec)
+    13 total Lead-level delegates in one session, zero blocking silent drops.
+    The 3-delegate-chain pattern (Planning → Engineering → Validation) for substantial
+    feature work is now the default mode for this codebase — each delegate has a
+    clear input doc and exits with a clear output doc, discovery-overhead is near zero,
+    and PM verification + EL self-correction catch real bugs at the spec/build seams.
 
 
 # ----------------------------------------------------------------------------

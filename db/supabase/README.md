@@ -106,6 +106,8 @@ Migrations **must** be applied in filename order:
 | `0004_auth_trigger.sql` | Creates `handle_new_user()` (SECURITY DEFINER) + `on_auth_user_created` trigger on `auth.users` |
 | `0005_match_labels.sql` | Adds nullable `round_label`, `opponent_label`, `court_label` text columns to `public.matches` (resolves OQ-API-1a) |
 | `0006_plan_llm_summary.sql` | Adds nullable `llm_summary` jsonb column to `public.plans` for Phase 6 LLM explanation layer (Phase 6) |
+| `0007_doubles_support.sql` | Adds nullable `doubles_format` text column to `public.matches` and nullable `match_type` text column to `public.plans` for doubles-spec extension (DOUBLES_SPEC_V1.md) |
+| `0008_per_match_plans.sql` | Adds nullable `match_id` uuid FK column to `public.plans` (ON DELETE CASCADE to `matches`) and a partial unique index `plans_match_id_match_type_uq` — enforces one plan per (match, match_type). Partial index excludes null match_ids (legacy rows). See NUTRITION_FIRST_IA_V1.md §E. |
 
 ---
 

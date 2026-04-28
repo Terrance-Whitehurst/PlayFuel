@@ -54,12 +54,29 @@ class WeatherCondition(StrEnum):
     snow = "snow"
 
 
+class MatchType(StrEnum):
+    """Doubles-spec extension — stored in matches.format (pre-existing, 0002) and
+    plans.match_type (new, 0007). See DOUBLES_SPEC_V1.md §A.1."""
+    singles = "singles"
+    doubles = "doubles"
+
+
+class DoublesFormat(StrEnum):
+    """Doubles match format — stored in matches.doubles_format (new, 0007).
+    Null / absent means singles or format not specified. See DOUBLES_SPEC_V1.md §A.1."""
+    best_of_3 = "best_of_3"
+    pro_set_8 = "pro_set_8"
+
+
 class TimelineEventKind(StrEnum):
     """Plan timeline event categories — mirrors iOS TimelineEvent.swift.
 
     OQ-TRIAGE-1 resolution: extended with gap, foodWindow, pickup, matchEnd
     so the rules-engine timeline can categorise inter-match events. iOS enum
     must be extended in lockstep (same string values, same camelCase casing).
+
+    partnerCoordination added in doubles-spec extension (DOUBLES_SPEC_V1.md §C.1).
+    Fires at T-60m relative to match scheduled_start when match is doubles.
 
     NOT a Postgres enum — this is an API contract enum only.
     """
@@ -75,3 +92,5 @@ class TimelineEventKind(StrEnum):
     foodWindow = "foodWindow"
     pickup = "pickup"
     matchEnd = "matchEnd"
+    # Doubles-spec extension — DOUBLES_SPEC_V1.md §C.1
+    partnerCoordination = "partnerCoordination"

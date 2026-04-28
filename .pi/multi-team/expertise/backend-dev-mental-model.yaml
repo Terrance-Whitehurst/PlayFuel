@@ -123,6 +123,119 @@ session3_seed_wiring_moh9uivm3dxv:
   path_math: "supabase/config.toml at repo root; seed at db/supabase/seed/dallas_demo.sql; relative path = ../db/supabase/seed/dallas_demo.sql"
   verification: "grep psql.*dallas_demo returns zero matches in both READMEs"
 
+doubles_spec_audit_moh9uivm3dxv:
+  completed: "2026-04-27"
+  description: "Closeout audit — wrote 3 missing test files + fixed 1 pre-existing test bug"
+  test_count_before: 180
+  test_count_after: 231
+  eval_harness: "exit 0 — 4 PASS, 1 XFAIL (Scenario 5)"
+
+nutrition_first_ia_session:
+  date: "2026-04-27"
+  spec: "NUTRITION_FIRST_IA_V1.md"
+  test_count_before: 231
+  test_count_after: 256
+  eval_harness: "exit 0 — 4 PASS, 1 XFAIL (Scenario 5)"
+  files_written:
+    - rules/next_action.py (NEW — derive_next_action pure function)
+    - tests/test_next_action.py (NEW — 12 tests, 0 skips)
+    - tests/test_per_match_plans.py (NEW — 8 tests)
+  files_edited:
+    - models/api.py (Plan.match_id + Plan.next_action; GeneratePlanResponse arrays)
+    - models/db.py (PlanRow.match_id — already present from prior session)
+    - rules/plan.py (build_plan_envelope gains match_id param)
+    - routes/plans.py (per-match loop; derive_next_action wired; array envelope)
+    - services/llm_safety.py (SEC-6 fix: _CANONICAL_DURATIONS expanded with doubles values)
+    - tests/test_routes_smoke.py (singlesPlan → singlesPlans[0]; doublesPlan null → doublesPlans==[])
+    - tests/test_doubles_routes.py (same envelope shape update — 4 tests)
+    - tests/test_llm_routes.py (singlesPlan → singlesPlans[0])
+    - tests/test_llm_safety.py (90 min → 95 min in non-canonical test — SEC-6 fix)
+  key_learnings:
+    - >-
+      TimelineEventKind uses camelCase string values (warmUp, hydration, match, matchEnd, partnerCoordination).
+      HEAT_SENSITIVE_KINDS must mirror these exactly. Writing them as snake_case (match_start, warmup)
+      causes all parametrize cases to skip. Always cross-reference against the actual enum before coding.
+    - >-
+      When widening a constants table (e.g. SCENARIO_DURATIONS_MIN, _CANONICAL_DURATIONS), grep
+      services/ and tests/ for hardcoded old values. SEC-6 archetype: _CANONICAL_DURATIONS in
+      llm_safety.py was stale after doubles-spec widened the durations table. Fix in the same pass.
+    - >-
+      Per-match plan generation: route iterates match_rows in DB fetch order (display_order ASC,
+      scheduled_start ASC). Plans are appended in that order. No re-sort needed in the route
+      because the DB query guarantees the right order.
+    - >-
+      TimelineEventOut.time is a str (ISO 8601), not a datetime. Always parse it inside next_action
+      derivation with fromisoformat(). Inject 'now' as a datetime for deterministic testing.
+  sec6_fix:
+    file: services/llm_safety.py
+    old_value: 'frozenset({"75", "120", "180"})'
+    new_value: 'frozenset({"75","120","180","60","90","135","45","70","100"})'
+    root_cause: >-
+      Doubles durations (60/90/135 for best_of_3; 45/70/100 for pro_set_8) were added in
+      DOUBLES_SPEC_V1 session but _CANONICAL_DURATIONS was never updated. TemplateProvider
+      doesn't emit numeric durations so the false-positive was masked. Would break real
+      Anthropic/OpenAI providers.
+  breaking_changes:
+    - >-
+      GeneratePlanResponse: {singlesPlan: Plan|null, doublesPlan: Plan|null}
+      → {singlesPlans: [Plan], doublesPlans: [Plan]}. Both arrays; either may be empty.
+      iOS must use arrays; all tests updated in same pass.
+  files_written:
+    - tests/test_doubles_timeline.py (8 tests — partnerCoordination event)
+    - tests/test_doubles_routes.py (10 tests — validation + envelope shape)
+    - tests/test_doubles_llm.py (7 tests — TemplateProvider doubles prose)
+  bug_fixed:
+    file: tests/test_doubles_scenarios.py::test_doubles_best_of_3_long_scenario_gap
+    root_cause: >
+      m2 = _match(_BASE + timedelta(minutes=120 + 135)) = 255 min from base.
+      Long scenario ends at +135 min; gap = 255-135 = 120 (not 0 as asserted).
+      Fix: m2 = _match(_BASE + timedelta(minutes=135)) so gap == 0 as intended.
+  compliance_checks:
+    db_readme_0007: PASS
+    env_example_unchanged: PASS (no new env vars for doubles per spec)
+    llm_py_doubles_branching: PASS (match_type=='doubles' → 'your doubles team' subject)
+    routes_plans_envelope_shape: PASS (singlesPlan/doublesPlan fields confirmed)
+    get_plans_latest_envelope: OQ-DBL-6 (deferred — no /plans/latest endpoint exists; not a regression)
+
+hotfix_oq_ia9_moh9uivm3dxv:
+  date: "2026-04-27"
+  description: "OQ-IA-9 upsert fix + route hardening for generate_plan"
+  root_cause: >
+    Migration 0008 added a partial unique index plans_match_id_match_type_uq
+    ON (match_id, match_type) WHERE match_id IS NOT NULL. The route used plain
+    INSERT, so any re-generate call collided → 500 UniqueViolation.
+  fix:
+    file: routes/plans.py
+    change: "client.table(_PLANS_TABLE).insert({...}) → .upsert({...}, on_conflict='match_id,match_type')"
+    line: 275
+  secondary_fixes:
+    - "0 matches: HTTPException(404) → return GeneratePlanResponse(singles_plans=[], doubles_plans=[]) (line 87)"
+    - "derive_next_action wrapped in try/except (next_action stays None on unexpected raise)"
+    - "import logging moved to module level; inline import inside except block removed"
+    - "test_per_match_plans.py mock updated: insert → upsert to match fixed route"
+  tests_added:
+    file: tests/test_generate_plan_hotfix.py
+    count: 6
+    names:
+      - test_regenerate_is_idempotent
+      - test_upsert_called_not_insert
+      - test_zero_matches_returns_empty_envelope
+      - test_weather_provider_failure_degrades
+      - test_llm_provider_failure_degrades
+      - test_places_provider_failure_degrades
+  test_counts:
+    before: "256 passed, 1 xfailed"
+    after: "262 passed, 1 xfailed, 0 failed"
+  lesson: >
+    After any migration that adds a UNIQUE index, immediately grep .insert( across
+    every route that writes to that table. If any plain INSERT exists, convert to
+    upsert in the same PR — never defer. The pattern: schema change + route fix +
+    idempotency test must ship together. Also: 'try/finally' is NOT the same as
+    'try/except/finally' — a finally block ensures cleanup but still propagates the
+    exception. When a function is documented as 'never raises' but is mocked to raise
+    in tests, the test is testing the wrong contract; mock its documented return
+    value (None) instead.
+
 new_oqs:
   - id: "OQ-H"
     question: "weather_condition enum — does it need 'partly_cloudy', 'fog', or 'haze'?"
