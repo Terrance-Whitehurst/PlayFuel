@@ -74,6 +74,8 @@ class MatchRow(BaseModel):
     court_label: Optional[str] = None
     # Doubles-spec extension — migration 0007_doubles_support.sql
     doubles_format: Optional[str] = None  # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
+    # Player scouting extension — migration 0010_players_and_notes.sql
+    opponent_player_id: Optional[UUID] = None  # FK to players.id; null when no scouted opponent
     created_at: datetime
     updated_at: datetime
 
@@ -111,6 +113,49 @@ class MatchScenarioRow(BaseModel):
     pickup_bucket: Optional[PickupBucket] = None
     rewarm_up_minutes: Optional[int] = None
     overrun_warning: Optional[dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ─── Player scouting (migration 0010) ────────────────────────────────────────
+
+
+class PlayerRow(BaseModel):
+    """Mirror of public.players row."""
+    id: UUID
+    user_id: UUID
+    display_name: str
+    club: Optional[str] = None
+    city: Optional[str] = None
+    notes_summary: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlayerNoteRow(BaseModel):
+    """Mirror of public.player_notes row."""
+    id: UUID
+    player_id: UUID
+    user_id: UUID
+    source: str          # player_note_source enum value
+    body: str
+    match_id: Optional[UUID] = None
+    created_at: datetime
+
+
+class MatchEvaluationRow(BaseModel):
+    """Mirror of public.match_evaluations row. See POST_MATCH_EVAL_V1.md §B."""
+    id: UUID
+    match_id: UUID
+    user_id: UUID
+    result: str           # match_eval_result enum value
+    score_text: Optional[str] = None
+    effort_rating: Optional[int] = None
+    focus_rating: Optional[int] = None
+    went_well: list[str] = []
+    to_improve: list[str] = []
+    opponent_observations: Optional[str] = None
+    key_moments: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

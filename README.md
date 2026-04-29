@@ -153,6 +153,7 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | iOS README | `apps/ios/PlayFuel/README.md` | Xcode setup, Phase 3 swap path, screen tour |
 | DB README | `db/supabase/README.md` | Migration order, RLS pattern, seed UUIDs, env vars |
 | Build Plan | `specs/PLAN.md` | Phased roadmap, task IDs, parallelization, open questions |
+| On-Device Testing | `docs/ON_DEVICE_TESTING.md` | Sequenced checklist: local dev loop → distribution path → Fly.io deploy → iOS signing → SIWA → smoke-test |
 | PRD | `.pi/multi-team/expertise/PRD.md` | Product requirements, demo scenario, build phases |
 | Rules Engine Spec | `.pi/multi-team/expertise/RULES_CONSTANTS_V1.md` | All constants, bucket boundaries, gap contract (v1.0.0) |
 | Safety Disclaimers | `.pi/multi-team/expertise/SAFETY_DISCLAIMERS.md` | Verbatim disclaimer text, prohibited phrases, heat-emergency guidance |

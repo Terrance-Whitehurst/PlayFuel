@@ -26,12 +26,13 @@ from datetime import datetime
 from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
 
 from playfuel_api.models.enums import (
     FoodBucket,
     GapStatus,
+    MatchEvalResult,
     PickupBucket,
     ScenarioKind,
     ScheduleConfidence,
@@ -55,6 +56,8 @@ class MatchInput(BaseModel):
     round_label: Optional[str] = None
     opponent_label: Optional[str] = None
     court_label: Optional[str] = None
+    # Player scouting extension — migration 0010
+    opponent_player_id: Optional[UUID] = None
 
 
 # ─── ScenarioPlan sub-objects ─────────────────────────────────────────────────
@@ -320,6 +323,22 @@ class FoodRecommendationSummary(BaseModel):
     is_draft: bool = False
 
 
+class OpponentNoteForLLM(BaseModel):
+    """Sanitized note fragment passed to PlanExplanationInput.
+
+    Never contains raw note text. The body_paraphrasable field is:
+      1. Stripped of URLs, emails, phones.
+      2. Truncated to 200 chars.
+      3. Scanned for §C prohibited phrases; if any match, replaced with '[note redacted]'.
+
+    Notes with body_paraphrasable == '[note redacted]' are DROPPED from the list
+    before being attached to PlanExplanationInput (they carry zero signal).
+    """
+    source: str          # 'secondhand' | 'observed' | 'post_match'
+    age_days: int        # days since note created_at; newer = more relevant
+    body_paraphrasable: str  # max 200 chars, sanitized
+
+
 class PlanExplanationInput(BaseModel):
     """Frozen structured input to the LLM/TemplateProvider.
 
@@ -341,6 +360,8 @@ class PlanExplanationInput(BaseModel):
     heat_emergency_text: Optional[str] = None
     user_disclaimer: str
     match_type: str = "singles"  # 'singles' | 'doubles' — drives partner-aware LLM prose
+    # Player scouting extension (PLAYER_SCOUTING_V1.md §D) — additive, decode-safe
+    opponent_notes: list[OpponentNoteForLLM] = []
 
 
 class PlanExplanation(BaseModel):
@@ -369,6 +390,157 @@ class PlanExplanation(BaseModel):
     generated_at: datetime
 
 # ─── Request / response wrappers ─────────────────────────────────────────────
+
+
+# ─── Player scouting models (migration 0010) ─────────────────────────────────────
+
+
+class PlayerCreate(BaseModel):
+    """Request body for POST /v1/players. Accepts camelCase (displayName) or snake_case."""
+    model_config = _CAMEL
+
+    display_name: str = Field(min_length=1, max_length=120)
+    club: Optional[str] = Field(default=None, max_length=120)
+    city: Optional[str] = Field(default=None, max_length=120)
+    notes_summary: Optional[str] = None
+
+
+class PlayerUpdate(BaseModel):
+    """Request body for PATCH /v1/players/{pid}. Accepts camelCase or snake_case."""
+    model_config = _CAMEL
+
+    display_name: Optional[str] = Field(default=None, min_length=1, max_length=120)
+    club: Optional[str] = Field(default=None, max_length=120)
+    city: Optional[str] = Field(default=None, max_length=120)
+    notes_summary: Optional[str] = None
+
+
+class Player(BaseModel):
+    """API response model for a scouted player."""
+    model_config = _CAMEL
+
+    id: UUID
+    user_id: UUID
+    display_name: str
+    club: Optional[str] = None
+    city: Optional[str] = None
+    notes_summary: Optional[str] = None
+    note_count: int = 0          # derived by route; not stored in DB
+    created_at: datetime
+    updated_at: datetime
+
+
+class PlayerNoteCreate(BaseModel):
+    """Request body for POST /v1/players/{pid}/notes. Accepts camelCase or snake_case."""
+    model_config = _CAMEL
+
+    source: str = Field(pattern="^(secondhand|observed|post_match)$")
+    body: str = Field(min_length=1, max_length=2000)
+    match_id: Optional[UUID] = None
+
+
+class PlayerNoteUpdate(BaseModel):
+    """Request body for PATCH /v1/players/{pid}/notes/{nid}."""
+    model_config = _CAMEL
+
+    body: str = Field(min_length=1, max_length=2000)
+
+
+class PlayerNote(BaseModel):
+    """API response model for a player note."""
+    model_config = _CAMEL
+
+    id: UUID
+    player_id: UUID
+    user_id: UUID
+    source: str
+    body: str
+    match_id: Optional[UUID] = None
+    created_at: datetime
+
+
+# ─── Post-match evaluation models (migration 0011) ──────────────────────────
+
+
+def _validate_eval_list(v: list[str] | None) -> list[str] | None:
+    """Shared validator for went_well / to_improve list fields.
+
+    Enforces:
+    - Max 5 items per list.
+    - Each item ≤200 chars.
+
+    Returns the list unchanged if valid; raises ValueError otherwise.
+    """
+    if v is None:
+        return v
+    if len(v) > 5:
+        raise ValueError("Maximum 5 items allowed")
+    for item in v:
+        if len(item) > 200:
+            raise ValueError(f"Each item must be ≤200 chars (got {len(item)})")
+    return v
+
+
+class MatchEvalCreate(BaseModel):
+    """Request body for POST /v1/matches/{mid}/evaluation.
+
+    All fields except result are optional. Accepts camelCase (iOS) or snake_case.
+    iOS sends: effortRating, focusRating, wentWell, toImprove,
+               opponentObservations, keyMoments, scoreText.
+    """
+    model_config = _CAMEL
+
+    result: MatchEvalResult
+    score_text: Optional[str] = Field(default=None, max_length=80)
+    effort_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    focus_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    went_well: list[str] = Field(default_factory=list)
+    to_improve: list[str] = Field(default_factory=list)
+    opponent_observations: Optional[str] = Field(default=None, max_length=500)
+    key_moments: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("went_well", "to_improve", mode="before")
+    @classmethod
+    def _check_list_items(cls, v: object) -> object:
+        return _validate_eval_list(v)  # type: ignore[arg-type]
+
+
+class MatchEvalUpdate(BaseModel):
+    """Request body for PATCH /v1/matches/{mid}/evaluation. All fields optional."""
+    model_config = _CAMEL
+
+    result: Optional[MatchEvalResult] = None
+    score_text: Optional[str] = Field(default=None, max_length=80)
+    effort_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    focus_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    went_well: Optional[list[str]] = None
+    to_improve: Optional[list[str]] = None
+    opponent_observations: Optional[str] = Field(default=None, max_length=500)
+    key_moments: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("went_well", "to_improve", mode="before")
+    @classmethod
+    def _check_list_items(cls, v: object) -> object:
+        return _validate_eval_list(v)  # type: ignore[arg-type]
+
+
+class MatchEvaluation(BaseModel):
+    """API response model for GET / POST / PATCH /v1/matches/{mid}/evaluation."""
+    model_config = _CAMEL
+
+    id: UUID
+    match_id: UUID
+    user_id: UUID
+    result: MatchEvalResult
+    score_text: Optional[str] = None
+    effort_rating: Optional[int] = None
+    focus_rating: Optional[int] = None
+    went_well: list[str] = Field(default_factory=list)
+    to_improve: list[str] = Field(default_factory=list)
+    opponent_observations: Optional[str] = None
+    key_moments: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
 
 
 class GeneratePlanResponse(BaseModel):

@@ -125,8 +125,7 @@ final class Repository: ObservableObject {
     /// the encoded request body.
     ///
     /// Phase 7: `matchType` and `doublesFormat` added per DOUBLES_SPEC_V1.md §A.2.
-    /// Validation (singles + non-nil doublesFormat, doubles + nil doublesFormat) is
-    /// enforced by the API — iOS sends what the user selected in MatchCreateView.
+    /// Player Scouting: `opponentPlayerId` added per PLAYER_SCOUTING_V1.md §E.4.
     func createMatch(
         tournamentId: UUID,
         scheduledStart: Date,
@@ -137,7 +136,8 @@ final class Repository: ObservableObject {
         estimatedNextMatchTime: Date?,
         displayOrder: Int,
         matchType: MatchType = .singles,
-        doublesFormat: DoublesFormat? = nil
+        doublesFormat: DoublesFormat? = nil,
+        opponentPlayerId: UUID? = nil
     ) async throws -> Match {
         let body = MatchCreateRequest(
             scheduledStart: scheduledStart,
@@ -147,7 +147,8 @@ final class Repository: ObservableObject {
             courtLabel: courtLabel,
             displayOrder: displayOrder,
             format: matchType.rawValue,
-            doublesFormat: doublesFormat?.rawValue
+            doublesFormat: doublesFormat?.rawValue,
+            opponentPlayerId: opponentPlayerId
         )
         let bodyData = try postEncoder.encode(body)
         let dto = try await api.send(
@@ -156,6 +157,171 @@ final class Repository: ObservableObject {
             expecting: MatchDTO.self
         )
         return dto.toModel()
+    }
+
+    // MARK: - Scouting Players (PLAYER_SCOUTING_V1.md §G items 11–13)
+
+    /// List the current user's scouted players, ordered by updated_at DESC.
+    func listPlayers() async throws -> [Player] {
+        let dtos = try await api.send(
+            Endpoints.listPlayers(baseURL: api.baseURL),
+            as: .snake,
+            expecting: [PlayerDTO].self
+        )
+        return dtos.map { $0.toModel() }
+    }
+
+    /// Create a new scouted player.
+    func createPlayer(
+        displayName: String,
+        club: String? = nil,
+        city: String? = nil,
+        notesSummary: String? = nil
+    ) async throws -> Player {
+        let body = PlayerCreateRequest(
+            displayName: displayName,
+            club: club,
+            city: city,
+            notesSummary: notesSummary
+        )
+        let bodyData = try postEncoder.encode(body)
+        let dto = try await api.send(
+            Endpoints.createPlayer(baseURL: api.baseURL, body: bodyData),
+            as: .snake,
+            expecting: PlayerDTO.self
+        )
+        return dto.toModel()
+    }
+
+    /// Fetch a single player by ID.
+    func getPlayer(id: UUID) async throws -> Player {
+        let dto = try await api.send(
+            Endpoints.getPlayer(baseURL: api.baseURL, id: id),
+            as: .snake,
+            expecting: PlayerDTO.self
+        )
+        return dto.toModel()
+    }
+
+    /// Update player metadata.
+    func updatePlayer(
+        id: UUID,
+        displayName: String? = nil,
+        club: String? = nil,
+        city: String? = nil,
+        notesSummary: String? = nil
+    ) async throws -> Player {
+        let body = PlayerUpdateRequest(
+            displayName: displayName,
+            club: club,
+            city: city,
+            notesSummary: notesSummary
+        )
+        let bodyData = try postEncoder.encode(body)
+        let dto = try await api.send(
+            Endpoints.updatePlayer(baseURL: api.baseURL, id: id, body: bodyData),
+            as: .snake,
+            expecting: PlayerDTO.self
+        )
+        return dto.toModel()
+    }
+
+    /// Delete a player and cascade all their notes.
+    func deletePlayer(id: UUID) async throws {
+        try await api.sendNoContent(
+            Endpoints.deletePlayer(baseURL: api.baseURL, id: id)
+        )
+    }
+
+    /// List notes for a player, newest-first.
+    func listPlayerNotes(playerId: UUID) async throws -> [PlayerNote] {
+        let dtos = try await api.send(
+            Endpoints.listPlayerNotes(baseURL: api.baseURL, playerId: playerId),
+            as: .snake,
+            expecting: [PlayerNoteDTO].self
+        )
+        return dtos.map { $0.toModel() }
+    }
+
+    /// Add a new note to a player.
+    func addPlayerNote(
+        playerId: UUID,
+        source: PlayerNoteSource,
+        body: String,
+        matchId: UUID? = nil
+    ) async throws -> PlayerNote {
+        let req = PlayerNoteCreateRequest(
+            source: source.rawValue,
+            body: body,
+            matchId: matchId
+        )
+        let bodyData = try postEncoder.encode(req)
+        let dto = try await api.send(
+            Endpoints.addPlayerNote(baseURL: api.baseURL, playerId: playerId, body: bodyData),
+            as: .snake,
+            expecting: PlayerNoteDTO.self
+        )
+        return dto.toModel()
+    }
+
+    /// Edit a note (allowed within 24h window per spec; API returns 422 after).
+    func editPlayerNote(playerId: UUID, noteId: UUID, body: String) async throws -> PlayerNote {
+        let req = ["body": body]
+        let bodyData = try JSONEncoder().encode(req)
+        let dto = try await api.send(
+            Endpoints.editPlayerNote(baseURL: api.baseURL, playerId: playerId, noteId: noteId, body: bodyData),
+            as: .snake,
+            expecting: PlayerNoteDTO.self
+        )
+        return dto.toModel()
+    }
+
+    /// Delete a single note.
+    func deletePlayerNote(playerId: UUID, noteId: UUID) async throws {
+        try await api.sendNoContent(
+            Endpoints.deletePlayerNote(baseURL: api.baseURL, playerId: playerId, noteId: noteId)
+        )
+    }
+
+    // MARK: - Post-Match Evaluation (POST_MATCH_EVAL_V1.md §G items 14–16)
+
+    /// Fetch the post-match evaluation for a match. Returns nil when no evaluation
+    /// has been created yet (API returns 404 in that case).
+    func getMatchEvaluation(matchId: UUID) async throws -> MatchEvaluation? {
+        do {
+            let dto = try await api.send(
+                Endpoints.getMatchEvaluation(baseURL: api.baseURL, matchId: matchId),
+                as: .snake,
+                expecting: MatchEvaluationDTO.self
+            )
+            return dto.toModel()
+        } catch APIError.notFound {
+            return nil
+        }
+    }
+
+    /// Create or update (upsert) the post-match evaluation for a match.
+    /// The API returns 201 on first creation, 200 on subsequent saves.
+    /// The auto-player-note loop (services/post_match_sync.py) fires server-side.
+    func saveMatchEvaluation(
+        matchId: UUID,
+        request: MatchEvaluationCreateRequest
+    ) async throws -> MatchEvaluation {
+        let bodyData = try postEncoder.encode(request)
+        let dto = try await api.send(
+            Endpoints.saveMatchEvaluation(baseURL: api.baseURL, matchId: matchId, body: bodyData),
+            as: .snake,
+            expecting: MatchEvaluationDTO.self
+        )
+        return dto.toModel()
+    }
+
+    /// Delete the post-match evaluation for a match (204 expected).
+    /// Also removes the auto-created post_match player_note server-side.
+    func deleteMatchEvaluation(matchId: UUID) async throws {
+        try await api.sendNoContent(
+            Endpoints.deleteMatchEvaluation(baseURL: api.baseURL, matchId: matchId)
+        )
     }
 
     // MARK: - Plans

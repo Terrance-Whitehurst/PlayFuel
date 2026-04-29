@@ -47,6 +47,8 @@ class MatchCreate(BaseModel):
     court_label: Optional[str] = None
     # Doubles-spec extension — migration 0007_doubles_support.sql
     doubles_format: Optional[str] = None   # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
+    # Player scouting extension — migration 0010_players_and_notes.sql
+    opponent_player_id: Optional[UUID] = None  # FK to players.id; SET NULL on player delete
 
 
 class MatchUpdate(BaseModel):
@@ -62,6 +64,8 @@ class MatchUpdate(BaseModel):
     court_label: Optional[str] = None
     # Doubles-spec extension
     doubles_format: Optional[str] = None   # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
+    # Player scouting extension
+    opponent_player_id: Optional[UUID] = None  # FK to players.id
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -82,6 +86,31 @@ def list_matches(
         .execute()
     )
     return result.data
+
+
+def _validate_opponent_player_id(
+    opponent_player_id: Optional[UUID],
+    client: Client,
+) -> None:
+    """Verify that opponent_player_id, if provided, belongs to the current user.
+
+    Uses RLS-scoped client: if the player exists but belongs to a different user,
+    RLS returns empty results and we raise 404 (don't leak existence).
+    """
+    if opponent_player_id is None:
+        return
+    result = (
+        client.table("players")
+        .select("id")
+        .eq("id", str(opponent_player_id))
+        .limit(1)
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Player not found or not owned by you",
+        )
 
 
 def _validate_doubles_format(format_val: Optional[str], doubles_format: Optional[str]) -> None:
@@ -121,8 +150,12 @@ def create_match(
 ) -> dict[str, Any]:
     """Create a match under a tournament. RLS verifies tournament ownership."""
     _validate_doubles_format(body.format, body.doubles_format)
+    _validate_opponent_player_id(body.opponent_player_id, client)
     payload = body.model_dump(exclude_none=True)
     payload["tournament_id"] = str(tid)
+    # UUID → string for PostgREST
+    if payload.get("opponent_player_id") is not None:
+        payload["opponent_player_id"] = str(payload["opponent_player_id"])
     # datetime → ISO string for PostgREST
     if "scheduled_start" in payload:
         payload["scheduled_start"] = payload["scheduled_start"].isoformat()
@@ -164,10 +197,14 @@ def update_match(
 ) -> dict[str, Any]:
     """Update a match. RLS enforces ownership."""
     _validate_doubles_format(body.format, body.doubles_format)
+    _validate_opponent_player_id(body.opponent_player_id, client)
     payload = body.model_dump(exclude_none=True)
     if not payload:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="No fields to update")
+    # UUID → string for PostgREST
+    if payload.get("opponent_player_id") is not None:
+        payload["opponent_player_id"] = str(payload["opponent_player_id"])
     for k in ("scheduled_start", "actual_end_at"):
         if k in payload:
             payload[k] = payload[k].isoformat()

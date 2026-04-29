@@ -592,4 +592,111 @@ Because the parent is the only authenticated user **and** the only person whose 
 
 ---
 
+---
+
+## 2.13 `public.players` — parent's opponent roster (PLAYER_SCOUTING_V1.md §A)
+> Added: 2026-04-28 · Source: PLAYER_SCOUTING_V1.md §B verified against migration 0010_players_and_notes.sql spec.
+
+| Column | Type | Category | PII | COPPA-relevant | ASTC bucket | Notes |
+|---|---|---|---|---|---|---|
+| `id` | uuid | identifier | No | No | ID | Internal PK. |
+| `user_id` | uuid FK→users.id | identifier | Yes (parent) | No | ID | RLS join key. |
+| `display_name` | text NOT NULL | child-adjacent | **Yes (name of child opponent)** | **Yes** | **CI** (Name) | Name of another parent's child. Data minimisation: first name strongly preferred. See §13.2. |
+| `club` | text (optional) | account | Low | Indirect | OUC | e.g. "Dallas Tennis Academy". |
+| `city` | text (optional) | location | Low | Indirect | **LOC-C** | City/region context only. |
+| `notes_summary` | text (optional) | OUC | Possibly | Possibly | **OUC** | Parent-curated 1-line headline. Free-form — may mention playing style. |
+| `created_at` / `updated_at` | timestamptz | telemetry | No | No | DG | — |
+
+---
+
+## 2.14 `public.player_notes` — scouting observations log (PLAYER_SCOUTING_V1.md §A)
+> Added: 2026-04-28 · Source: PLAYER_SCOUTING_V1.md §B verified against migration 0010_players_and_notes.sql spec.
+
+| Column | Type | Category | PII | COPPA-relevant | ASTC bucket | Notes |
+|---|---|---|---|---|---|---|
+| `id` | uuid | identifier | No | No | ID | — |
+| `player_id` | uuid FK→players.id | identifier | No | No | ID | — |
+| `user_id` | uuid FK→users.id | identifier | Yes (parent) | No | ID | RLS join key. |
+| `source` | player_note_source enum | account | No | No | OUC | "secondhand" / "observed" / "post_match". |
+| `body` | text NOT NULL ≤ 2000 chars | OUC (free-form) | **Possibly** | **Yes** | **OUC** | Parent-authored observation. May contain names or descriptions of a child opponent. UX guardrail text required (§13.3). |
+| `match_id` | uuid FK→matches.id (nullable, SET NULL) | identifier | No | No | ID | Links note to a specific match when known. |
+| `created_at` | timestamptz | telemetry | No | No | DG | No `updated_at` — notes immutable after creation (within 24h edit window). |
+
+**`matches.opponent_player_id` (added in migration 0010):**
+
+| Column | Type | Category | PII | COPPA-relevant | ASTC bucket | Notes |
+|---|---|---|---|---|---|---|
+| `opponent_player_id` | uuid FK→players.id (nullable, SET NULL) | identifier | No | No | ID | Links a match to a scouted opponent. Additive; no change to existing ASTC declarations for `matches`. |
+
+---
+
+## 13. Notes About Other Minors (Scouting Feature)
+
+> Added: 2026-04-28. Covers `public.players` and `public.player_notes` tables (migration 0010).
+
+### 13.1 Data nature
+
+The Player Scouting feature (PLAYER_SCOUTING_V1.md) lets a parent store observations about their child's **opponents** — other parents' children. This is a new PII surface that extends the existing parent-provided model.
+
+Critical distinction:
+- **Not opponent-authored.** The opponent never creates an account, never consents, and never knows a note exists.
+- **Parent-authored opinion data.** Analogous to a coach's clipboard of pre-match scouting notes: entirely the observer's own written observations.
+- **No contact data by schema design.** `players` has no email, phone, home address, photo, or physical-description columns. Character-capped free-form notes (2,000 chars).
+
+### 13.2 Data minimisation
+
+| Constraint | Mechanism |
+|---|---|
+| No contact info columns | Schema has none: no email, no phone, no address, no photo, no physical description |
+| Name only + court-observable fields | `display_name` (name), `club` (org), `city` (regional), `body` (free-form observation) |
+| Body capped at 2,000 chars | DB `CHECK (char_length(body) <= 2000)` |
+| UX guardrail text | Verbatim required on AddPlayerNoteSheet: *"Notes are private to your account. Don't include personal contact info, photos, or anything not directly observable on court."* |
+
+### 13.3 LLM paraphrase-only rule
+
+When opponent notes feed into the plan explanation:
+1. Sanitization pipeline strips URLs, emails, phone numbers; truncates to 200 chars before the LLM sees the text.
+2. §C prohibited-phrase check redacts any note containing a prohibited phrase (replaced with `[note redacted]`) before it reaches the LLM input.
+3. `TemplateProvider` conservative acknowledgment only counts notes — never quotes body text.
+4. Real-LLM prompt rule (post-MVP, `OQ-SCOUT-LLM-1`): paraphrase only, never quote verbatim, never reveal source.
+5. `validate_explanation` from `services/llm_safety.py` scans all LLM output for §C phrases unconditionally — no new code needed.
+
+### 13.4 Cascade delete
+
+```
+auth.users (DELETE)
+  └── public.users                  [CASCADE]
+        └── public.players          [CASCADE]   ← new
+              └── public.player_notes  [CASCADE]   ← new
+```
+
+If a parent deletes their account, all their scouted players and notes are deleted in the same transaction. If a parent deletes a single player, all that player's notes cascade. `player_notes.match_id` is SET NULL on match delete (note survives; FK link is cleared).
+
+### 13.5 Legal posture
+
+**Ship with current guardrails.** Parent-authored opinion data about opponents is legally analogous to a coach's clipboard — the parent's own court observations. This is not a new category of collected PII beyond what already exists (parent can already type any text into `injury_notes` or `player_profiles.display_name`). The same parent-provided model from §3 applies. Legal confirmation flagged as `OQ-SCOUT-PRIV-1` (non-blocking for MVP).
+
+**App Store questionnaire impact:** `players.display_name` for opponent children adds another instance of **CI (Name)** — already declared for `player_profiles.display_name`. No new ASTC category is introduced. `player_notes.body` adds another instance of **OUC (Other User Content)** — already declared. No questionnaire change required for the existing categories.
+
+### 13.6 Post-Match Evaluations: `opponent_observations` (POST_MATCH_EVAL_V1.md §H)
+
+The post-match evaluation feature (migration 0011) adds a `match_evaluations.opponent_observations` field (text, ≤500 chars). This field is **in scope of the §13 posture** — same privacy treatment as `player_notes.body`:
+- Parent-authored content about a minor (opponent child).
+- No PII schema columns: `match_evaluations` has no email, phone, address, or photo columns.
+- Auto-synced to `player_notes` (source='post_match') via `services/post_match_sync.py` — the note itself inherits all §13 constraints.
+- Sanitization applies at LLM-input time (same pipeline as `player_notes`).
+- ASTC bucket: **OUC** — already declared. **No new questionnaire category introduced.**
+- Form guardrail text required near the field: *"These notes will be added to your scouting log for this opponent."* (hard-coded; see POST_MATCH_EVAL_V1.md §H.2).
+
+---
+
+## 14. New Open Questions from Player Scouting (2026-04-28)
+
+| ID | Question | Owner | Pre-launch blocker? |
+|---|---|---|---|
+| **OQ-SCOUT-PRIV-1** | Parent-authored opinion data about other minors — is this a regulated category under COPPA or state laws (WA My Health My Data, NY SHIELD Act, etc.)? Posture: it's the parent's own court observation, not PII about the opponent as a user. | Legal | Non-blocking for MVP; must confirm before App Store submission |
+| **OQ-SCOUT-PRIV-2** | Retention policy for opponent notes. Current stance: no scheduled purge (running log is the feature). Should notes auto-expire after X years or X days post-tournament? | Legal + PM | Non-blocking for MVP; flag in privacy policy draft |
+
+---
+
 *End of PRIVACY_V1.md*

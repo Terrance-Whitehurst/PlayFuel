@@ -142,6 +142,107 @@ enum Endpoints {
         return req
     }
 
+    // MARK: - Scouting Players (migration 0010 — PLAYER_SCOUTING_V1.md §C)
+
+    /// GET /v1/players — list user’s scouted players (RLS-filtered, updated_at DESC).
+    static func listPlayers(baseURL: URL) -> URLRequest {
+        URLRequest(url: baseURL.appendingPathComponent("v1/players"))
+    }
+
+    /// POST /v1/players — create a new player.
+    static func createPlayer(baseURL: URL, body: Data) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent("v1/players"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return req
+    }
+
+    /// GET /v1/players/{id} — fetch single player.
+    static func getPlayer(baseURL: URL, id: UUID) -> URLRequest {
+        URLRequest(url: baseURL.appendingPathComponent("v1/players/\(id.uuidString)"))
+    }
+
+    /// PATCH /v1/players/{id} — update player metadata.
+    static func updatePlayer(baseURL: URL, id: UUID, body: Data) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent("v1/players/\(id.uuidString)"))
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return req
+    }
+
+    /// DELETE /v1/players/{id} — delete player + cascade all notes.
+    static func deletePlayer(baseURL: URL, id: UUID) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent("v1/players/\(id.uuidString)"))
+        req.httpMethod = "DELETE"
+        return req
+    }
+
+    /// GET /v1/players/{id}/notes — list notes for player, newest-first.
+    static func listPlayerNotes(baseURL: URL, playerId: UUID) -> URLRequest {
+        URLRequest(url: baseURL.appendingPathComponent("v1/players/\(playerId.uuidString)/notes"))
+    }
+
+    /// POST /v1/players/{id}/notes — add a note to a player.
+    static func addPlayerNote(baseURL: URL, playerId: UUID, body: Data) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent("v1/players/\(playerId.uuidString)/notes"))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return req
+    }
+
+    /// PATCH /v1/players/{id}/notes/{nid} — edit a note (within 24h window).
+    static func editPlayerNote(baseURL: URL, playerId: UUID, noteId: UUID, body: Data) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent(
+            "v1/players/\(playerId.uuidString)/notes/\(noteId.uuidString)"
+        ))
+        req.httpMethod = "PATCH"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return req
+    }
+
+    /// DELETE /v1/players/{id}/notes/{nid} — delete a single note.
+    static func deletePlayerNote(baseURL: URL, playerId: UUID, noteId: UUID) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent(
+            "v1/players/\(playerId.uuidString)/notes/\(noteId.uuidString)"
+        ))
+        req.httpMethod = "DELETE"
+        return req
+    }
+
+    // MARK: - Post-Match Evaluation (migration 0011 — POST_MATCH_EVAL_V1.md §C)
+
+    /// GET /v1/matches/{mid}/evaluation — fetch the evaluation; 404 if not yet created.
+    static func getMatchEvaluation(baseURL: URL, matchId: UUID) -> URLRequest {
+        URLRequest(url: baseURL.appendingPathComponent(
+            "v1/matches/\(matchId.uuidString)/evaluation"
+        ))
+    }
+
+    /// POST /v1/matches/{mid}/evaluation — create or upsert evaluation.
+    /// Returns 201 on creation, 200 on update.
+    static func saveMatchEvaluation(baseURL: URL, matchId: UUID, body: Data) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent(
+            "v1/matches/\(matchId.uuidString)/evaluation"
+        ))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return req
+    }
+
+    /// DELETE /v1/matches/{mid}/evaluation — delete the evaluation (204).
+    static func deleteMatchEvaluation(baseURL: URL, matchId: UUID) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent(
+            "v1/matches/\(matchId.uuidString)/evaluation"
+        ))
+        req.httpMethod = "DELETE"
+        return req
+    }
+
     // MARK: - Plans
 
     /// POST /v1/tournaments/{tid}/plans/generate — run rules engine + persist plan.

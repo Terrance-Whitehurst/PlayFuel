@@ -5,6 +5,8 @@ security_reviewer_mental_model:
   session: moh9uivm3dxv
   last_nutrition_ia_audit: "2026-04-27"
   last_food_deck_map_audit: "2026-04-28"
+  last_player_scouting_audit: "2026-04-28"
+  last_post_match_eval_audit: "2026-04-28"
 
   # ── Auth & Trust Boundaries ──────────────────────────────────────────────
   auth:
@@ -20,6 +22,8 @@ security_reviewer_mental_model:
       matches: all 5 endpoints ✅
       tournaments: all 6 endpoints ✅
       player_profiles: all 5 endpoints ✅
+      players: all 9 endpoints ✅ (migration 0010, RLS chain-through verified 2026-04-28)
+      player_notes: all endpoints ✅ (chain-through EXISTS to players table)
     rls:
       enforced_by: postgres row level security (Supabase)
       pattern: "auth.uid() = user_id (direct) or EXISTS subquery one-hop via tournament_id"
@@ -28,7 +32,11 @@ security_reviewer_mental_model:
       tables_covered:
         - users, player_profiles, tournaments, matches, match_scenarios
         - weather_snapshots, food_options, plans, feedback
-      note: "Column additions (0005–0008) inherit table RLS automatically in PostgreSQL."
+        - players, player_notes (migration 0010 — RLS verified 2026-04-28)
+        - match_evaluations (migration 0011 — INSERT/UPDATE chain-check through match→tournament, RLS verified 2026-04-28)
+      note: "Column additions (0005–0010) inherit table RLS automatically in PostgreSQL."
+      rls_pattern_player_notes: "EXISTS chain-through players.user_id — mirrors matches one-hop from 0003_rls.sql"
+      rls_parenthesized_form: "All new policies use (select auth.uid()) parenthesized subquery — prevents per-row re-evaluation"
 
   # ── API Key Posture ───────────────────────────────────────────────────────
   api_keys:
@@ -198,6 +206,61 @@ security_reviewer_mental_model:
       blocker_for_demo: false
       blocker_for_app_store: true
 
+    - id: SEC-SCOUT-1
+      severity: yellow
+      status: NEW (2026-04-28 player_scouting)
+      description: >
+        validate_explanation has no verbatim-note-reproduction check.
+        TemplateProvider (current ship) only uses count — not a concern.
+        When real Anthropic/OpenAI provider ships, it could quote
+        note.body_paraphrasable verbatim and pass validation if no §C phrase.
+        OQ-SCOUT-LLM-1 tracks the prompt-rule side; SEC-SCOUT-1 tracks
+        the automated-check side.
+      file: "apps/api/src/playfuel_api/services/llm_safety.py::validate_explanation"
+      fix: >
+        Add check 6 to validate_explanation: scan all_text for each
+        note.body_paraphrasable and flag as violation if found verbatim.
+        Code sketch in player-scouting-secrev-findings.md §SEC-SCOUT-1.
+      blocker_for_demo: false
+      blocker_for_real_llm_ship: true
+
+    - id: SEC-SCOUT-2
+      severity: cosmetic
+      status: NEW (2026-04-28 player_scouting)
+      description: >
+        _EMAIL_RE in services/scouting.py uses r'\S+@\S+\.\S+' (requires TLD).
+        Spec suggested r'\S+@\S+'. Bare local-domain emails (foo@bar) not stripped.
+        No realistic exploit path — tactical notes rarely contain bare-domain emails.
+      file: "apps/api/src/playfuel_api/services/scouting.py:33"
+      fix: "Change _EMAIL_RE to r'\\S+@\\S+' to match spec exactly"
+      blocker_for_demo: false
+
+    - id: SEC-EVAL-1
+      severity: cosmetic
+      status: NEW (2026-04-28 post_match_eval)
+      description: >
+        SELECT-then-INSERT/UPDATE in sync_player_note_from_eval has a TOCTOU window.
+        player_notes has NO UNIQUE INDEX on (player_id, match_id, source).
+        Two concurrent PATCH /evaluation calls could both INSERT post_match notes.
+        Practical risk negligible (single-user mobile). 5-note LLM cap absorbs duplicates.
+      file: "apps/api/src/playfuel_api/services/post_match_sync.py"
+      fix: >
+        Add partial unique index: player_notes_post_match_uq ON player_notes
+        (player_id, match_id) WHERE source = 'post_match'. Use DB-level upsert in sync.
+      blocker_for_demo: false
+      blocker_for_testflight: true
+
+    - id: SEC-EVAL-2
+      severity: cosmetic
+      status: NEW (2026-04-28 post_match_eval)
+      description: >
+        RLS isolation tests cover GET+POST only. No test_patch_evaluation_rls_isolation
+        or test_delete_evaluation_rls_isolation. Code is correct (all verbs chain through
+        _get_match_or_404 with RLS-scoped client). Test coverage gap only.
+      file: "apps/api/src/playfuel_api/tests/test_match_evaluations_routes.py"
+      fix: "Add 2 isolation tests for PATCH and DELETE verbs"
+      blocker_for_demo: false
+
     - id: SEC-FOOD-2
       severity: informational
       status: NEW (2026-04-28 food_deck_map)
@@ -210,6 +273,19 @@ security_reviewer_mental_model:
       blocker_for_demo: false
 
   # ── Files Audited (session moh9uivm3dxv, Food Deck + Map) ──────────────────
+  # ── Files Audited (session moh9uivm3dxv, Player Scouting) ─────────────────
+  audited_files_player_scouting:
+    - apps/api/src/playfuel_api/services/scouting.py
+    - apps/api/src/playfuel_api/services/llm_safety.py (contains_prohibited_phrase helper)
+    - apps/api/src/playfuel_api/services/llm.py (TemplateProvider._build_summary opponent notes section)
+    - apps/api/src/playfuel_api/models/api.py (PlayerCreate/Update/NoteCreate model_config=_CAMEL)
+    - apps/api/src/playfuel_api/routes/plans.py (fetch_opponent_notes wiring at :258)
+    - db/supabase/migrations/0010_players_and_notes.sql (RLS policies, FK targets)
+    - apps/api/src/playfuel_api/tests/test_scouting_sanitization.py
+    - apps/api/src/playfuel_api/tests/test_players_routes.py
+    - apps/api/src/playfuel_api/tests/test_player_notes_routes.py
+    - apps/api/src/playfuel_api/tests/test_opponent_notes_in_plan.py
+
   audited_files_food_deck_map:
     - apps/ios/PlayFuel/Sources/PlayFuel/Views/FoodOptionDeck.swift
     - apps/ios/PlayFuel/Sources/PlayFuel/Views/Sheets/FoodOptionDetailSheet.swift
@@ -281,6 +357,49 @@ security_reviewer_mental_model:
         Force-unwrap-after-filter pattern (option.lat! after filter for non-nil lat) is
         acceptable in SwiftUI ForEach bodies when the filter and unwrap are co-located.
         Risk: if filter is removed or condition changes, crash. Flag as ⚪ to track.
+    - date: "2026-04-28"
+      note: >
+        Player scouting sanitization audit: the order strip→truncate→scan is security-critical.
+        Truncating BEFORE stripping URLs can let a partial fragment (e.g. 'https://x') slip
+        through the 200-char boundary. scouting.py gets this right. Add to code-review checklist:
+        verify order is always strip→truncate→scan.
+    - date: "2026-04-28"
+      note: >
+        New archetype: validate_explanation needs a verbatim-note-reproduction check before
+        any real LLM provider ships. The TemplateProvider is safe because it only uses the count,
+        but an Anthropic/OpenAI model that quotes body_paraphrasable verbatim would pass all
+        existing checks (since redaction already ensured no §C phrase). SEC-SCOUT-1 tracks this.
+    - date: "2026-04-28"
+      note: >
+        Pydantic camelCase rule confirmed critical: all request-body models (Create/Update/Input)
+        MUST have model_config = _CAMEL. Verified in models/api.py at PlayerCreate:399,
+        PlayerUpdate:409, PlayerNoteCreate:434, PlayerNoteUpdate:443 — all correct.
+        This is now a mandatory code-review checklist item; without it iOS gets 422 on every call.
+    - date: "2026-04-28"
+      note: >
+        Post-match eval auto-note loop: the key design rule is raw-body-at-storage,
+        sanitize-at-LLM-input. This separation is correct and intentional — the parent's
+        authentic words are preserved in player_notes.body; privacy protection fires at the
+        last responsible moment (plan gen) via scouting.py. When reviewing new features that
+        store parent-authored text, verify they do NOT call sanitize_note_for_llm at write time.
+    - date: "2026-04-28"
+      note: >
+        New SELECT-then-INSERT/UPDATE idempotency pattern in post_match_sync.py is correct
+        for MVP but lacks DB-level enforcement. Any service that needs true idempotency should
+        have a UNIQUE partial index to back up the application-layer check. SEC-EVAL-1 tracks this.
+        Pattern: app-layer dedup is necessary but insufficient; DB constraint is the backstop.
+
+  # ── Files Audited (session moh9uivm3dxv, Post-Match Eval) ─────────────────
+  audited_files_post_match_eval:
+    - apps/api/src/playfuel_api/services/post_match_sync.py (idempotency key, raw-body storage)
+    - apps/api/src/playfuel_api/routes/match_evaluations.py (4 endpoints, RLS enforcement)
+    - apps/api/src/playfuel_api/models/api.py (MatchEvalCreate/Update/Evaluation model_config=_CAMEL)
+    - apps/api/src/playfuel_api/services/llm_safety.py (contains_prohibited_phrase carry-through)
+    - apps/api/src/playfuel_api/services/scouting.py (sanitization chain at plan-gen time)
+    - db/supabase/migrations/0011_match_evaluations.sql (RLS policies, INSERT chain-check)
+    - apps/api/src/playfuel_api/tests/test_post_match_sync.py (10 sync tests)
+    - apps/api/src/playfuel_api/tests/test_match_evaluations_routes.py (26 route tests)
+    - apps/api/src/playfuel_api/routes/__init__.py (router mount verified via routers list)
 
   # ── Files Audited (session moh9uivm3dxv, Nutrition-First IA) ─────────────
   audited_files_nutrition_ia:

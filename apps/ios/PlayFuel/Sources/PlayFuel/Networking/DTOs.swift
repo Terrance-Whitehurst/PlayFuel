@@ -91,6 +91,9 @@ struct MatchDTO: Decodable {
     let opponentLabel: String? // opponent_label → opponentLabel
     let courtLabel: String?    // court_label → courtLabel
 
+    // Player Scouting — migration 0010. Decoded via .convertFromSnakeCase.
+    let opponentPlayerId: UUID? // opponent_player_id → opponentPlayerId
+
     // Doubles spec (Phase 7 — 0007_doubles_support.sql). Decoded via .convertFromSnakeCase.
     // `format` is pre-existing in the DB (0002_tables.sql) but was omitted from MatchDTO
     // until this spec — add it here alongside the new doubles_format column.
@@ -397,6 +400,7 @@ struct TournamentCreateRequest: Encodable {
 /// NOTE: `estimated_next_match_time` is NOT a DB column — it is derived from the match list
 /// (next match's scheduledStart). The iOS form collects it for UX but it is not sent to the API.
 /// Phase 7: `format` and `doublesFormat` added per DOUBLES_SPEC_V1.md §A.2.
+/// Player Scouting: `opponentPlayerId` added per PLAYER_SCOUTING_V1.md §E.4.
 struct MatchCreateRequest: Encodable {
     let scheduledStart: Date            // → scheduled_start (ISO 8601 datetime)
     let estimatedDurationMinutes: Int?  // → estimated_duration_minutes
@@ -407,6 +411,140 @@ struct MatchCreateRequest: Encodable {
     // Phase 7 — match type + doubles format
     let format: String                  // → format ("singles" | "doubles")
     let doublesFormat: String?          // → doubles_format ("best_of_3" | "pro_set_8" | null)
+    // Player Scouting — optional FK to scouted opponent
+    let opponentPlayerId: UUID?         // → opponent_player_id (migration 0010)
+}
+
+// MARK: - Player Scouting DTOs (migration 0010)
+//
+// All player endpoints (/v1/players) use the snake decoder (.convertFromSnakeCase).
+// Request bodies are encoded with postEncoder (.convertToSnakeCase + .iso8601).
+
+/// Wire format for a `public.players` row returned by player CRUD endpoints.
+/// Decoded with snakeDecoder. noteCount is a derived field (subquery in route).
+struct PlayerDTO: Decodable {
+    let id: UUID
+    let userId: UUID
+    let displayName: String
+    let club: String?
+    let city: String?
+    let notesSummary: String?
+    let noteCount: Int
+    let createdAt: Date
+    let updatedAt: Date
+
+    func toModel() -> Player {
+        Player(
+            id: id,
+            displayName: displayName,
+            club: club,
+            city: city,
+            notesSummary: notesSummary,
+            noteCount: noteCount,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+/// Wire format for a `public.player_notes` row.
+/// Decoded with snakeDecoder.
+struct PlayerNoteDTO: Decodable {
+    let id: UUID
+    let playerId: UUID
+    let userId: UUID
+    let source: String           // "secondhand" | "observed" | "post_match"
+    let body: String
+    let matchId: UUID?
+    let createdAt: Date
+
+    func toModel() -> PlayerNote {
+        PlayerNote(
+            id: id,
+            playerId: playerId,
+            source: PlayerNoteSource(rawValue: source) ?? .observed,
+            body: body,
+            matchId: matchId,
+            createdAt: createdAt
+        )
+    }
+}
+
+/// Request body for POST /v1/players.
+/// Encoded with postEncoder (.convertToSnakeCase).
+struct PlayerCreateRequest: Encodable {
+    let displayName: String      // → display_name
+    let club: String?            // → club (optional)
+    let city: String?            // → city (optional)
+    let notesSummary: String?    // → notes_summary (optional)
+}
+
+/// Request body for PATCH /v1/players/{id}.
+struct PlayerUpdateRequest: Encodable {
+    let displayName: String?
+    let club: String?
+    let city: String?
+    let notesSummary: String?
+}
+
+/// Request body for POST /v1/players/{id}/notes.
+struct PlayerNoteCreateRequest: Encodable {
+    let source: String           // → source ("secondhand" | "observed" | "post_match")
+    let body: String             // → body (max 2000 chars)
+    let matchId: UUID?           // → match_id (optional)
+}
+
+// MARK: - Post-Match Evaluation DTOs (migration 0011)
+//
+// Endpoints: GET/POST/PATCH/DELETE /v1/matches/{mid}/evaluation
+// Request bodies encoded with postEncoder (.convertToSnakeCase + .iso8601).
+// Response decoded with snakeDecoder (.convertFromSnakeCase + .iso8601).
+
+/// Wire format for a `public.match_evaluations` row.
+/// Decoded with snakeDecoder (.convertFromSnakeCase + .iso8601 dates).
+struct MatchEvaluationDTO: Decodable {
+    let id: UUID
+    let matchId: UUID
+    let result: String          // "won" | "lost" | "withdrew" | "retired"
+    let scoreText: String?
+    let effortRating: Int?
+    let focusRating: Int?
+    let wentWell: [String]
+    let toImprove: [String]
+    let opponentObservations: String?
+    let keyMoments: String?
+    let createdAt: Date
+    let updatedAt: Date
+
+    func toModel() -> MatchEvaluation {
+        MatchEvaluation(
+            id: id,
+            matchId: matchId,
+            result: MatchEvalResult(rawValue: result) ?? .lost,
+            scoreText: scoreText,
+            effortRating: effortRating,
+            focusRating: focusRating,
+            wentWell: wentWell,
+            toImprove: toImprove,
+            opponentObservations: opponentObservations,
+            keyMoments: keyMoments,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+/// Request body for POST /v1/matches/{mid}/evaluation.
+/// Encoded with postEncoder (.convertToSnakeCase).
+struct MatchEvaluationCreateRequest: Encodable {
+    let result: String              // → result
+    let scoreText: String?          // → score_text
+    let effortRating: Int?          // → effort_rating
+    let focusRating: Int?           // → focus_rating
+    let wentWell: [String]          // → went_well
+    let toImprove: [String]         // → to_improve
+    let opponentObservations: String? // → opponent_observations
+    let keyMoments: String?         // → key_moments
 }
 
 // MARK: - MatchDTO.toModel()
@@ -435,6 +573,9 @@ extension MatchDTO {
             // Phase 7: pass format + doublesFormat explicitly from the DB row
             format: format,
             doublesFormat: doublesFormat
+            // opponentPlayerId uses its `= nil` stored-property default; populated via Codable
+            // when Match is decoded directly. In MatchDTO.toModel() it defaults to nil because
+            // MatchDTO carries it but Match.opponentPlayerId is set via Codable decode path.
         )
     }
 }

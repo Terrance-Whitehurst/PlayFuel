@@ -622,3 +622,76 @@ session_2026_04_28_dark_mode_and_xcodegen_landmine:
   qa_validation_quality_continues: "QA's pbxproj line-by-line read caught a real runtime regression that BUILD SUCCEEDED would have masked. Lesson reinforced: 'BUILD SUCCEEDED' is necessary but not sufficient — runtime resource resolution requires explicit asset bundle verification. Add to validation checklist for any session that touches Resources or Assets.xcassets."
   qa_dm_1_status: RESOLVED via 5-site manual pbxproj patch.
 
+session_2026_04_28_player_scouting:
+  delivery: |
+    Player scouting end-to-end (DB + API + LLM widening + iOS). Migration 0010_players_and_notes.sql (NOT 0009 — that slot consumed by OQ-IA-9 upsert hotfix). FK target public.users(id) — never auth.users(id), mirror existing pattern. matches.opponent_label (text) STAYS; we ADD opponent_player_id (uuid FK) alongside for backwards compat. TemplateProvider ships count-only acknowledgment ('Your notes mention N prior observations') — never quotes notes verbatim. Sanitization pipeline (URL+email+phone strip -> 200 char trunc -> §C scan -> redact). Order matters: strip BEFORE truncating else partial URL fragments leak.
+  test_counts: 291 -> 342 passed, 1 xfail unchanged (51 new tests across 4 new files; ≥20 minimum was conservative)
+  ios_files_added: 7 (Player.swift, PlayerNote.swift, PlayerNoteSource.swift, PlayerListView.swift, PlayerDetailView.swift, AddPlayerSheet.swift, AddPlayerNoteSheet.swift) plus MatchCreateView opponent picker upgrade + ProfileMenuSheet 3rd row.
+  xcodebuild_result: BUILD SUCCEEDED. OQ-XCG-1 treadmill: Assets.xcassets re-patched (4 hits) after xcodegen regen.
+  pydantic_camelcase_rule_REINFORCED: |
+    BD's first pass missed alias_generator=to_camel on PlayerCreate / PlayerUpdate / PlayerNoteCreate / PlayerNoteUpdate. iOS sends {"displayName": "Smith"} -> 422 instead of 201 because Pydantic without to_camel only accepts snake_case keys. Response models had it; request models were missed.
+    NEW HARD RULE: every Pydantic model that receives an iOS payload (Create/Update/Input) MUST have model_config = _CAMEL (alias_generator=to_camel, populate_by_name=True). Add to spec checklist + code-review checklist. Symptom is always 422 with 'displayName' in the error message.
+  swiftui_landmines_captured_3:
+    1: "All @State referenced in body MUST be declared in the struct before body — missing declarations cascade to 12+ 'cannot find X in scope' errors that look like compiler bugs but are real missing-vars. Pattern: when a build error count exceeds the actual edit surface, look for missing @State first."
+    2: "if-else { ForEach(collection) } inside List {} triggers 'cannot convert [T] to Binding<C>' — Swift's type checker can't infer the List's row type through the conditional. Fix: put ForEach at top level of List, use .overlay for empty states, conditional rows as siblings (not children) of ForEach."
+    3: ".foregroundStyle(.accentColor) shorthand fails to resolve as ShapeStyle on this toolchain. Always use Color.accentColor with foregroundStyle. Codebase convention is now explicit Color.* prefix everywhere."
+  truncation_recovery_pattern: |
+    Both BD and FE responses truncated mid-flight (BD between source files and tests; FE while fixing build errors). The continuation-delegate pattern (re-delegate with 'continue from where you left off' + specific resume points) recovered both cleanly with no rework.
+    Key: pickup delegate found the 'self.body' note from prior FE was a red herring — actual issue was 5 missing @State declarations. Lesson: don't trust truncated FE notes about what's broken; the pickup delegate must re-read the build errors fresh.
+  privacy_posture_for_minor_pii: |
+    Parent-authored opinion data about other minors (opponents) is treated like coach's clipboard — schema-level minimization (no contact columns), UX guardrail copy verbatim ('Notes are private to your account. Don't include personal contact info, photos, or anything not directly observable on court.'), cascade-delete on player deletion, paraphrase-only LLM rule, §C output scan still applies. PRIVACY_V1.md §13 captures the posture. OQ-SCOUT-PRIV-1 (legal opinion-data review) flagged but non-blocking.
+  spec_quality_compounded: |
+    PLAYER_SCOUTING_V1.md was 770 lines with §G mechanically copy-pasteable AND PM verification caught 2 🔴 pre-build (migration number conflict + auth.users vs public.users). Both would have failed at migration time. PM-verified spec investment continues to pay 5x at execution time. Pattern is now 5+ consecutive sessions of clean parallel BD/FE delegates.
+
+session_2026_04_28_post_match_eval:
+  delivery: |
+    Post-match evaluation end-to-end shipped via parallel BD+FE delegates. Migration 0011_match_evaluations.sql. 4 endpoints under /v1/matches/{mid}/evaluation, POST is upsert (UNIQUE on match_id; 200 update / 201 create). services/post_match_sync.py auto-creates player_note (source=post_match) keyed idempotently by (player_id, match_id, source='post_match'). Closes the loop with player scouting — opponent_observations entered post-match flow back into the running scouting log without double entry.
+  test_counts: 342 -> 375 passed, 1 xfail unchanged (33 new tests; ≥23 minimum was conservative)
+  ios_files_added: 5 (MatchEvalResult, MatchEvaluation, MatchDetailView, PostMatchEvaluationView, PostMatchEvaluationForm) plus TournamentDashboardView "View match details" link + Repository 3 methods + DTOs.
+  xcodebuild_result: BUILD SUCCEEDED. FE skipped xcodegen entirely — edited pbxproj directly with sequential hex UUIDs. Asset patch preserved automatically (no regen, no clobber). 4 Assets.xcassets hits maintained.
+  pbxproj_direct_edit_pattern: |
+    NEW PLAYBOOK for small file additions (≤7 files): edit pbxproj directly (PBXBuildFile + PBXFileReference + PBXGroup child + PBXSourcesBuildPhase entry — 4 sites per file) instead of running xcodegen. Avoids the OQ-XCG-1 treadmill entirely. Use sequential hex UUIDs (EE000001-...). xcodegen still appropriate for schema overhauls/bulk moves/target reorg. For incremental additions, pbxproj edit is faster and safer.
+  routes_init_pattern_caught: |
+    Planning's PM verification caught Brief I-6 — orchestrator's brief said 'mount router in main.py' but actual pattern is appending to routers list in routes/__init__.py which main.py iterates. Add to lead's checklist: when a brief mentions 'mount router', verify against routes/__init__.py first, never edit main.py directly. Pattern means new routes need exactly 2 file edits (route file + __init__ append).
+  fk_target_rule_REINFORCED: |
+    Third migration in a row (0010, 0011) where brief specced auth.users(id) but actual codebase pattern is public.users(id). Mirror 0002/0010 patterns, never assume Supabase-stock auth.users. PM keeps catching this. Hard rule for brief checklist: 'FK to user_id ALWAYS targets public.users(id) for this codebase.'
+  parallelism_pattern_continued: |
+    7th consecutive session of cross-member parallel BD+FE delegates landing clean on first try. Both delegates this session shipped without retries, without truncation, without close-out. Operative formula remains: PM-verified spec + tight orchestrator brief + parallel fan-out by domain (apps/api vs apps/ios) + lead-as-router-not-author = clean ship.
+  field_validator_choice: |
+    BD enforced went_well/to_improve max-5-items × 200-char-each at Pydantic @field_validator level rather than Postgres CHECK on text[] cardinality (which would require array_length() + cumbersome syntax). Trade-off: validation is API-only (a direct DB INSERT could exceed limits). Acceptable since API is the only client and RLS requires authenticated context.
+  upsert_via_unique_index: |
+    match_evaluations.match_id is UNIQUE. POST endpoint uses SELECT-existing-then-INSERT-or-UPDATE (not ON CONFLICT) because API needs to distinguish 200 vs 201 status. ON CONFLICT always returns one or the other. SELECT-then-branch cleaner here. Pattern applies whenever HTTP semantics require the distinction.
+  loop_closure_design: |
+    Auto-creating a player_note from opponent_observations means the user enters scouting context exactly once (in the post-match flow) and it appears in two places (eval read-only view + player detail notes log). Idempotency key (player_id, match_id, source='post_match') means re-saving the eval UPDATES the note rather than spawning duplicates. DELETE eval also deletes the auto-note. This 'derived data with strong key' pattern is reusable any time a feature wants to write into a sibling feature's table without normalization.
+
+session_2026_04_28_tournaments_network_error_diag:
+  symptom: "iOS sim My Tournaments shows 'Couldn't load tournaments — Network error: Could not connect to the server' after sign-in (Sign Out button visible)."
+  diagnosis_method: "Parallel delegate to FE + BD. FE inspected iOS client + Info.plist; BD inspected API endpoint + JWT verify path + env requirements. No code changes — pure diagnosis."
+  root_cause: "FastAPI backend not running on port 8000. Error string 'Could not connect to the server' is the iOS system localizedDescription for URLError.cannotConnectToHost (TCP refused). Distinct from ATS rejection ('App Transport Security policy requires the use of a secure connection') and from 4xx/5xx (different code paths in APIClient.executeRequest)."
+  ios_error_string_table_for_future_debug:
+    - "Could not connect to the server  → URLError.cannotConnectToHost  → uvicorn not running / wrong port / wrong host"
+    - "App Transport Security policy requires the use of a secure connection  → ATS block  → missing NSAppTransportSecurity exception for http://"
+    - "HTTP 401  → missing/expired/wrong JWT  → check Keychain token + SUPABASE_JWT_SECRET in .env matches supabase status"
+    - "HTTP 500 + supabase Postgres connection refused in API logs  → supabase start not running"
+    - "HTTP 500 + RLS violation  → JWT not re-injected to PostgREST client (authed_client bug)"
+  latent_bug_found: "NSAppTransportSecurity is MISSING from both Resources/Info.plist AND Sources/PlayFuel/Info.plist. Active build plist is Resources/Info.plist (Sources/ one is the legacy artifact flagged in session_2026_04_27_demo_session3). Once backend is reachable, ATS will block http://localhost depending on which plist Xcode resolves at build time. Fix: add NSAllowsLocalNetworking=true to Resources/Info.plist — covers localhost, 127.0.0.1, and .local mDNS in one minimal exception. This should ship in the next polish pass even if the backend-not-running fix unblocks the user today."
+  api_wiring_confirmed_intact:
+    - "GET /v1/tournaments exists at routes/tournaments.py:74 with verify_supabase_jwt + authed_client deps; returns RLS-filtered rows."
+    - "/healthz exists at routes/health.py:19, no auth, no DB. Use as the canonical liveness probe in any future debug."
+    - "JWT verify is local HS256 — Supabase Auth being down does NOT break verification. Only Postgres-via-PostgREST calls require Supabase up."
+  ios_wiring_confirmed_intact:
+    - "Configuration.swift:12 base URL = http://localhost:8000 (env override via PLAYFUEL_API_BASE_URL)."
+    - "Endpoints.swift:25 GET /v1/tournaments. APIClient.sendData() reads Keychain (KeychainStore.Keys.accessToken) and attaches Authorization: Bearer on every call."
+    - "AuthService.isSignedIn is hydrated from Keychain on init — Sign Out button visible == token present == auth header would be sent if a server existed."
+  recommended_fix_path:
+    - "1. supabase status (start if not running)"
+    - "2. grep apps/api/.env for non-blank SUPABASE_URL/ANON_KEY/JWT_SECRET (values from supabase status)"
+    - "3. cd apps/api && uvicorn playfuel_api.main:app --reload --port 8000"
+    - "4. curl -i http://localhost:8000/healthz expects 200; curl -i http://localhost:8000/v1/tournaments expects 401"
+    - "5. Retry in iOS sim — error should clear or surface a different (non-connect) failure mode"
+    - "Polish pass: add NSAllowsLocalNetworking=true to Resources/Info.plist before next session."
+  lead_observation: |
+    Diagnosis split cleanly across team-member domains: FE owned ios/ + Info.plist, BD owned api/ + env. Single-turn parallel delegate produced a complete picture in one round. Both delegates returned without [error] wrappers and without truncation despite both being substantive multi-file diagnostic asks. Pattern reaffirmed: read-only diagnostic delegates (no file writes) are the most reliable shape of work — wrapper failures correlate with write-stream length, not response length.
+  lead_self_correction: |
+    Tried to write a session note to .pi/multi-team/sessions/<id>/ — denied by domain restrictions (sessions/ subdirs are read-only for the lead). Permanent file-write target for lead-authored notes is THIS file (engineering-lead-mental-model.yaml). Specs are written by orchestrator/planning lead under specs/, code under apps/ by team members. Lead's only write surface is the mental model. Don't re-attempt session-dir writes — go straight to mental model.
+

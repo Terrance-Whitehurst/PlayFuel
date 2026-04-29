@@ -13,6 +13,124 @@ domain_restrictions:
   note: "QA Engineer CANNOT write to apps/. Must stage files in session dir and
          flag for Engineering/Lead to place them on disk."
 
+post_match_eval_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  verdict: Clean pass — 0 blockers
+  test_count: '375 passed, 1 xfailed — CONFIRMED (+33 new tests over prior 342)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  migration_audit:
+    file: '0011_match_evaluations.sql'
+    fk_target: 'public.users(id) — NOT auth.users. Confirmed.'
+    enum_idempotent: 'do $$ begin ... exception when duplicate_object then null; end $$'
+    match_id_unique: 'UNIQUE constraint on match_id — 1:1 eval per match'
+    check_constraints: 'score_text≤80, effort/focus BETWEEN 1 AND 5, opp_obs≤500, key_moments≤500 — ALL present'
+    rls_insert_chain: 'EXISTS (select 1 from matches m join tournaments t on m.tournament_id=t.id where m.id=match_evaluations.match_id and t.user_id=(select auth.uid()))'
+    readme_updated: 'README.md line 113 has row for 0011'
+  pydantic_camelcase:
+    MatchEvalCreate: 'line 491: model_config = _CAMEL'
+    MatchEvalUpdate: 'line 510: model_config = _CAMEL'
+    MatchEvaluation: 'line 529: model_config = _CAMEL'
+    field_validator: '@field_validator("went_well","to_improve", mode="before") on both Create (502) and Update (521) — shared _validate_eval_list helper handles None safely'
+  router_mount:
+    file: 'routes/__init__.py lines 7+19 — NOT main.py (Planning I-6 catch honored)'
+  auto_note_loop:
+    dedup_key: '(player_id, match_id, source=post_match) — SELECT-then-INSERT/UPDATE'
+    raw_body: 'No sanitize_note_for_llm call in post_match_sync.py — sanitize at LLM input time only'
+    skip_conditions: 'no opp_player_id → skip; observations None/empty/whitespace → skip'
+    delete_sync: 'delete_post_match_note() exported helper; called from DELETE endpoint'
+  test_counts:
+    routes: '22 named tests (Engineering reported 26; actual 22; both ≥15 minimum)'
+    sync: '11 named tests (Engineering reported 7; actual 11; both ≥8 minimum)'
+    total: '33 (matches Engineering total)'
+  ios_surface:
+    five_files_confirmed: 'MatchEvalResult(44L), MatchEvaluation(63L), MatchDetailView(228L), PostMatchEvaluationView(229L), PostMatchEvaluationForm(350L)'
+    helper_text_verbatim: 'PostMatchEvaluationForm:119 — exact §H.2 text confirmed'
+    three_state_flow: 'loading→ProgressView; null→emptyEvalCTA; eval→PostMatchEvaluationView+Edit closure'
+    match_detail_gating: 'showMatchDetail button inside planContent — only when envelope loaded; .sheet presentation'
+    fake_data_hex_clean: 'dallasMatchEval UUID EE000001-... (E,0 are valid hex); §C spot-check clean'
+  uuid_hex_audit: '0 hits across entire iOS Sources tree'
+  pbxproj_counts:
+    per_file: '4 hits each for all 5 new files (CC0017-CC0021 UUID series)'
+    assets_xcassets: '4 hits — patch preserved'
+    direct_edit_pattern: 'CONFIRMED — no xcodegen run; Assets.xcassets undisturbed; UUIDs CC0017CC... (all valid hex digits C,0,1,2,7)'
+  new_oqs:
+    - id: QA-EVAL-1
+      severity: cosmetic
+      title: 'Engineering test count distribution discrepancy (22+11 vs reported 26+7)'
+      detail: 'Total 33 correct; both minimums met; no impact'
+    - id: QA-EVAL-2
+      severity: cosmetic
+      title: 'Save button always enabled — result defaults to .lost (not nil-gated)'
+      detail: 'Functionally equivalent to spec; picker always has a selection'
+    - id: UX-EVAL-1
+      severity: cosmetic
+      title: 'Auto-note loop is invisible to parent — no confirmation toast'
+      detail: 'Feature works; just not surfaced. Toast "Added to [Name] scouting log" would close the loop visibly'
+
+key_patterns_from_post_match_eval:
+  - 'Direct-edit pbxproj beats xcodegen regen for ≤7-file additions — Assets.xcassets patch not disturbed when xcodegen never runs. New playbook confirmed.'
+  - 'Engineering test distribution can differ from reported while total is correct — always grep ^def test_ for ground truth'
+  - 'text[] columns: Postgres has no DDL array-length constraint — always enforce at API layer via Pydantic @field_validator'
+  - 'Idempotency for auto-generated child rows: SELECT-then-INSERT/UPDATE pattern when parent table has no UNIQUE index on the dedup key'
+  - 'RLS INSERT chain-check: check both user_id = auth.uid() AND EXISTS(match→tournament ownership) to block cross-user match_id injection'
+  - 'Graceful fallback for missing Plan fields (roundLabel/opponentLabel): "Match #N" prevents crash; add to pre-App-Store follow-up backlog'
+
+player_scouting_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  verdict: Clean pass — 0 blockers
+  test_count: '342 passed, 1 xfailed — CONFIRMED (+51 new tests over prior 291)'
+  eval_harness: exit 0, 4 PASS, 1 XFAIL
+  migration_audit:
+    file: '0010_players_and_notes.sql (NOT 0009 — slot consumed by OQ-IA-9)'
+    fk_target: 'public.users(id) — NOT auth.users(id). Confirmed on disk.'
+    enum_idempotent: 'DO $$ ... EXCEPTION WHEN duplicate_object THEN null; END $$'
+    check_constraint: 'char_length(body) <= 2000 on player_notes.body'
+    opponent_label_preserved: 'comment confirms existing text col stays; only opponent_player_id added'
+    rls_players: '4 policies, (select auth.uid()) = user_id parenthesized form'
+    rls_player_notes: '4 policies, chain-through EXISTS (select 1 from players p where p.id = player_notes.player_id and p.user_id = (select auth.uid()))'
+    readme_updated: 'README.md line 112 has row for 0010'
+  pydantic_camelcase_fix_confirmed:
+    PlayerCreate: 'line 399: model_config = _CAMEL'
+    PlayerUpdate: 'line 409: model_config = _CAMEL'
+    PlayerNoteCreate: 'line 434: model_config = _CAMEL'
+    PlayerNoteUpdate: 'line 443: model_config = _CAMEL'
+    lesson: 'EVERY Pydantic Create/Update model receiving iOS payloads needs model_config = _CAMEL; response models had it, request models were missed first pass'
+  api_surface:
+    router_mount: 'routes/__init__.py lines 11,17 — players_router in routers list; main.py iterates routers'
+    endpoints: '9 confirmed (GET/POST /v1/players + 3 on /{pid} + GET/POST /v1/players/{pid}/notes + 2 on /notes/{nid})'
+    edit_24h: '_NOTE_EDIT_WINDOW = timedelta(hours=24) at line 46; check at line 366'
+    match_ownership: 'POST note with match_id: RLS-scoped match fetch; 404 if not owned'
+    opponent_player_id_validation: '_validate_opponent_player_id() at line 91; called on create (line 153) + update (line 200)'
+  sanitization:
+    order: 'URL → email → phone strip → 200-char truncate → §C scan → redact'
+    note_cap: '.limit(5) at scouting.py:120'
+    contains_prohibited_phrase: 'extracted as public helper at llm_safety.py:91'
+    combined_attack_test: 'test_sanitize_combined_attack_redacted — email+prohibited phrase → None'
+    all_redacted_safe: 'TemplateProvider: if notes: — empty list (all redacted) → no phrase; functionally safe'
+  rls_isolation_tests:
+    players: 'test_list_players_rls_isolation (line 95) — mock returns [] for other-user player → 404'
+    player_notes: 'test_create_note_with_match_id_not_owned (line 165) — match not owned → 404'
+  llm_template:
+    phrase: '"Your notes mention N prior observation(s) — review the player profile for tactics."'
+    singular_plural: 'word = "observation" if n==1 else "observations" — TESTED'
+    never_quotes_verbatim: 'test_note_body_never_quoted_verbatim confirms body text absent from summary'
+    all_redacted_no_phrase: 'if notes: guard — empty list → no phrase appended'
+  ios_surface:
+    seven_files_confirmed: 'Player.swift(24L), PlayerNote.swift(23L), PlayerNoteSource.swift(21L), PlayerListView.swift(220L), PlayerDetailView.swift(224L), AddPlayerSheet.swift(136L), AddPlayerNoteSheet.swift(133L)'
+    profile_menu_third_row: 'person.2.fill at line 64, showPlayers state at line 16, .sheet at line 96-98'
+    privacy_helper_verbatim: 'AddPlayerNoteSheet: exact §A.2 text confirmed in body'
+    match_create_both_fields: 'opponentPlayerId at line 234, opponentLabelText at line 235 — BOTH written on select'
+    fake_data: '4 Players + 6 PlayerNotes; ABAB/BABA UUID prefixes (valid hex A,B); §C spot-check clean'
+  uuid_hex_audit: '0 non-hex UUID literal hits across entire iOS Sources tree'
+  pbxproj_counts: 'All 7 new files: 4 hits each; Assets.xcassets: 4 hits (OQ-XCG-1 hotfix preserved)'
+  new_oqs:
+    - id: QA-SCOUT-1
+      severity: cosmetic
+      title: 'No dedicated test for all-notes-redacted path → 0 valid notes → no phrase'
+      detail: 'Functionally safe (if notes: guard). Add parametrized case pre-TestFlight.'
+
 task5_qa_pass:
   session: mogfjh9hslqr
   status: COMPLETE (QA pass) / BLOCKED (file write)
@@ -199,6 +317,37 @@ demo_readiness_report_written:
     - "Set LLM_PROVIDER=template in apps/api/.env"
     - "Resolve timeline event count (extend build_timeline OR narrate around 3-event limit)"
     - "Fill DEVELOPMENT_TEAM in project.yml for on-device run"
+
+auto_gen_and_history_dashboard_validation:
+  session: moh9uivm3dxv
+  status: COMPLETE
+  verdict: Clean pass — 0 blockers
+  test_count: '291 passed, 1 xfailed — UNCHANGED'
+  auto_gen_flow:
+    task_modifier: '.task(id: tournament.id) at TournamentDashboardView:93 — re-fires on tournament switch + first appear'
+    generate_call: 'AppState.generatePlan(for: tournament.id) at lines 96-99'
+    load_states: 'idle/loading → ProgressView; failed → errorView with Retry; loaded → envelopeContent'
+    stale_reset: 'selectedMatchType = .singles + selectedMatchId = nil before generate call'
+  new_files:
+    TournamentHistoryEntry: 'Identifiable+Hashable+Codable; 10 fields including highlights:[String]'
+    FakeHistoryData: '10 entries; daysAgo() helper uses Calendar.current (no hardcoded year); spans ~24 weeks back'
+    DashboardView: 'NavigationStack + month switcher + CalendarMonthGrid + date/recent section + sheet(item: $selectedEntry)'
+    CalendarMonthGrid: '7-col LazyVGrid + weekday header + DayGridCell with dot + selected circle + today ring; pure SwiftUI only'
+    TournamentHistoryDetailSheet: '5 sections (header/result/highlights/notes/location); highlights+notes conditionally rendered; presentationDetents at call site'
+  profile_menu_dashboard_row: 'Now live Button — showDashboard = true; .sheet presentationDetents([.large])'
+  safety_audit_fakehistory: '0 prohibited phrases from §C in FakeHistoryData notes'
+  assets_hotfix_preserved: 'Assets.xcassets = 4 pbxproj hits; PBXResourcesBuildPhase 3 entries; UUIDs AA0000AA0000AA0000AA0001-0004 = 8 hits'
+  new_oqs:
+    - id: OQ-DM-WEEKEND
+      severity: cosmetic
+      title: 'FakeHistoryData dates are daysAgo(N) from today — not guaranteed to land on weekends'
+      detail: 'User said "every weekend." Demo-safe. Post-demo: snap daysAgo() output to nearest Saturday/Sunday.'
+  key_patterns:
+    - '.task(id:) is the correct SwiftUI modifier for re-firing async work on dependency change; fire+forget pattern with idempotent backend call is safe'
+    - 'For dummy data: spread dates using daysAgo() helper with Calendar.current — portable across years, no hardcoded constants'
+    - 'CalendarMonthGrid pattern: leadingEmptyCells = calendar.component(.weekday, from: firstDayOfMonth) - 1 (Sunday=1, so Sunday-first grid needs 0 leading cells)'
+    - 'TournamentHistoryDetailSheet: conditional sections (highlights+notes) guard on isEmpty — prevents empty section headers'
+    - 'DashboardView: markedDatesInDisplayedMonth filters history by month granularity to compute calendar dots'
 
 profile_popout_validation:
   session: moh9uivm3dxv

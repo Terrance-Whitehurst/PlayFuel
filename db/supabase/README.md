@@ -108,6 +108,9 @@ Migrations **must** be applied in filename order:
 | `0006_plan_llm_summary.sql` | Adds nullable `llm_summary` jsonb column to `public.plans` for Phase 6 LLM explanation layer (Phase 6) |
 | `0007_doubles_support.sql` | Adds nullable `doubles_format` text column to `public.matches` and nullable `match_type` text column to `public.plans` for doubles-spec extension (DOUBLES_SPEC_V1.md) |
 | `0008_per_match_plans.sql` | Adds nullable `match_id` uuid FK column to `public.plans` (ON DELETE CASCADE to `matches`) and a partial unique index `plans_match_id_match_type_uq` — enforces one plan per (match, match_type). Partial index excludes null match_ids (legacy rows). See NUTRITION_FIRST_IA_V1.md §E. |
+| `0009_plans_upsert_constraint.sql` | Ensures the partial unique index on `(match_id, match_type)` exists for idempotent plan upserts (resolves OQ-IA-9). |
+| `0010_players_and_notes.sql` | Creates `public.players` and `public.player_notes` tables, `player_note_source` enum, adds nullable `opponent_player_id` FK to `public.matches`. Includes RLS (8 new policies). See PLAYER_SCOUTING_V1.md §B. |
+| `0011_match_evaluations.sql` | Creates `public.match_evaluations` table, `match_eval_result` enum (`won`/`lost`/`withdrew`/`retired`), 4 RLS policies. One row per match (UNIQUE on `match_id`). Auto-syncs `opponent_observations` to `player_notes` via `services/post_match_sync.py`. See POST_MATCH_EVAL_V1.md §B. |
 
 ---
 

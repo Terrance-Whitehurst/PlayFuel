@@ -158,7 +158,7 @@ class TemplateProvider:
             subject = "Your player's tournament day"
             match_desc = f"includes {round_part}"
 
-        return (
+        summary = (
             f"{subject} at {venue} {match_desc} "
             f"scheduled to start at {time_part}. "
             f"We've prepared three scenarios—short, normal, and long—to cover "
@@ -166,6 +166,20 @@ class TemplateProvider:
             f"The normal scenario (~{friendly_duration(normal_min)}) is used as the primary planning reference."
             f"{heat_note}"
         )
+
+        # Conservative opponent-notes acknowledgment (PLAYER_SCOUTING_V1.md §D.4).
+        # Count-only: never quotes note body, never reveals source.
+        # Real tactical paraphrase waits for actual LLM provider — OQ-SCOUT-LLM-1.
+        notes = getattr(inp, "opponent_notes", [])
+        if notes:
+            n = len(notes)
+            word = "observation" if n == 1 else "observations"
+            summary += (
+                f" Your notes mention {n} prior {word}"
+                f" — review the player profile for tactics."
+            )
+
+        return summary
 
     @staticmethod
     def _build_scenario_explanations(

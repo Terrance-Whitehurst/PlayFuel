@@ -7,10 +7,13 @@ import SwiftUI
 ///
 /// Rows:
 ///   1. Settings (live) — drills into SettingsView which holds the Appearance toggle
-///   2. Dashboard (placeholder) — the next planned feature; shown disabled with "Coming soon"
+///   2. Dashboard (live) — Tournament History calendar with dummy data
+///   3. Players (live) — Opponent scouting roster (PLAYER_SCOUTING_V1.md §E.1)
 struct ProfileMenuSheet: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var showSettings = false
+    @State private var showSettings  = false
+    @State private var showDashboard = false
+    @State private var showPlayers   = false
 
     var body: some View {
         NavigationStack {
@@ -34,21 +37,43 @@ struct ProfileMenuSheet: View {
                 }
                 .buttonStyle(.plain)
 
-                // Row 2: Dashboard placeholder (next feature)
-                HStack {
-                    Image(systemName: "square.grid.2x2.fill")
-                        .foregroundStyle(.gray)
-                        .frame(width: 28)
-                    VStack(alignment: .leading, spacing: 2) {
+                // Row 2: Dashboard (live — tournament history calendar)
+                Button {
+                    showDashboard = true
+                } label: {
+                    HStack {
+                        Image(systemName: "square.grid.2x2.fill")
+                            .foregroundStyle(.indigo)
+                            .frame(width: 28)
                         Text("Dashboard")
-                            .foregroundStyle(.secondary)
-                        Text("Coming soon")
-                            .font(.caption2)
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.tertiary)
                     }
-                    Spacer()
+                    .contentShape(Rectangle())
                 }
-                .opacity(0.6)
+                .buttonStyle(.plain)
+
+                // Row 3: Players — opponent scouting roster (PLAYER_SCOUTING_V1.md §E.1)
+                Button {
+                    showPlayers = true
+                } label: {
+                    HStack {
+                        Image(systemName: "person.2.fill")
+                            .foregroundStyle(.green)
+                            .frame(width: 28)
+                        Text("Players")
+                            .foregroundStyle(.primary)
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(.tertiary)
+                    }
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Profile")
@@ -61,6 +86,16 @@ struct ProfileMenuSheet: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
                     .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showDashboard) {
+                DashboardView()
+                    .presentationDetents([.large])
+                    .presentationDragIndicator(.visible)
+            }
+            .sheet(isPresented: $showPlayers) {
+                PlayerListView()
+                    .presentationDetents([.large])
                     .presentationDragIndicator(.visible)
             }
         }

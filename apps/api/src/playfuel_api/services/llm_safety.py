@@ -88,6 +88,16 @@ def _all_text_fields(exp: "PlanExplanation") -> list[str]:
     return parts
 
 
+def contains_prohibited_phrase(text: str) -> bool:
+    """Return True if any §C prohibited phrase appears in text (case-insensitive).
+
+    Public helper extracted from validate_explanation so services/scouting.py
+    can call it to redact opponent notes before they reach the LLM input.
+    """
+    lower = text.lower()
+    return any(p.lower() in lower for p in PROHIBITED_PHRASES)
+
+
 def validate_explanation(
     exp: "PlanExplanation",
     inp: "PlanExplanationInput",

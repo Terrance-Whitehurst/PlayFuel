@@ -72,6 +72,24 @@
 - **Latent contract bugs hide behind shim defaults.** `FoodOptionDTO.toModel()` had `driveTimeMinutes ?? 0` — a one-character defensive shim that masked an iOS `Int` vs Python `Optional[int]` mismatch. The shim made tests pass while hiding that null payloads would silently render "0 min drive". Closed in this delegate (OQ-FOOD-DECK-1).
 - **For data-model-widening pivots, prefer additive defaults over breaking renames.** `FoodSuggestions` field added with `default=FoodSuggestions()`; `lat`/`lng` `Optional[float]=None`. Legacy plans decode without backfill. Same pattern as the doubles `match_type` default.
 
+## 2026-04-28 — PLAYER_SCOUTING_V1.md shipped (player roster + notes + LLM widening + minor-PII privacy)
+
+- Doc at `.pi/multi-team/expertise/PLAYER_SCOUTING_V1.md` — 770 lines. Single PM delegate, single pass. Also appended PRIVACY_V1 (+95 lines, new §§2.13/2.14/13/14) and USER_STORIES (+157 lines, US-PLAYER-1..5).
+- **PM verification surfaced 2 🔴 corrections that would have failed at migration time:**
+  - **I-1 (migration number)**: brief said `0009_players_and_notes.sql`. PM grepped migrations/ and found `0009_plans_upsert_constraint.sql` already exists (the OQ-IA-9 hotfix from prior session). Corrected to `0010_players_and_notes.sql` throughout. **Lesson:** every spec that introduces a new migration must `ls db/supabase/migrations/` first — migration numbers are append-only and prior hotfix sessions consume them invisibly. Build into next spec brief by default.
+  - **I-2 (FK target)**: brief said `REFERENCES auth.users(id)`. PM read 0002_tables.sql and confirmed every existing user-scoped table (`tournaments`, `matches`, `player_profiles`) references `public.users(id)`, not `auth.users(id)`. Corrected DDL throughout. **Lesson:** the auth.users vs public.users target is project-specific (Supabase pattern is auth.users; this codebase mirrors via a public.users shadow per 0004_auth_trigger). Don't assume the Supabase-stock pattern.
+- Locked decisions all defensible: schema minimization (no email/phone/photo columns), 24h edit window on notes (typo correction without retroactive scouting rewrite), TemplateProvider ships count-only acknowledgment now (tactical paraphrase deferred to real-LLM rollout via OQ-SCOUT-LLM-1), 3rd row in ProfileMenuSheet (no app-shell rewrite).
+- Privacy posture stated clearly: SHIP with current guardrails. Parent-authored opinion data = coach's clipboard, not new ASTC category. Same posture as existing `injury_notes` field. OQ-SCOUT-PRIV-1 flagged for legal but non-blocking.
+- Sanitization pipeline (URL+email+phone strip → 200-char truncate → §C scan → redact) prevents contact data from reaching the LLM even if a parent types it in — defense-in-depth beyond UX helper text.
+
+## Lessons (this round)
+
+- **Migration-number verification is now mandatory in every spec brief.** OQ-IA-9 hotfix consumed `0009` in a prior session; my brief assumed `0009` was free. PM caught it pre-write. Reusable rule: "verify next free migration number against `ls migrations/` before scribing DDL" goes into the standard verification checklist alongside FK target.
+- **FK target verification (auth.users vs public.users) is project-specific.** Don't ship Supabase-default assumptions. PM reads 0002_tables.sql, mirrors the dominant pattern, flags any existing inconsistency.
+- **For privacy-sensitive features, lock the posture statement BEFORE the schema.** §A came first in the spec; schema columns flow from "what data minimization permits." Reversing this leaks PII columns into the schema that the privacy posture would later have to justify removing. Pattern: §A privacy → §B schema → §C API → §D LLM.
+- **Defense-in-depth for LLM input sanitization beats trust-the-input.** Even with UX helper text saying "don't include contact info," the sanitization pipeline strips URLs/emails/phones server-side. Two layers, both cheap, no user friction. Same posture as the §C prohibited-phrase scan on LLM output (already shipped).
+- **Cross-spec self-correction continues:** PRIVACY_V1's existing `injury_notes` field gave me a direct precedent for the privacy posture statement (parent-authored child data, freeform, no medical-claim risk because LLM output is §C-scanned). Cite the precedent rather than reinvent the justification.
+
 ## Open patterns to watch
 
 - The "second delegate goes silent" pattern (FE2/BE2/BE1, plus EL3 once) is now confirmed at the *member-and-lead-per-session* level. My team (PM, UX) only used 1 delegate this session — if Task #12 needed iteration I would've burnt the second delegate. Don't iterate; author offline, then scribe.

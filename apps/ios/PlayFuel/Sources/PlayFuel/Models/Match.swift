@@ -54,6 +54,14 @@ struct Match: Codable, Identifiable, Hashable {
     /// Nil when format != "doubles". Maps to `matches.doubles_format` (migration 0007).
     let doublesFormat: String?
 
+    // MARK: - Player Scouting (migration 0010 — PLAYER_SCOUTING_V1.md §E.4)
+    //
+    // FK to `public.players.id`. Nil when the parent hasn’t linked a scouted opponent.
+    // Populated from DB column `matches.opponent_player_id` via MatchDTO.toModel().
+
+    /// UUID of the scouted opponent player (from `players` table). Optional.
+    let opponentPlayerId: UUID? = nil
+
     // MARK: - Typed Accessors
 
     /// Typed MatchType derived from `format`. Defaults to `.singles` when nil

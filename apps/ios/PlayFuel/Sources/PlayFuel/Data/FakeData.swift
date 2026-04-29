@@ -655,4 +655,132 @@ enum FakeData {
             return nil
         }
     }
+
+    // MARK: - Fake Players (Player Scouting — PLAYER_SCOUTING_V1.md §G.18)
+    //
+    // Preview-only player data. UUIDs are hex-only (no G-Z letters).
+    // Safety: no §C prohibited phrases in any note body.
+
+    static let fakePlayers: [Player] = [
+        Player(
+            id: UUID(uuidString: "ABAB0001-0000-0000-0000-000000000001")!,
+            displayName: "J. Smith",
+            club: "Dallas Tennis Academy",
+            city: "Dallas, TX",
+            notesSummary: "Strong forehand, weak second serve",
+            noteCount: 3,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 14),
+            updatedAt: Date(timeIntervalSinceNow: -86400 * 2)
+        ),
+        Player(
+            id: UUID(uuidString: "ABAB0002-0000-0000-0000-000000000002")!,
+            displayName: "M. Garcia",
+            club: "Plano TC",
+            city: "Plano, TX",
+            notesSummary: "Baseline player, consistent",
+            noteCount: 2,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 30),
+            updatedAt: Date(timeIntervalSinceNow: -86400 * 5)
+        ),
+        Player(
+            id: UUID(uuidString: "ABAB0003-0000-0000-0000-000000000003")!,
+            displayName: "A. Patel",
+            club: nil,
+            city: "Frisco, TX",
+            notesSummary: nil,
+            noteCount: 1,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 7),
+            updatedAt: Date(timeIntervalSinceNow: -86400 * 7)
+        ),
+        Player(
+            id: UUID(uuidString: "ABAB0004-0000-0000-0000-000000000004")!,
+            displayName: "C. Reeves",
+            club: "Allen TC",
+            city: "Allen, TX",
+            notesSummary: "Serve-and-volley, net pressure",
+            noteCount: 0,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 3),
+            updatedAt: Date(timeIntervalSinceNow: -86400 * 3)
+        )
+    ]
+
+    static let fakePlayerNotes: [PlayerNote] = [
+        // Notes for J. Smith
+        PlayerNote(
+            id: UUID(uuidString: "BABA0001-0000-0000-0000-000000000001")!,
+            playerId: UUID(uuidString: "ABAB0001-0000-0000-0000-000000000001")!,
+            source: .secondhand,
+            body: "Coach mentioned he hits a big crosscourt forehand, likes to open the court before going down the line. Tends to get tight on second serve when down a break.",
+            matchId: nil,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 14)
+        ),
+        PlayerNote(
+            id: UUID(uuidString: "BABA0002-0000-0000-0000-000000000002")!,
+            playerId: UUID(uuidString: "ABAB0001-0000-0000-0000-000000000001")!,
+            source: .observed,
+            body: "Watched his match at North Texas Classic. Footwork looked off in the second set — may have been tired. Double-faulted twice when serving to stay in the set.",
+            matchId: nil,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 10)
+        ),
+        PlayerNote(
+            id: UUID(uuidString: "BABA0003-0000-0000-0000-000000000003")!,
+            playerId: UUID(uuidString: "ABAB0001-0000-0000-0000-000000000001")!,
+            source: .post_match,
+            body: "We played him in QF. He came to net well but we had success lobbing over his backhand side. His backhand volley break down under pressure.",
+            matchId: UUID(uuidString: "AAAA0001-0000-0000-0000-000000000001")!,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 2)
+        ),
+        // Notes for M. Garcia
+        PlayerNote(
+            id: UUID(uuidString: "BABA0004-0000-0000-0000-000000000004")!,
+            playerId: UUID(uuidString: "ABAB0002-0000-0000-0000-000000000002")!,
+            source: .secondhand,
+            body: "Very consistent off both wings. Rarely misses in the middle of a rally — has to be pushed wide to create errors. Patient from the baseline.",
+            matchId: nil,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 30)
+        ),
+        PlayerNote(
+            id: UUID(uuidString: "BABA0005-0000-0000-0000-000000000005")!,
+            playerId: UUID(uuidString: "ABAB0002-0000-0000-0000-000000000002")!,
+            source: .post_match,
+            body: "Tight match, went to tiebreak. She handled high-ball kick serves well but struggled with flat wide serves to the ad side. Remember that for next time.",
+            matchId: nil,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 5)
+        ),
+        // Note for A. Patel
+        PlayerNote(
+            id: UUID(uuidString: "BABA0006-0000-0000-0000-000000000006")!,
+            playerId: UUID(uuidString: "ABAB0003-0000-0000-0000-000000000003")!,
+            source: .observed,
+            body: "Watched him play at Frisco Open. Good movement, likes inside-out forehand. Backhand can break down on high balls to that side — worth testing with heavy topspin.",
+            matchId: nil,
+            createdAt: Date(timeIntervalSinceNow: -86400 * 7)
+        )
+    ]
+
+    // MARK: - Match Evaluations (POST_MATCH_EVAL_V1.md §G item 19)
+    //
+    // Dummy evals for preview blocks. Hex-only UUIDs (sequential EE-pattern).
+    // Safety check: no §C prohibited phrases in any text field.
+
+    static let dallasMatchEval = MatchEvaluation(
+        id: UUID(uuidString: "EE000001-0000-0000-0000-000000000001")!,
+        matchId: UUID(uuidString: "AAAA0000-0000-0000-0000-000000000001")!,
+        result: .won,
+        scoreText: "6-4, 7-5",
+        effortRating: 4,
+        focusRating: 5,
+        wentWell: [
+            "First-serve percentage held above 65% throughout",
+            "Stayed composed on break-point pressure at 4-4 in the second set"
+        ],
+        toImprove: [
+            "Net approach timing after a short ball needs work",
+            "Second-serve placement drifted wide in games 7-8"
+        ],
+        opponentObservations: "Strong crosscourt forehand but backhand breaks down when pushed wide to the ad side with heavy topspin. Came to net confidently after a short ball but lob recovery was slow.",
+        keyMoments: "Saved two break points at 4-4 with back-to-back first-serve winners. Broke in game 11 with a return winner down the line.",
+        createdAt: Date(timeIntervalSinceNow: -3600 * 4),
+        updatedAt: Date(timeIntervalSinceNow: -3600 * 4)
+    )
 }
