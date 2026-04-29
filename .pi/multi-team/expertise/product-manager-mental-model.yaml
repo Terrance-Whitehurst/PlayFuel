@@ -1,5 +1,5 @@
 project: PlayFuel (Junior Tennis Tournament Assistant)
-last_updated: "2026-04-28T-food-deck-and-map-spec"
+last_updated: "2026-04-28T-post-match-eval-spec"
 
 positioning:
   one_sentence: "iPhone app for junior tennis parents — schedule-aware, weather-aware, food-aware tournament-day planner."
@@ -186,6 +186,10 @@ observations:
     note: 'Spec cadence: DOUBLES_SPEC_V1 (matches.format reuse catch), NUTRITION_FIRST_IA_V1 (plans.match_id non-existence catch), HEADER_BUBBLES_V1 (PlanExplanation has no scenario-explanation field catch). Three specs, three real bugs caught via pre-scribe verification. Pattern is reliable: always verify model fields exist before scribing content that references them.'
   - date: "2026-04-27"
     note: 'Dashboard evolution: weather demoted from #2 to #8 compact pill (IA pivot), then fully removed from scroll to bubble (Phase 8.1). EmergencyBanner demoted to 1-line EmergencyStrip on dashboard — banner kept in code for previews. PlanSummaryCard removed from scroll — bubble only. QA-IA-1 fixed: EmergencyStrip now hoisted above Picker in envelopeContent().'
+  - date: "2026-04-28"
+    note: 'PLAYER_SCOUTING_V1.md authored. Critical PM verification finds: (1) migration 0009 already exists — corrected to 0010; (2) FK target must be public.users(id) not auth.users(id) — existing tables confirmed; (3) opponent_label confirmed present in 0005_match_labels.sql; (4) player_note_source enum no collision with 0001 enums. Privacy posture: ship with guardrails (parent-authored opinion data = coach clipboard; no new ASTC category). 5 user stories added (US-PLAYER-1..5). Pattern: always check migration number sequence before speccing DDL.'
+  - date: "2026-04-28"
+    note: 'POST_MATCH_EVAL_V1.md authored. Migration 0011 confirmed free (ls verified). Critical I-6 catch: brief said "mount in main.py" but actual pattern is routes/__init__.py routers list — main.py iterates it, never imports directly. I-10 catch: Plan response does NOT carry roundLabel/opponentLabel — MatchDetailView falls back to "Match N" for MVP; flagged as OQ-EVAL-UX-2. I-9 catch: MatchCreateView already has player-scouting state from prior delegate — no rework needed. field_validator needed on text[] fields for item count (max 5) and per-item length (max 200) — DB has no array length constraint in DDL. No-edit-window decision locked: match evals are journaling, not scouting records. Auto-note loop: sync_player_note_from_eval keyed on (player_id, match_id, source=post_match). 4 user stories added (US-EVAL-1..4). Privacy posture: opponent_observations flows under existing §13 OUC posture — no new ASTC category.'
   - date: "2026-04-28"
     note: 'FOOD_DECK_AND_MAP_V1.md authored (Phase 8.3). 8 PM-verification findings caught by pre-scribe disk read: (1) RawPlace has no lat/lng — must add to dataclass; (2) FoodOption Pydantic has no lat/lng — must add; (3) iOS driveTimeMin is Int (non-optional) vs Python Optional[int] — latent decode-fail bug, fixed by widening to Int?; (4) Starbucks absent from FakeData.dallasFoodOptions despite user request; (5) food.py fast_casual_bowl template diverges from §F.3 doc — food.py is authoritative; (6) HeaderBubbleRow signature widening needed for tournament: Tournament; (7) FoodOptionDTO.toModel uses ?? 0 hardcode for driveTimeMin; (8) PlanExplanation.scenario_explanations DOES exist (Planning Lead was wrong in HEADER_BUBBLES §J). Pattern is reliable — fifth spec, eighth real bug caught via pre-scribe verification.'
   - date: "2026-04-27"

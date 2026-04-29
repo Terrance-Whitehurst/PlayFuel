@@ -2,6 +2,50 @@ role: Backend Dev (Engineering3 team)
 session: moh9uivm3dxv
 last_updated: "2026-04-28"
 
+post_match_eval_session_moh9uivm3dxv:
+  date: '2026-04-28'
+  description: 'Post-Match Evaluation — migration 0011 + CRUD routes + auto-player-note sync + tests'
+  files_written:
+    - db/supabase/migrations/0011_match_evaluations.sql (NEW)
+    - routes/match_evaluations.py (NEW — 4 endpoints)
+    - services/post_match_sync.py (NEW — sync + delete helpers)
+    - tests/test_match_evaluations_routes.py (NEW — 26 tests)
+    - tests/test_post_match_sync.py (NEW — 7 tests)
+  files_edited:
+    - models/enums.py (MatchEvalResult)
+    - models/db.py (MatchEvaluationRow)
+    - models/api.py (MatchEvalCreate, MatchEvalUpdate, MatchEvaluation + @field_validator)
+    - routes/__init__.py (match_evaluations_router added to routers list)
+    - db/supabase/README.md (migration 0011 row)
+  test_counts:
+    before: '342 passed, 1 xfailed'
+    after: '375 passed, 1 xfailed, 0 failed'
+    new_tests: '33 (26 route tests + 7 sync tests)'
+  eval_harness: 'exit 0 — 4 PASS, 1 XFAIL'
+  critical_rules:
+    - >
+      Router mount is via routes/__init__.py routers list — NOT main.py directly.
+      Planning caught this as a 🔴 (I-6) before Engineering ran it. Always read
+      routes/__init__.py before adding a new router.
+    - >
+      @field_validator on list fields: use mode='before' to intercept before Pydantic
+      coerces. For Optional[list[str]], the validator receives None when the field is
+      absent — guard with `if v is None: return v` before iterating.
+    - >
+      Mock call_count for two-step DB operations: each sync_player_note_from_eval
+      call makes 2 DB calls (SELECT + INSERT/UPDATE). A test asserting call_count==5
+      for 5 sync calls will get 10. Count table calls accurately or assert on
+      specific mock call args instead.
+    - >
+      Response shape in route using Response(content=model.model_dump_json(by_alias=True)):
+      this allows returning different status codes (201 vs 200) from the same endpoint
+      while still serializing through Pydantic. The response_model annotation is kept
+      for OpenAPI schema generation only.
+  idempotency_key_note: >
+    player_notes has NO unique index on (player_id, match_id, source) — must use
+    API-layer SELECT-then-INSERT/UPDATE. Never INSERT-or-CONFLICT here. Confirmed
+    by reading 0010_players_and_notes.sql before writing the service.
+
 task_completed:
   id: "Phase 2 Task #4"
   description: "Supabase schema migrations + RLS + Sign in with Apple"
@@ -302,6 +346,46 @@ food_deck_and_map_session_moh9uivm3dxv:
     assemble_food_options() uses getattr(place, 'lat', None) to safely access RawPlace.lat.
     This future-proofs against any RawPlace subclass or stub that lacks the field.
     After the dataclass widening, getattr is redundant but cost-free and safe.
+
+player_scouting_session_moh9uivm3dxv:
+  date: '2026-04-28'
+  description: 'Player Scouting — migration 0010 + CRUD routes + sanitization + integration tests'
+  files_written:
+    - db/supabase/migrations/0010_players_and_notes.sql (NEW)
+    - routes/players.py (NEW — 9 endpoints)
+    - services/scouting.py (NEW — sanitization + fetch)
+    - tests/test_players_routes.py (NEW — 16 tests)
+    - tests/test_player_notes_routes.py (NEW — N tests)
+    - tests/test_scouting_sanitization.py (NEW — 16 tests)
+    - tests/test_opponent_notes_in_plan.py (NEW — 7 tests)
+  files_edited:
+    - models/db.py (PlayerRow, PlayerNoteRow, MatchRow.opponent_player_id)
+    - models/api.py (Player, PlayerCreate+_CAMEL, PlayerNote*, OpponentNoteForLLM, widened MatchInput/PlanExplanationInput)
+    - models/enums.py (PlayerNoteSource)
+    - routes/matches.py (_validate_opponent_player_id)
+    - routes/plans.py (fetch_opponent_notes_for_match wired in per-match loop)
+    - services/llm.py (TemplateProvider count-only acknowledgment)
+    - services/llm_safety.py (contains_prohibited_phrase extracted as public helper)
+    - db/supabase/README.md (migration 0010 row)
+  test_counts:
+    before: '291 passed, 1 xfailed (prior session total)'
+    after: '342 passed, 1 xfailed, 0 failed'
+    new_tests: '51 (across 4 new test files)'
+  fixes_applied:
+    - 'PlayerCreate/PlayerUpdate/PlayerNoteCreate/PlayerNoteUpdate: added model_config = _CAMEL so iOS camelCase payload (displayName) is accepted'
+    - 'test_sanitize_combined_attack_redacted: body changed to contain actual PROHIBITED_PHRASES member (guarantees better performance) not just bare guarantees'
+  critical_rules:
+    - >
+      Every Pydantic request-body model (Create/Update) that receives camelCase
+      from the iOS client MUST have model_config = _CAMEL (alias_generator=to_camel,
+      populate_by_name=True). Without it, camelCase JSON keys (displayName) are
+      rejected with 422. Response models already had this; request models were missed.
+    - >
+      Test prohibited-phrase assertions must use verbatim strings from PROHIBITED_PHRASES
+      list in llm_safety.py (e.g. 'guarantees better performance'), NOT approximate
+      fragments (e.g. 'guarantees'). Always cross-check against the actual list.
+  migration_number_rule: 'Always ls migrations/ before writing a new migration spec. 0009 was OQ-IA-9 hotfix; new schema used 0010.'
+  fk_target_rule: 'FK to user table is public.users(id), NOT auth.users(id). Mirror existing tables (tournaments, matches, player_profiles).'
 
 new_oqs:
   - id: "OQ-H"

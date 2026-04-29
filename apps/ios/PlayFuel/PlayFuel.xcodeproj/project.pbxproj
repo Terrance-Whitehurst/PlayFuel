@@ -61,6 +61,23 @@
 		F595DE549B9CF77D38C5A898 /* TournamentDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */; };
 		FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AE19CFED4698BCC9E569E /* TournamentListView.swift */; };
 		AA0000AA0000AA0000AA0002 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA0000AA0000AA0000AA0001 /* Assets.xcassets */; };
+		BB0001BB0001BB0001BB0002 /* TournamentHistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0001BB0001BB0001BB0001 /* TournamentHistoryEntry.swift */; };
+		BB0002BB0002BB0002BB0002 /* FakeHistoryData.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0002BB0002BB0002BB0001 /* FakeHistoryData.swift */; };
+		BB0003BB0003BB0003BB0002 /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0003BB0003BB0003BB0001 /* DashboardView.swift */; };
+		BB0004BB0004BB0004BB0002 /* CalendarMonthGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0004BB0004BB0004BB0001 /* CalendarMonthGrid.swift */; };
+		BB0005BB0005BB0005BB0002 /* TournamentHistoryDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BB0005BB0005BB0005BB0001 /* TournamentHistoryDetailSheet.swift */; };
+		CC0010CC0010CC0010CC0002 /* PlayerNoteSource.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0010CC0010CC0010CC0001 /* PlayerNoteSource.swift */; };
+		CC0011CC0011CC0011CC0002 /* Player.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0011CC0011CC0011CC0001 /* Player.swift */; };
+		CC0012CC0012CC0012CC0002 /* PlayerNote.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0012CC0012CC0012CC0001 /* PlayerNote.swift */; };
+		CC0013CC0013CC0013CC0002 /* PlayerListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0013CC0013CC0013CC0001 /* PlayerListView.swift */; };
+		CC0014CC0014CC0014CC0002 /* PlayerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0014CC0014CC0014CC0001 /* PlayerDetailView.swift */; };
+		CC0015CC0015CC0015CC0002 /* AddPlayerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0015CC0015CC0015CC0001 /* AddPlayerSheet.swift */; };
+		CC0016CC0016CC0016CC0002 /* AddPlayerNoteSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0016CC0016CC0016CC0001 /* AddPlayerNoteSheet.swift */; };
+		CC0017CC0017CC0017CC0002 /* MatchEvalResult.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0017CC0017CC0017CC0001 /* MatchEvalResult.swift */; };
+		CC0018CC0018CC0018CC0002 /* MatchEvaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0018CC0018CC0018CC0001 /* MatchEvaluation.swift */; };
+		CC0019CC0019CC0019CC0002 /* MatchDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0019CC0019CC0019CC0001 /* MatchDetailView.swift */; };
+		CC0020CC0020CC0020CC0002 /* PostMatchEvaluationView.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0020CC0020CC0020CC0001 /* PostMatchEvaluationView.swift */; };
+		CC0021CC0021CC0021CC0002 /* PostMatchEvaluationForm.swift in Sources */ = {isa = PBXBuildFile; fileRef = CC0021CC0021CC0021CC0001 /* PostMatchEvaluationForm.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -119,6 +136,23 @@
 		EC59EB7BC5AA3895B189FBF0 /* Repository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repository.swift; sourceTree = "<group>"; };
 		FFAA6A3A9295F34782002C64 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
 		AA0000AA0000AA0000AA0001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		BB0001BB0001BB0001BB0001 /* TournamentHistoryEntry.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentHistoryEntry.swift; sourceTree = "<group>"; };
+		BB0002BB0002BB0002BB0001 /* FakeHistoryData.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FakeHistoryData.swift; sourceTree = "<group>"; };
+		BB0003BB0003BB0003BB0001 /* DashboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		BB0004BB0004BB0004BB0001 /* CalendarMonthGrid.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = CalendarMonthGrid.swift; sourceTree = "<group>"; };
+		BB0005BB0005BB0005BB0001 /* TournamentHistoryDetailSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentHistoryDetailSheet.swift; sourceTree = "<group>"; };
+		CC0010CC0010CC0010CC0001 /* PlayerNoteSource.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNoteSource.swift; sourceTree = "<group>"; };
+		CC0011CC0011CC0011CC0001 /* Player.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Player.swift; sourceTree = "<group>"; };
+		CC0012CC0012CC0012CC0001 /* PlayerNote.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerNote.swift; sourceTree = "<group>"; };
+		CC0013CC0013CC0013CC0001 /* PlayerListView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerListView.swift; sourceTree = "<group>"; };
+		CC0014CC0014CC0014CC0001 /* PlayerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDetailView.swift; sourceTree = "<group>"; };
+		CC0015CC0015CC0015CC0001 /* AddPlayerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPlayerSheet.swift; sourceTree = "<group>"; };
+		CC0016CC0016CC0016CC0001 /* AddPlayerNoteSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AddPlayerNoteSheet.swift; sourceTree = "<group>"; };
+		CC0017CC0017CC0017CC0001 /* MatchEvalResult.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchEvalResult.swift; sourceTree = "<group>"; };
+		CC0018CC0018CC0018CC0001 /* MatchEvaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchEvaluation.swift; sourceTree = "<group>"; };
+		CC0019CC0019CC0019CC0001 /* MatchDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchDetailView.swift; sourceTree = "<group>"; };
+		CC0020CC0020CC0020CC0001 /* PostMatchEvaluationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostMatchEvaluationView.swift; sourceTree = "<group>"; };
+		CC0021CC0021CC0021CC0001 /* PostMatchEvaluationForm.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostMatchEvaluationForm.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -167,9 +201,13 @@
 		66B42F8CD0AE47989FF9048E /* Sheets */ = {
 			isa = PBXGroup;
 			children = (
+				CC0016CC0016CC0016CC0001 /* AddPlayerNoteSheet.swift */,
+				CC0015CC0015CC0015CC0001 /* AddPlayerSheet.swift */,
+				CC0021CC0021CC0021CC0001 /* PostMatchEvaluationForm.swift */,
 				9955DC10D597BB485D282CDF /* FoodOptionDetailSheet.swift */,
 				BF17BA3D5E76F4AF68C9C330 /* HeatGuidanceSheet.swift */,
 				CA7E7E4D672B8D8EF7796C33 /* PlanSummarySheet.swift */,
+				BB0005BB0005BB0005BB0001 /* TournamentHistoryDetailSheet.swift */,
 				ACAA8888F2AD6600C40071F4 /* VenueMapSheet.swift */,
 				922C1380076B2C68DB6A93B7 /* WeatherSheet.swift */,
 			);
@@ -195,9 +233,15 @@
 				85B0D0628C8AC1E5CB21A121 /* Plan.swift */,
 				EA04910F6D82636BBE65BCD8 /* PlanEnvelope.swift */,
 				604200C03C727C2AD4A3F47E /* PlanExplanation.swift */,
+				CC0011CC0011CC0011CC0001 /* Player.swift */,
+				CC0012CC0012CC0012CC0001 /* PlayerNote.swift */,
+				CC0010CC0010CC0010CC0001 /* PlayerNoteSource.swift */,
+				CC0017CC0017CC0017CC0001 /* MatchEvalResult.swift */,
+				CC0018CC0018CC0018CC0001 /* MatchEvaluation.swift */,
 				438A0DE1A7A9004AAFDE9E5F /* ScenarioPlan.swift */,
 				796A0EDD57748854929E6897 /* TimelineEvent.swift */,
 				D79888F3E040BD239741B1D5 /* Tournament.swift */,
+				BB0001BB0001BB0001BB0001 /* TournamentHistoryEntry.swift */,
 				AB91EF7D1C39218BE3F841E3 /* User.swift */,
 				0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */,
 			);
@@ -223,6 +267,7 @@
 			isa = PBXGroup;
 			children = (
 				7E1765305F0E1FFE9661C32E /* FakeData.swift */,
+				BB0002BB0002BB0002BB0001 /* FakeHistoryData.swift */,
 				5F7C90C7F8361AD719882689 /* HardCodedStrings.swift */,
 			);
 			path = Data;
@@ -256,7 +301,13 @@
 				499C95E4DF0C4C4D64ABB501 /* MatchCreateView.swift */,
 				87AE661B091859A7E90E4C6A /* NextActionCard.swift */,
 				30B0C6A0B70E723E8BA64E6D /* PlanSummaryCard.swift */,
+				CC0014CC0014CC0014CC0001 /* PlayerDetailView.swift */,
+				CC0013CC0013CC0013CC0001 /* PlayerListView.swift */,
+				CC0019CC0019CC0019CC0001 /* MatchDetailView.swift */,
+				CC0020CC0020CC0020CC0001 /* PostMatchEvaluationView.swift */,
 				2C9ECAECD87FA6EC473542CE /* ProfileMenuSheet.swift */,
+				BB0003BB0003BB0003BB0001 /* DashboardView.swift */,
+				BB0004BB0004BB0004BB0001 /* CalendarMonthGrid.swift */,
 				C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */,
 				016BE8196E49B913F0050A0F /* ScheduleStripView.swift */,
 				6EAA16931681674D75171D1C /* SettingsView.swift */,
@@ -384,6 +435,23 @@
 				ED783DB00779757DDC31488C /* WeatherCardView.swift in Sources */,
 				49F5D0C77D8EF04341F37CA5 /* WeatherSheet.swift in Sources */,
 				AD64452F4938CC50EAFAB031 /* WeatherSnapshot.swift in Sources */,
+				BB0001BB0001BB0001BB0002 /* TournamentHistoryEntry.swift in Sources */,
+				BB0002BB0002BB0002BB0002 /* FakeHistoryData.swift in Sources */,
+				BB0003BB0003BB0003BB0002 /* DashboardView.swift in Sources */,
+				BB0004BB0004BB0004BB0002 /* CalendarMonthGrid.swift in Sources */,
+				BB0005BB0005BB0005BB0002 /* TournamentHistoryDetailSheet.swift in Sources */,
+				CC0010CC0010CC0010CC0002 /* PlayerNoteSource.swift in Sources */,
+				CC0011CC0011CC0011CC0002 /* Player.swift in Sources */,
+				CC0012CC0012CC0012CC0002 /* PlayerNote.swift in Sources */,
+				CC0013CC0013CC0013CC0002 /* PlayerListView.swift in Sources */,
+				CC0014CC0014CC0014CC0002 /* PlayerDetailView.swift in Sources */,
+				CC0015CC0015CC0015CC0002 /* AddPlayerSheet.swift in Sources */,
+				CC0016CC0016CC0016CC0002 /* AddPlayerNoteSheet.swift in Sources */,
+				CC0017CC0017CC0017CC0002 /* MatchEvalResult.swift in Sources */,
+				CC0018CC0018CC0018CC0002 /* MatchEvaluation.swift in Sources */,
+				CC0019CC0019CC0019CC0002 /* MatchDetailView.swift in Sources */,
+				CC0020CC0020CC0020CC0002 /* PostMatchEvaluationView.swift in Sources */,
+				CC0021CC0021CC0021CC0002 /* PostMatchEvaluationForm.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};

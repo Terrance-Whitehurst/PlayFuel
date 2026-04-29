@@ -465,6 +465,272 @@
 
 ---
 
+---
+
+## US-PLAYER-1 · Player Scouting Log
+
+> Source: `PLAYER_SCOUTING_V1.md §F` · Added: 2026-04-28
+
+**As a** parent of a junior tennis player,
+**I want** to keep a running log of opponents I've tracked — with notes from before a match, during observation, or after playing them —
+**so that** I can recall what I know about a player before sending my child onto the court against them.
+
+### Acceptance Criteria
+
+**Given** I navigate to Profile → Players,
+**When** I tap the "+" button,
+**Then** I can add a player with a required display name and optional club and city fields.
+
+**Given** I have added a player,
+**When** I tap their row,
+**Then** I see the PlayerDetailView with their existing notes in reverse-chronological order.
+
+**Given** I tap "+ Add Note" on a player's detail view,
+**When** the AddPlayerNoteSheet opens,
+**Then** I can select a source (Heard from others / I observed this / After we played), type a body (≤ 2000 characters), and save.
+
+**Given** I save a note with body text exceeding 2000 characters,
+**When** the API processes the request,
+**Then** the API returns 422 and the note is not saved.
+
+**Given** another user attempts to read my player or notes,
+**When** the database query runs,
+**Then** RLS prevents access — they see nothing.
+
+---
+
+## US-PLAYER-2 · Match Opponent Picker
+
+> Source: `PLAYER_SCOUTING_V1.md §E.4` · Added: 2026-04-28
+
+**As a** parent creating a match,
+**I want** to search for an existing player from my roster as the opponent, or add a new one inline,
+**so that** the match is linked to the player's scouting notes and future plan generation can use that context.
+
+### Acceptance Criteria
+
+**Given** I open MatchCreateView and tap the opponent field,
+**When** the player search view appears,
+**Then** I see a search-as-type list of my existing players with display name and club/city subtitle.
+
+**Given** I type a name that partially matches an existing player,
+**When** the list filters,
+**Then** only matching players appear; "+ Add \"<typed name>\" as new player" appears at the bottom.
+
+**Given** I tap an existing player in the search results,
+**When** I return to MatchCreateView,
+**Then** both `opponent_player_id` (FK) and `opponentLabelText` (display fallback) are populated.
+
+**Given** I tap "+ Add new player" from the search view,
+**When** AddPlayerSheet opens and I save a name,
+**Then** the new player is created and returned, and both `opponent_player_id` and `opponentLabelText` are populated in MatchCreateView.
+
+**Given** I leave the opponent field blank,
+**When** I save the match,
+**Then** the match saves successfully — opponent is optional.
+
+---
+
+## US-PLAYER-3 · Tactical Context in Day-of Plan
+
+> Source: `PLAYER_SCOUTING_V1.md §D` · Added: 2026-04-28
+
+**As a** parent reviewing the day-of plan summary,
+**I want** the coaching summary to acknowledge that I have recorded notes about today's opponent,
+**so that** I know to consult those notes for tactical preparation — without the app quoting them verbatim or revealing their source.
+
+### Acceptance Criteria
+
+**Given** a match has `opponent_player_id` linked to a player with ≥ 1 note,
+**When** the plan is generated,
+**Then** the `PlanExplanationInput.opponent_notes` list is non-empty (notes were fetched and sanitized).
+
+**Given** `opponent_notes` is non-empty,
+**When** `TemplateProvider._build_summary` runs,
+**Then** the summary contains the phrase "Your notes mention N prior observation[s] — review the player profile for tactics." where N matches the count.
+
+**Given** no notes exist for the opponent (or no opponent is linked),
+**When** the plan is generated,
+**Then** the summary does NOT contain "Your notes mention" — no phantom reference.
+
+**Given** a note body contains a §C prohibited phrase,
+**When** the sanitization pipeline runs,
+**Then** that note's `body_paraphrasable` is replaced with `[note redacted]` and it is dropped from the LLM payload — it is not passed to the template provider.
+
+**Given** any LLM explanation is generated (template or real provider),
+**When** `validate_explanation` runs,
+**Then** all §C prohibited phrases are checked across the full output — no new validation code is required.
+
+---
+
+## US-PLAYER-4 · Private by Design
+
+> Source: `PLAYER_SCOUTING_V1.md §A` · Added: 2026-04-28
+
+**As a** parent who records notes about other people's children,
+**I want** those notes to be completely private to my account and never include contact information by design,
+**so that** I am not inadvertently collecting regulated PII about minors.
+
+### Acceptance Criteria
+
+**Given** the `players` table schema,
+**When** I inspect the columns,
+**Then** there are no columns for email, phone, home address, photo, or physical description — data minimisation is enforced at the schema level.
+
+**Given** I open AddPlayerNoteSheet,
+**When** the sheet is displayed,
+**Then** the verbatim text *"Notes are private to your account. Don't include personal contact info, photos, or anything not directly observable on court."* is visible as a static label.
+
+**Given** any other user (different `auth.uid()`) attempts a GET/POST/PATCH/DELETE on my players or notes,
+**When** the API processes the request,
+**Then** all operations return 404 — the data is not visible and cannot be modified.
+
+**Given** I submit a plan for a match with opponent notes,
+**When** the LLM explanation is generated,
+**Then** the output never contains a verbatim quote from any note body (TemplateProvider only counts notes; real LLM providers are bound by the system-prompt paraphrase rule, `OQ-SCOUT-LLM-1`).
+
+---
+
+## US-PLAYER-5 · Player Deletion Cascade
+
+> Source: `PLAYER_SCOUTING_V1.md §A.4` · Added: 2026-04-28
+
+**As a** parent,
+**I want** to be able to delete a player and have all their notes removed at the same time,
+**so that** I am not left with orphaned note data I can no longer see or manage.
+
+### Acceptance Criteria
+
+**Given** a player with ≥ 1 note in `player_notes`,
+**When** I DELETE `/v1/players/{id}`,
+**Then** the player row and all child `player_notes` rows are removed in the same transaction (CASCADE).
+
+**Given** a match had `opponent_player_id` pointing to the deleted player,
+**When** the player is deleted,
+**Then** `matches.opponent_player_id` is SET NULL — the match record is preserved.
+
+**Given** I delete my entire account (Settings → Delete Account),
+**When** Supabase cascades from `auth.users` → `public.users`,
+**Then** all my `players` rows cascade-delete, taking all `player_notes` with them in the same transaction.
+
+**Given** a match linked to a note (via `player_notes.match_id`) is deleted,
+**When** the match DELETE cascades,
+**Then** `player_notes.match_id` is SET NULL — the note survives with its match link cleared.
+
+---
+
+## US-EVAL-1 · Post-Match Write-Up
+
+> Source: `POST_MATCH_EVAL_V1.md §E` · Added: 2026-04-28
+
+**As a** parent who just watched their child finish a match,
+**I want** to fill out a structured post-match write-up covering result, what went well, what to improve, and opponent observations,
+**so that** I have a running record of each match that I can review at any time.
+
+### Acceptance Criteria
+
+**Given** I tap a match in the schedule strip and open Match Details,
+**When** no write-up exists yet,
+**Then** I see a CTA card "Add Post-Match Write-Up" that opens the evaluation form.
+
+**Given** I am in the evaluation form,
+**When** I select a result (required) and optionally fill any other fields,
+**Then** the Save button becomes active after result is selected.
+
+**Given** I save the evaluation,
+**When** the form dismisses,
+**Then** Match Details now shows the read-only evaluation cards (Result, Ratings, What Went Well, What to Improve, Opponent Observations, Key Moments). Cards with empty content are omitted.
+
+**Given** an evaluation already exists,
+**When** I tap Edit,
+**Then** the form re-opens pre-filled with existing data and I can update any field.
+
+**Given** any generated evaluation is displayed,
+**When** it is rendered,
+**Then** no §C prohibited phrases appear in any field (no medical claims, no performance guarantees).
+
+---
+
+## US-EVAL-2 · Opponent Observations Auto-Sync to Scouting Log
+
+> Source: `POST_MATCH_EVAL_V1.md §D` · Added: 2026-04-28
+
+**As a** parent who linked an opponent to a match and then filled out a post-match write-up,
+**I want** my opponent observations to automatically appear in that player's scouting log,
+**so that** I don't have to enter the same information in two places.
+
+### Acceptance Criteria
+
+**Given** a match has `opponent_player_id` linked and I save an evaluation with non-empty `opponent_observations`,
+**When** the eval is saved (POST or PATCH),
+**Then** a `player_note` with `source='post_match'` and `body = opponent_observations` is created or updated for that player.
+
+**Given** I update the evaluation's `opponent_observations` field and save again,
+**When** the sync runs,
+**Then** the existing `player_note` (same `match_id` + `source='post_match'`) is **updated** — no duplicate note is created.
+
+**Given** the match has no `opponent_player_id` set,
+**When** I save the evaluation with opponent observations,
+**Then** no player_note is created — the sync is silently skipped.
+
+**Given** the eval's `opponent_observations` is empty or whitespace,
+**When** the sync runs,
+**Then** no player_note is created or modified.
+
+**Given** a scouting plan is generated for a future match against the same opponent,
+**When** `fetch_opponent_notes_for_match` runs,
+**Then** the auto-created `post_match` note (from the eval) appears in the opponent notes list and contributes to the plan summary acknowledgment ("Your notes mention N prior observations").
+
+---
+
+## US-EVAL-3 · Revisit Past Match Write-Ups
+
+> Source: `POST_MATCH_EVAL_V1.md §E.2` · Added: 2026-04-28
+
+**As a** parent,
+**I want** to go back to any past match and see its structured write-up in scannable category cards,
+**so that** I can review performance history without wading through unstructured notes.
+
+### Acceptance Criteria
+
+**Given** I navigate to a past match via the schedule strip and Match Details,
+**When** a write-up exists,
+**Then** I see structured cards for: Result + Score, Ratings (Effort / Focus), What Went Well (bullet list), What to Improve (bullet list), Opponent Observations, Key Moments. Cards with no content are omitted.
+
+**Given** I view a match with a write-up where `went_well` has 3 items,
+**When** the card is rendered,
+**Then** all 3 items are visible without truncation (always-expanded for MVP; no accordion).
+
+**Given** I view a match where `effort_rating` is nil (parent skipped it),
+**When** the Ratings card is rendered,
+**Then** the Ratings card is omitted (not shown as blank stars).
+
+---
+
+## US-EVAL-4 · Edit Write-Up at Any Time (No Time Lock)
+
+> Source: `POST_MATCH_EVAL_V1.md §A.3` · Added: 2026-04-28
+
+**As a** parent who wants to update a match write-up after reviewing video or reflecting later,
+**I want** to edit the evaluation at any time without a time-based lock,
+**so that** my record can be as accurate as possible.
+
+### Acceptance Criteria
+
+**Given** a match evaluation was created more than 24 hours ago,
+**When** I tap Edit and save changes,
+**Then** the PATCH succeeds and the evaluation is updated (no 403 / time-lock error). This contrasts with `player_notes` which has a 24-hour edit window (scouting-record integrity).
+
+**Given** I edit `opponent_observations` in an existing evaluation and save,
+**When** the edit is processed,
+**Then** the corresponding `player_note` (source=post_match, same match_id) is also updated to reflect the new text.
+
+**Given** I delete an evaluation via the app,
+**When** the DELETE is processed,
+**Then** the eval row is removed; the associated `player_note` (source=post_match) is NOT automatically deleted — it was a scouting observation that may have independent value. Flag as `OQ-EVAL-3` if deletion cascading to the derived note is desired.
+
+---
+
 ## Open Questions
 
 1. **Multiple player profiles**: The spec shows a `player_profiles` table but does not specify whether the MVP UI supports creating more than one profile per user. The monetization tiers in §29 imply free = 1 profile, paid = multiple. Needs explicit scoping for Phase 2.

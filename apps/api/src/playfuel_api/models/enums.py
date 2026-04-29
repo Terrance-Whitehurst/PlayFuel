@@ -68,6 +68,27 @@ class DoublesFormat(StrEnum):
     pro_set_8 = "pro_set_8"
 
 
+class PlayerNoteSource(StrEnum):
+    """player_notes.source — PLAYER_SCOUTING_V1.md §B.
+
+    Byte-identical to the Postgres player_note_source enum values.
+    """
+    secondhand = "secondhand"   # heard from others before the match
+    observed = "observed"       # watched during a match
+    post_match = "post_match"   # reflection after playing them
+
+
+class MatchEvalResult(StrEnum):
+    """match_evaluations.result — POST_MATCH_EVAL_V1.md §B.
+
+    Byte-identical to the Postgres match_eval_result enum values.
+    """
+    won = "won"
+    lost = "lost"
+    withdrew = "withdrew"
+    retired = "retired"
+
+
 class TimelineEventKind(StrEnum):
     """Plan timeline event categories — mirrors iOS TimelineEvent.swift.
 

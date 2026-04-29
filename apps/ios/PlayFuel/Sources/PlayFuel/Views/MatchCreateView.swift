@@ -49,6 +49,16 @@ struct MatchCreateView: View {
     /// Doubles format. Only used (and shown) when matchType == .doubles. Default: Best of 3.
     @State private var doublesFormat: DoublesFormat = .bestOf3
 
+    // MARK: - Player scouting state
+
+    /// FK to the selected opponent in the player roster (nil = no player linked)
+    @State private var opponentPlayerId: UUID? = nil
+    /// Cached roster loaded on appear for the picker
+    @State private var availablePlayers: [Player] = []
+    @State private var showPlayerSearch: Bool = false
+    @State private var showAddPlayerInline: Bool = false
+    @State private var playerSearchText: String = ""
+
     // MARK: - Async state
 
     @State private var isSaving: Bool = false
@@ -131,8 +141,20 @@ struct MatchCreateView: View {
                     TextField("Round (e.g. R16, QF, SF, F)", text: $roundLabelText)
                         .autocorrectionDisabled()
 
-                    TextField("Opponent (e.g. Smith)", text: $opponentLabelText)
-                        .autocorrectionDisabled()
+                    Button {
+                        showPlayerSearch = true
+                    } label: {
+                        HStack {
+                            Text(opponentLabelText.isEmpty ? "Opponent (optional)" : opponentLabelText)
+                                .foregroundStyle(opponentLabelText.isEmpty ? .tertiary : .primary)
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption.weight(.semibold))
+                                .foregroundStyle(.tertiary)
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
 
                     TextField("Court (e.g. Court 7)", text: $courtLabelText)
                         .autocorrectionDisabled()
@@ -201,6 +223,44 @@ struct MatchCreateView: View {
             .onAppear {
                 nextMatchTime = scheduledStart.addingTimeInterval(4 * 3600)
             }
+            // Player Scouting — present player search picker
+            .sheet(isPresented: $showPlayerSearch, onDismiss: {
+                playerSearchText = ""
+            }) {
+                PlayerSearchSheet(
+                    players: availablePlayers,
+                    searchText: $playerSearchText
+                ) { player in
+                    opponentPlayerId  = player.id
+                    opponentLabelText = player.displayName
+                    showPlayerSearch  = false
+                } onAddNew: { typedName in
+                    opponentLabelText = typedName
+                    opponentPlayerId  = nil
+                    showPlayerSearch  = false
+                }
+            }
+            .sheet(isPresented: $showAddPlayerInline, onDismiss: {
+                // Re-fetch players after inline creation
+                Task {
+                    availablePlayers = (try? await appState.repository.listPlayers()) ?? []
+                }
+            }) {
+                AddPlayerSheet(existingPlayer: nil) { name, _, _ in
+                    // Create inline and select
+                    if let created = try? await appState.repository.createPlayer(displayName: name) {
+                        opponentPlayerId  = created.id
+                        opponentLabelText = created.displayName
+                        availablePlayers.insert(created, at: 0)
+                    }
+                }
+            }
+            .task {
+                // Pre-load player roster so picker is ready
+                if availablePlayers.isEmpty {
+                    availablePlayers = (try? await appState.repository.listPlayers()) ?? []
+                }
+            }
         }
     }
 
@@ -228,7 +288,8 @@ struct MatchCreateView: View {
                 estimatedNextMatchTime: nextMatch,
                 displayOrder: existingMatchCount + 1,
                 matchType: matchType,
-                doublesFormat: matchType == .doubles ? doublesFormat : nil
+                doublesFormat: matchType == .doubles ? doublesFormat : nil,
+                opponentPlayerId: opponentPlayerId
             )
             // Reset plan envelope to idle so the dashboard prompts re-generation
             // with the new match (Phase 7: envelope replaces single Plan).
@@ -246,6 +307,91 @@ struct MatchCreateView: View {
     private func trimmedOrNil(_ text: String) -> String? {
         let t = text.trimmingCharacters(in: .whitespaces)
         return t.isEmpty ? nil : t
+    }
+}
+
+// MARK: - Player Search Sheet
+//
+// Inline search-and-select for opponent players when creating a match.
+// Displayed as a .medium sheet from MatchCreateView via $showPlayerSearch.
+// Per PLAYER_SCOUTING_V1.md §E.4.
+
+private struct PlayerSearchSheet: View {
+    let players: [Player]
+    @Binding var searchText: String
+    let onSelect: (Player) -> Void
+    let onAddNew: (String) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    private var filtered: [Player] {
+        guard !searchText.trimmingCharacters(in: .whitespaces).isEmpty else { return players }
+        let q = searchText.lowercased()
+        return players.filter { $0.displayName.lowercased().contains(q) }
+    }
+
+    private var showAddNewRow: Bool {
+        let t = searchText.trimmingCharacters(in: .whitespaces)
+        guard !t.isEmpty else { return false }
+        return !players.contains { $0.displayName.lowercased() == t.lowercased() }
+    }
+
+    var body: some View {
+        NavigationStack {
+            List {
+                ForEach(filtered) { player in
+                    Button {
+                        onSelect(player)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(player.displayName)
+                                    .foregroundStyle(.primary)
+                                if let sub = player.locationSubtitle {
+                                    Text(sub)
+                                        .font(.caption)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if showAddNewRow {
+                    Button {
+                        onAddNew(searchText.trimmingCharacters(in: .whitespaces))
+                    } label: {
+                        HStack {
+                            Image(systemName: "plus.circle.fill")
+                                .foregroundStyle(Color.accentColor)
+                            Text("Add \"\(searchText.trimmingCharacters(in: .whitespaces))\" as new player")
+                                .foregroundStyle(Color.accentColor)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .listStyle(.insetGrouped)
+            .overlay {
+                if filtered.isEmpty && !showAddNewRow {
+                    Text("No players found.")
+                        .foregroundStyle(.secondary)
+                        .font(.subheadline)
+                }
+            }
+            .searchable(text: $searchText, placement: .navigationBarDrawer(displayMode: .always))
+            .navigationTitle("Select Opponent")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Cancel") { dismiss() }
+                }
+            }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
     }
 }
 

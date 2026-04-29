@@ -33,16 +33,14 @@ struct TournamentDashboardView: View {
     @State private var showingDisclaimer = false
     @State private var showingCreateMatch = false
     @State private var showProfile = false
+    @State private var showMatchDetail = false
 
     var body: some View {
         ScrollView {
             VStack(spacing: 16) {
                 switch appState.currentPlanEnvelope {
-                case .idle:
-                    generateButton
-
-                case .loading:
-                    ProgressView("Generating plan…")
+                case .idle, .loading:
+                    ProgressView("Preparing your plan…")
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 60)
 
@@ -86,6 +84,17 @@ struct TournamentDashboardView: View {
                 .presentationDetents([.height(280), .medium])
                 .presentationDragIndicator(.visible)
         }
+        .sheet(isPresented: $showMatchDetail) {
+            if case .loaded(let envelope) = appState.currentPlanEnvelope,
+               let activePlan = resolveActivePlan(from: envelope) {
+                let allPlans = envelope.allPlans
+                let idx = (allPlans.firstIndex { $0.matchId == activePlan.matchId } ?? 0) + 1
+                MatchDetailView(plan: activePlan, matchIndex: idx)
+                    .environmentObject(appState)
+                    .presentationDetents([.medium, .large])
+                    .presentationDragIndicator(.visible)
+            }
+        }
         .sheet(isPresented: $showingCreateMatch) {
             MatchCreateView(
                 tournamentId: tournament.id,
@@ -93,13 +102,14 @@ struct TournamentDashboardView: View {
             )
             .environmentObject(appState)
         }
-        .task {
-            // Reset plan envelope on each dashboard appearance so a stale plan from a
-            // different tournament is never shown. User taps "Generate Plan" to load.
-            // Phase 8: also resets selectedMatchId; re-anchored on envelope arrival.
-            appState.currentPlanEnvelope = .idle
+        .task(id: tournament.id) {
+            // Phase 8.6: Auto-generate plan on tournament selection.
+            // .task(id:) re-fires when tournament.id changes (i.e. the user switches
+            // to a different tournament), and on first appearance. generatePlan is
+            // idempotent (OQ-IA-9 upsert) so re-generation is always safe.
             appState.selectedMatchType = .singles
             appState.selectedMatchId = nil
+            await appState.generatePlan(for: tournament.id)
         }
     }
 
@@ -165,8 +175,8 @@ struct TournamentDashboardView: View {
         if let plan = resolveActivePlan(from: envelope) {
             planContent(plan: plan, envelope: envelope)
         } else {
-            // No plans at all — defensive guard (shouldn't happen in normal use)
-            generateButton
+            // No matches added yet — envelope is empty (OQ-IA-9: 200 with empty arrays).
+            emptyMatchesView
         }
     }
 
@@ -225,6 +235,25 @@ struct TournamentDashboardView: View {
             onAddMatch: { showingCreateMatch = true }
         )
 
+        // POST_MATCH_EVAL_V1.md §E.1 — "View match details" link below the strip.
+        // The strip remains a quick switcher; this link provides deliberate drill-in
+        // access to the MatchDetailView (post-match write-up + metadata).
+        // Only shown when there is a resolvable active plan.
+        Button {
+            showMatchDetail = true
+        } label: {
+            HStack(spacing: 4) {
+                Text("View match details")
+                    .font(.subheadline)
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+            }
+            .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity, alignment: .trailing)
+        .padding(.horizontal, 16)
+        .padding(.top, -4)
+
         // #4 — Next action card (glance-test: parent knows "what's next" in 2 sec)
         NextActionCard(nextAction: plan.nextAction)
 
@@ -251,27 +280,22 @@ struct TournamentDashboardView: View {
         footerDisclaimer
     }
 
-    // MARK: - Idle State — Generate Button
+    // MARK: - Empty State (no matches added yet)
 
-    private var generateButton: some View {
+    private var emptyMatchesView: some View {
         VStack(spacing: 16) {
-            Image(systemName: "sparkles")
+            Image(systemName: "tennisball.fill")
                 .font(.system(size: 48))
-                .foregroundStyle(.green)
+                .foregroundStyle(Color.accentColor)
 
-            Text("Generate today's plan")
+            Text("No matches yet")
                 .font(.headline)
 
-            Text("Add your matches with the + button, then generate a personalised fuel plan.")
+            Text("Tap + to add your first match. Your plan will generate automatically.")
                 .font(.caption)
                 .foregroundStyle(.secondary)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 32)
-
-            Button("Generate Plan") {
-                Task { await appState.generatePlan(for: tournament.id) }
-            }
-            .buttonStyle(.borderedProminent)
         }
         .padding(.vertical, 60)
     }

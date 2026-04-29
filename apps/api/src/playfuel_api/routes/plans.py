@@ -41,6 +41,7 @@ from playfuel_api.rules.scenarios import generate_match_scenarios
 from playfuel_api.services.llm import build_explanation_input, get_llm_provider
 from playfuel_api.services.llm_safety import sanitize_or_fallback
 from playfuel_api.services.places import find_nearby_food
+from playfuel_api.services.scouting import fetch_opponent_notes_for_match
 from playfuel_api.settings import get_settings
 from playfuel_api.weather import get_or_fetch_weather
 from playfuel_api.weather.service import WeatherService
@@ -250,6 +251,14 @@ async def generate_plan(
                 snapshot=snapshot,
                 food_options_list=food_options,
                 venue_name=venue_name,
+            )
+            # Attach sanitized opponent notes (PLAYER_SCOUTING_V1.md §D.2).
+            # fetch_opponent_notes_for_match returns [] if match has no opponent_player_id,
+            # or if the player has no notes, or on any DB error.
+            exp_input.opponent_notes = fetch_opponent_notes_for_match(
+                match_row=match,
+                client=client,
+                now=now_utc,
             )
             raw_explanation = llm_provider.explain_plan(exp_input)
             explanation = sanitize_or_fallback(raw_explanation, exp_input)

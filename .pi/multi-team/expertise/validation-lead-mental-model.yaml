@@ -1,5 +1,24 @@
 # Validation Lead — Mental Model
 
+# 2026-04-28 — Player Scouting validation (parallel QA + SecRev → synthesis)
+# Pattern again confirmed: SecRev catches forward-looking gaps QA misses.
+# - QA found: 342/1 unchanged, 51 new tests, all surfaces structurally correct.
+# - SecRev found: SEC-SCOUT-1 — `validate_explanation` doesn't scan output for verbatim
+#   reproduction of `body_paraphrasable`. MVP safe (TemplateProvider count-only never
+#   touches bodies). Risk opens when real Anthropic/OpenAI provider activates.
+# Lesson: when we widen LLM input with new structured fields (opponent_notes), the
+# OUTPUT validator must also widen. Easy to miss because input/output validators are
+# in different files. Add to checklist: 'new LLM input shape → corresponding output
+# scan rule in validate_explanation.'
+#
+# Also: count-only acknowledgment is honest but lands thin in demo — flagged as UX
+# sniff finding (not blocker). When MVP defers richer LLM behavior to a future provider,
+# narrate that explicitly during demo so the gap reads as roadmap, not omission.
+#
+# Domain note: Validation Lead has READ-only on sessions/. To write synthesis reports,
+# delegate as scribe to QA Engineer (who has read+write on .pi/multi-team/).
+
+
 # Recurring failure modes / coverage gaps / risk patterns observed across sessions.
 
 domain_routing:

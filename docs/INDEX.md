@@ -14,6 +14,14 @@
 
 ---
 
+## Operations
+
+| Document | Path | Purpose |
+|---|---|---|
+| On-Device Testing | `docs/ON_DEVICE_TESTING.md` | Sequenced checklist to get PlayFuel onto two physical iPhones — local dev loop verification, TestFlight distribution (paid team `G89TZ927TJ`), Fly.io backend deploy, iOS signing, SIWA on-device setup, smoke-test checklist |
+
+---
+
 ## Per-Component READMEs
 
 | Component | Path | Purpose |
