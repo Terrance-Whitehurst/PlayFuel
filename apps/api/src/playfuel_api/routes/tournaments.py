@@ -86,11 +86,12 @@ def list_tournaments(
              summary="Create tournament")
 def create_tournament(
     body: TournamentCreate,
-    _user_id: UUID = Depends(verify_supabase_jwt),
+    user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> dict[str, Any]:
-    """Create a new tournament. user_id set by DB trigger / RLS."""
+    """Create a new tournament owned by the authenticated caller."""
     payload = body.model_dump(exclude_none=True)
+    payload["user_id"] = str(user_id)  # required: NOT NULL, no DEFAULT; RLS enforces owner
     # date → ISO string for PostgREST
     for k in ("start_date", "end_date"):
         if k in payload:
