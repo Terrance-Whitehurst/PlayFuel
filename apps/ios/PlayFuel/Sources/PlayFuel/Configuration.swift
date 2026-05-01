@@ -15,7 +15,7 @@ enum Configuration {
            let url = URL(string: raw) {
             return url
         }
-        return URL(string: "http://localhost:8000")!
+        return URL(string: "https://playfuel-api.fly.dev")!
     }()
 
     /// Supabase project URL, e.g. https://abcdefgh.supabase.co
