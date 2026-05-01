@@ -1,2 +1,12 @@
 # Multi-Team Chat — agent session data
 .pi/multi-team/sessions/
+
+# Claude Code agent state
+.claude/
+
+# Supabase CLI runtime cache
+supabase/.temp/
+
+# Xcode per-user UI state
+xcuserdata/
+*.xcuserstate
