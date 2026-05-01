@@ -43,6 +43,7 @@
 		801F71E80E53509C97C1D48E /* PlayerDetailView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1CA25A481D0E08A294CA9AE4 /* PlayerDetailView.swift */; };
 		8182B00AFEBC06AF8344B44F /* CalendarMonthGrid.swift in Sources */ = {isa = PBXBuildFile; fileRef = A9B7931432AD11CC2E5F6FB1 /* CalendarMonthGrid.swift */; };
 		87627F03F9204B08F2A8C970 /* ScenarioCardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */; };
+		892D3B685B34014072BEE9FE /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = C0F3B51EFA4B3E46BB9BB003 /* Assets.xcassets */; };
 		89F13257D22AE3296DFCC17B /* MatchEvaluation.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14898B66B18811D2A1DDB799 /* MatchEvaluation.swift */; };
 		8B49A41A78A8D0FE27E2983A /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D8B8C49E5F68715067FCA8A2 /* DashboardView.swift */; };
 		951C2F103A97104D13602E36 /* HeaderBubble.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2DE823954C7D97BDD460461A /* HeaderBubble.swift */; };
@@ -140,6 +141,7 @@
 		B4CA646C436B2CBFBB301918 /* MatchDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchDetailView.swift; sourceTree = "<group>"; };
 		BA6EA336A6452F24FB5DAC8E /* DebugAuth.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = DebugAuth.swift; sourceTree = "<group>"; };
 		BF17BA3D5E76F4AF68C9C330 /* HeatGuidanceSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeatGuidanceSheet.swift; sourceTree = "<group>"; };
+		C0F3B51EFA4B3E46BB9BB003 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		C49C12C1856F7C3097410319 /* PostMatchEvaluationView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PostMatchEvaluationView.swift; sourceTree = "<group>"; };
 		C54BACD0249D1B9D78BC7177 /* ScenarioCardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ScenarioCardView.swift; sourceTree = "<group>"; };
 		CA0D016A6E8FAAC7A7465B28 /* AuthService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AuthService.swift; sourceTree = "<group>"; };
@@ -162,9 +164,18 @@
 			path = State;
 			sourceTree = "<group>";
 		};
+		0C892FE70C7DAB0F4C5D654F /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				C0F3B51EFA4B3E46BB9BB003 /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
 		29D82C8CB2C4286FD1804FE2 = {
 			isa = PBXGroup;
 			children = (
+				0C892FE70C7DAB0F4C5D654F /* Resources */,
 				78A4651B7978DCDFB55745FA /* Sources */,
 				5D4377B3D0AA929C970F19F5 /* Products */,
 			);
@@ -319,6 +330,7 @@
 			buildConfigurationList = 3F3284AB944F57467EADBAC7 /* Build configuration list for PBXNativeTarget "PlayFuel" */;
 			buildPhases = (
 				B63D3A3FE1D888AB9FE409DA /* Sources */,
+				68EA274995D2F03AD5E5AE26 /* Resources */,
 			);
 			buildRules = (
 			);
@@ -364,6 +376,17 @@
 			);
 		};
 /* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		68EA274995D2F03AD5E5AE26 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				892D3B685B34014072BEE9FE /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		B63D3A3FE1D888AB9FE409DA /* Sources */ = {
