@@ -9,7 +9,7 @@ import AuthenticationServices
 /// Auth flow:
 ///   1. Apple returns `ASAuthorizationAppleIDCredential` with `identityToken`.
 ///   2. `signIn(with:)` POSTs the id_token to Supabase Auth v1 token endpoint.
-///   3. Supabase issues a JWT (HS256) access_token + refresh_token.
+///   3. Supabase issues a JWT access_token + refresh_token.
 ///   4. Tokens stored in Keychain. `isSignedIn` flips to true.
 ///   5. `APIClient` reads `currentAccessToken` from Keychain on every /v1/* call.
 ///   6. On 401: `APIClient` calls `refresh()`, retries once.
