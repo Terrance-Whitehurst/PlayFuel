@@ -111,6 +111,7 @@ Migrations **must** be applied in filename order:
 | `0009_plans_upsert_constraint.sql` | Ensures the partial unique index on `(match_id, match_type)` exists for idempotent plan upserts (resolves OQ-IA-9). |
 | `0010_players_and_notes.sql` | Creates `public.players` and `public.player_notes` tables, `player_note_source` enum, adds nullable `opponent_player_id` FK to `public.matches`. Includes RLS (8 new policies). See PLAYER_SCOUTING_V1.md §B. |
 | `0011_match_evaluations.sql` | Creates `public.match_evaluations` table, `match_eval_result` enum (`won`/`lost`/`withdrew`/`retired`), 4 RLS policies. One row per match (UNIQUE on `match_id`). Auto-syncs `opponent_observations` to `player_notes` via `services/post_match_sync.py`. See POST_MATCH_EVAL_V1.md §B. |
+| `0012_tournament_location.sql` | Adds nullable `venue_place_id` TEXT column to `public.tournaments`; adds coords-pair CHECK constraint; creates `public.tournament_places_cache` table (keyed by `(tournament_id, place_type)`, JSONB payload, 24h TTL enforced at API layer) + 4 RLS policies. See TOURNAMENT_LOCATION_V1.md §C. |
 
 ---
 
