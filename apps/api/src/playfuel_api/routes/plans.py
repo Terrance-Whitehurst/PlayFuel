@@ -23,7 +23,9 @@ Endpoints:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timezone
+from collections import defaultdict, deque
+from datetime import datetime, timedelta, timezone
+from threading import Lock
 from typing import Any, Optional
 from uuid import UUID
 
@@ -53,6 +55,61 @@ _PLANS_TABLE = "plans"
 _MATCHES_TABLE = "matches"
 _WEATHER_TABLE = "weather_snapshots"
 
+# ── Per-user rate limiting (SP-2) ──────────────────────────────────────────────
+# In-memory sliding-window counters keyed by JWT sub (user_id as str).
+# TODO: migrate to Redis when deploying multiple Fly.io instances — in-memory
+# state is per-process and will not share across horizontally-scaled replicas.
+_RATE_LIMIT_HOURLY: int = 10   # max plan generations per user per rolling hour
+_RATE_LIMIT_DAILY: int = 30    # max plan generations per user per rolling 24 h
+_hourly_calls: dict[str, deque[datetime]] = defaultdict(deque)
+_daily_calls: dict[str, deque[datetime]] = defaultdict(deque)
+_rate_limit_lock = Lock()
+
+
+def _check_rate_limit(user_id: str) -> tuple[bool, int]:
+    """Check and record a plan-generation call against per-user rate limits.
+
+    Evicts expired timestamps before checking, keeping memory bounded.
+    Records the call only if it is within both windows.
+
+    Args:
+        user_id: JWT subject string (UUID) identifying the calling user.
+
+    Returns:
+        (is_allowed, retry_after_seconds): if is_allowed is False, retry_after
+        is the number of seconds until the earliest slot opens in the binding
+        window.  When is_allowed is True, retry_after is 0.
+
+    Thread-safe via _rate_limit_lock.
+    """
+    now = datetime.now(tz=timezone.utc)
+    one_hour_ago = now - timedelta(hours=1)
+    one_day_ago = now - timedelta(days=1)
+
+    with _rate_limit_lock:
+        hour_q = _hourly_calls[user_id]
+        while hour_q and hour_q[0] < one_hour_ago:
+            hour_q.popleft()
+
+        day_q = _daily_calls[user_id]
+        while day_q and day_q[0] < one_day_ago:
+            day_q.popleft()
+
+        if len(hour_q) >= _RATE_LIMIT_HOURLY:
+            oldest = hour_q[0]
+            retry_after = max(1, int((oldest + timedelta(hours=1) - now).total_seconds()) + 1)
+            return False, retry_after
+
+        if len(day_q) >= _RATE_LIMIT_DAILY:
+            oldest = day_q[0]
+            retry_after = max(1, int((oldest + timedelta(days=1) - now).total_seconds()) + 1)
+            return False, retry_after
+
+        # Within both windows — record the call.
+        hour_q.append(now)
+        day_q.append(now)
+        return True, 0
+
 
 @router.post(
     "/{tid}/plans/generate",
@@ -72,6 +129,20 @@ async def generate_plan(
     Either array may be empty when no matches of that type exist.
     HTTP response is always 200 regardless of gap_status (§G / OQ-14).
     """
+    # SP-2: per-user rate limit — checked BEFORE any DB or weather calls.
+    # Limits: 10 calls/rolling-hour, 30 calls/rolling-day per JWT sub.
+    # Returns 429 + Retry-After header (seconds) when either window is full.
+    _allowed, _retry_after = _check_rate_limit(str(_user_id))
+    if not _allowed:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=(
+                "Plan generation rate limit exceeded. "
+                "Please wait before generating another plan."
+            ),
+            headers={"Retry-After": str(_retry_after)},
+        )
+
     # 1. Load matches ordered by display_order, then scheduled_start.
     matches_result = (
         client.table(_MATCHES_TABLE)
