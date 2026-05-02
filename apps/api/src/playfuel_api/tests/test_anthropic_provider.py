@@ -429,13 +429,17 @@ def test_build_explanation_input_strips_pii() -> None:
         f"Found in: {serialized}"
     )
 
-    # Positive assertion: the food option's name and category DO appear
-    # (stripped version, not the raw FoodOption with PII fields).
-    assert "Caffe Luna Rosa" in serialized, (
-        "food recommendation name must appear in PlanExplanationInput output"
+    # SEC-P6-1: restaurant NAME must be ABSENT — build_explanation_input() now
+    # populates food_categories (bucket name only), not food_recommendations.
+    # Sending specific restaurant names to an external LLM is prohibited.
+    assert "Caffe Luna Rosa" not in serialized, (
+        "food recommendation name 'Caffe Luna Rosa' must NOT appear in PlanExplanationInput output. "
+        "SEC-P6-1: build_explanation_input() must send food_categories, not restaurant names. "
+        f"Found in: {serialized}"
     )
+    # Category bucket name MUST be present.
     assert "italian_restaurant" in serialized, (
-        "food recommendation category must appear in PlanExplanationInput output"
+        "food category bucket 'italian_restaurant' must appear in PlanExplanationInput output"
     )
 
 

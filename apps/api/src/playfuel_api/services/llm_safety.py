@@ -4,7 +4,8 @@ validate_explanation() checks that a PlanExplanation produced by any provider:
   1. Contains no prohibited phrase (SAFETY_DISCLAIMERS.md §C verbatim table).
   2. Includes user_disclaimer verbatim in safety_note.
   3. If extreme_heat_risk, includes heat_emergency_text verbatim in safety_note.
-  4. Does not hallucinate a restaurant name absent from the input food_recommendations.
+  4. Does not hallucinate a restaurant name not derivable from input food_categories or
+     food_recommendations (heuristic: multi-word Title-Case phrase in food_note).
   5. Does not mention a match duration not in {75, 120, 180} minutes.
 
 sanitize_or_fallback() wraps validate_explanation() — on any violation it discards
@@ -61,6 +62,11 @@ _CANONICAL_DURATIONS_INT: frozenset[int] = frozenset({
 # (No external tests import this; kept for defensive backward-compat.)
 _CANONICAL_DURATIONS: frozenset[str] = frozenset(str(d) for d in _CANONICAL_DURATIONS_INT)
 
+# Regex to detect multi-word proper-noun phrases in food_note — heuristic for
+# hallucinated restaurant names (e.g. "Caffe Luna Rosa", "Burger King").
+# Matches two or more consecutive Title-Case words each ≥3 chars total.
+_PROPER_NOUN_RE = re.compile(r'\b([A-Z][a-z]{2,})(?:\s+[A-Z][a-z]{2,})+\b')
+
 # Regex to extract duration expressions in two forms:
 #   (A) hr-based  — group 1 & 2: "2 hr" or "1 hr 15 min" (friendly_duration output)
 #   (B) standalone — group 3:     "75 min" / "95 minutes"  (legacy / hardcoded test strings)
@@ -114,7 +120,7 @@ def validate_explanation(
         1. No prohibited phrase (case-insensitive substring).
         2. user_disclaimer verbatim in safety_note.
         3. heat_emergency_text verbatim in safety_note when extreme_heat_risk.
-        4. No restaurant name in prose not present in inp.food_recommendations.
+        4. No hallucinated restaurant name in food_note (multi-word Title-Case heuristic).
         5. No fabricated match duration (only 75, 120, 180 allowed adjacent to "min").
     """
     violations: list[str] = []
@@ -143,29 +149,35 @@ def validate_explanation(
             )
 
     # 4. No hallucinated restaurant name.
-    # Build the allowed set from inp.food_recommendations (case-insensitive).
+    # SEC-P6-1: at runtime food_recommendations is always empty; food_categories contains
+    # category bucket names (e.g. ["italian_restaurant"]). Build allowed sets from both
+    # sources so backward-compat tests that still use food_recommendations still pass.
     allowed_food_names: set[str] = {r.name.lower() for r in inp.food_recommendations}
-    # We only check summary, scenario_explanations, food_note — not safety_note
-    # (safety_note never mentions restaurants).
-    food_scan_text = " ".join([
-        exp.summary,
-        exp.food_note or "",
-        *exp.scenario_explanations.values(),
-    ])
-    # Simple heuristic: look for capitalized proper-noun-like tokens ≥5 chars that
-    # appear inside a parenthetical or after "at " / "near " and are NOT in the
-    # allowed set.  This avoids false positives on common words.
-    # For a more robust check in production, pass the full allowed name list.
-    if allowed_food_names:
-        # Only flag if there are expected names in input — if empty, any mention is suspicious.
-        pass  # Restaurant hallucination via LLM is caught by the "no key → template" path.
-    else:
-        # If input has zero food recommendations, any food-sounding proper noun in food_note is a flag.
-        if exp.food_note and len(exp.food_note) > 10:
-            _logger.debug(
-                "food_note present but no food_recommendations in input — "
-                "may indicate fabricated restaurant: %r", exp.food_note[:80]
-            )
+    # Build vocabulary of allowed words from food_categories bucket names.
+    _category_words: set[str] = set()
+    for _cat in inp.food_categories:
+        for _word in _cat.replace("_", " ").lower().split():
+            _category_words.add(_word)
+    # Generic non-restaurant terms that may appear as consecutive Title-Case words in
+    # legitimate food notes (e.g. "Quick Pickup window", "Light Meal option").
+    _FOOD_NOTE_GENERIC: frozenset[str] = frozenset({
+        "nearby", "options", "option", "food", "quick", "pickup", "light", "meal",
+        "grab", "local", "fresh", "portable", "snack", "normal", "short", "long",
+        "window", "plan", "match", "schedule", "service",
+    })
+    # Only scan food_note — that is where hallucinated restaurant names would appear.
+    food_only_text = exp.food_note or ""
+    for _m in _PROPER_NOUN_RE.finditer(food_only_text):
+        _phrase = _m.group(0).lower()
+        _phrase_words = set(_phrase.split())
+        # Allow if all phrase words are derivable from category vocab or generic terms.
+        if not _phrase_words.issubset(_category_words | _FOOD_NOTE_GENERIC):
+            # Also allow if it's an explicitly provided restaurant name (backward compat).
+            if _phrase not in allowed_food_names:
+                violations.append(
+                    f"Possible hallucinated restaurant name in food_note: {_m.group(0)!r}. "
+                    "Food notes must use category types, not specific restaurant names."
+                )
 
     # 5. Fabricated match duration — only canonical values allowed adjacent to "hr"/"min".
     #    Handles both legacy "75 min" form and friendly_duration "1 hr 15 min" form.

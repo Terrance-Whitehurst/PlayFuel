@@ -39,6 +39,8 @@ SYSTEM_PROMPT: str = (
     "- Explain the plan clearly to a parent.\n"
     "- Use a calm, practical tone.\n"
     "- Do not invent restaurants, menu items, weather facts, match rules, or medical advice.\n"
+    "- Describe food options using the category types provided — do not name specific "
+    "restaurants (e.g., say 'Italian restaurant nearby' not 'Caffe Luna Rosa').\n"
     "- Do not change the structured timing.\n"
     "- Mention that injury or illness concerns should be handled by a qualified professional.\n"
     "- Keep the plan concise enough to read during a tournament.\n\n"
@@ -108,6 +110,16 @@ def _pickup_bucket_text(pickup_bucket: str) -> str:
         "pickup_during_match": "consider picking up food during the final portion of the match if another trusted adult is present",
         "wait_until_end": "wait until the match ends before getting food",
     }.get(pickup_bucket, "follow your normal routine")
+
+
+def _fmt_food_category(cat: str) -> str:
+    """Format a food bucket name into parent-readable text.
+
+    'italian_restaurant' → 'Italian restaurant'
+    'fast_food_restaurant' → 'Fast food restaurant'
+    """
+    text = cat.replace("_", " ")
+    return text[:1].upper() + text[1:] if text else ""
 
 
 class TemplateProvider:
@@ -234,14 +246,24 @@ class TemplateProvider:
     ) -> Optional[str]:
         if inp.bag_fallback_only:
             return "Pack from home \u2014 bag-only window between matches."
-        if not inp.food_recommendations:
-            return None
-        top3 = inp.food_recommendations[:3]
-        parts: list[str] = []
-        for r in top3:
-            drive = f", {r.drive_time_minutes} min drive" if r.drive_time_minutes is not None else ""
-            parts.append(f"{r.name} ({r.category}{drive})")
-        return f"Nearby options: {', '.join(parts)}."
+        # SEC-P6-1: prefer food_categories (category-only, no names) when available.
+        # Fall back to legacy food_recommendations for backward compat \u2014 tests that
+        # construct PlanExplanationInput directly still set food_recommendations.
+        if inp.food_categories:
+            cats = [_fmt_food_category(c) for c in inp.food_categories[:3]]
+            return f"Nearby food options include: {', '.join(cats)}."
+        if inp.food_recommendations:
+            top3 = inp.food_recommendations[:3]
+            parts: list[str] = []
+            for r in top3:
+                drive = (
+                    f", {r.drive_time_minutes} min drive"
+                    if r.drive_time_minutes is not None
+                    else ""
+                )
+                parts.append(f"{r.name} ({r.category}{drive})")
+            return f"Nearby options: {', '.join(parts)}."
+        return None
 
     @staticmethod
     def _build_safety_note(
@@ -510,7 +532,6 @@ def build_explanation_input(
     Called in routes/plans.py after build_plan_envelope() returns.
     """
     from playfuel_api.models.api import (
-        FoodRecommendationSummary,
         PlanExplanationInput,
         ScenarioSummary,
     )
@@ -532,16 +553,16 @@ def build_explanation_input(
         for s in plan.scenario_plans
     ]
 
-    # Food recommendations (name + category + drive_time; no address / place_id)
-    food_recs = [
-        FoodRecommendationSummary(
-            name=f.name,
-            category=f.category,
-            drive_time_minutes=f.drive_time_minutes,
-            is_draft=f.is_draft if hasattr(f, "is_draft") else False,
-        )
-        for f in (food_options_list or [])
-    ]
+    # SEC-P6-1: build food_categories (deduplicated bucket names, no restaurant names).
+    # food_recommendations stays empty — sending specific names to an external LLM
+    # violates the spec intent ("send the shape of the day, not specific restaurants").
+    _seen_cats: set[str] = set()
+    food_cats: list[str] = []
+    for _f in (food_options_list or []):
+        _cat = _f.category or "unknown_cuisine"
+        if _cat not in _seen_cats:
+            _seen_cats.add(_cat)
+            food_cats.append(_cat)
 
     # Weather flags
     weather_flags: list[str] = []
@@ -582,7 +603,8 @@ def build_explanation_input(
         weather_flags=weather_flags,
         extreme_heat_risk=extreme_heat_risk,
         scenarios=scenarios,
-        food_recommendations=food_recs,
+        food_categories=food_cats,
+        # food_recommendations intentionally empty (SEC-P6-1: names not sent to LLM)
         bag_fallback_only=plan.bag_fallback_only,
         heat_emergency_text=HEAT_EMERGENCY_TEXT if extreme_heat_risk else None,
         user_disclaimer=USER_DISCLAIMER,
