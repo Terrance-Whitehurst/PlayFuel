@@ -187,10 +187,12 @@ _SUGGESTIONS: dict[str, tuple[dict, bool]] = {
     "fast_casual_bowl": (
         # Chipotle bowl — CONFIRMED (is_draft=False).
         # Decomposed from _TEMPLATES["fast_casual_bowl"] authoritative text.
+        # GAP-5a: added 3rd main option to meet ≥3 threshold (all 3 are clean, rules-compliant).
         {
             "main_options": [
                 "Rice bowl with grilled chicken or steak: brown or white rice base, black beans",
-                "Add fresh salsa and lettuce",
+                "Burrito bowl (no tortilla): chicken or steak, rice, mild salsa, lettuce",
+                "Salad bowl with grilled protein, rice, and pico de gallo — lighter option",
             ],
             "add_ons": [],
             "drinks": ["16\u201320 oz water"],
@@ -205,10 +207,12 @@ _SUGGESTIONS: dict[str, tuple[dict, bool]] = {
     ),
     "breakfast_cafe": (
         # DRAFT — OQ-B: pending content review. Priority: user said \"click into Starbucks.\"
+        # GAP-5a: added 3rd main option to meet ≥3 threshold.
         {
             "main_options": [
                 "Oatmeal (plain or lightly sweetened)",
                 "Whole-grain item with eggs if available",
+                "Greek yogurt (plain, low-sugar) with fruit — if 2+ hours before play",
             ],
             "add_ons": ["Banana or fruit cup \u2014 easy carb bridge"],
             "drinks": [
@@ -226,10 +230,12 @@ _SUGGESTIONS: dict[str, tuple[dict, bool]] = {
     ),
     "sandwich_shop": (
         # DRAFT — OQ-B: pending content review.
+        # GAP-5a: third item was really an add-on; added as a true main option instead.
         {
             "main_options": [
                 "Turkey or chicken on whole-grain bread",
-                "Add lettuce, tomato, mustard",
+                "Lean deli wrap: turkey or chicken in whole-grain tortilla with vegetables",
+                "Whole-grain sub with lean protein, no heavy sauces or extra cheese",
             ],
             "add_ons": ["Baked chips or pretzels if gap allows"],
             "drinks": ["Water or diluted sports drink"],
@@ -243,10 +249,12 @@ _SUGGESTIONS: dict[str, tuple[dict, bool]] = {
     ),
     "grocery_prepared": (
         # DRAFT — OQ-B: pending content review.
+        # GAP-5a: added 3rd main option to meet ≥3 threshold.
         {
             "main_options": [
                 "Rotisserie chicken with rice",
                 "Prepared grain bowl \u2014 lean protein + complex carbs",
+                "Pre-packaged sushi rolls (rice-based, no fried items) \u2014 if gap allows",
             ],
             "add_ons": ["Fresh fruit for post-match recovery"],
             "drinks": ["Water or electrolyte drink"],
