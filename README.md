@@ -2,7 +2,7 @@
 
 > Tournament-day operating system for junior tennis parents. iPhone-first.
 
-**Phase 1 complete · Phase 2 complete · Phase 3 complete · Phases 4–6 in progress**
+**Phase 1 complete · Phase 2 complete · Phase 3 complete · Phase 4 complete · Phase 5 complete · Phase 6 in progress**
 
 ---
 
@@ -67,7 +67,7 @@ _(Screenshots TBD when iOS build is recordable)_
 | Auth | Supabase Auth + Sign in with Apple → HS256 JWT | supabase-py ≥ 2.5 · PyJWT ≥ 2.8 |
 | Database | Supabase Postgres + Row-Level Security | — |
 | Settings | pydantic-settings | ≥ 2.3 |
-| Weather | WeatherKit _or_ OpenWeather | TBD — Phase 4 (OQ-D) |
+| Weather | Open-Meteo (free, keyless, global) | Phase 4 complete |
 | Places | Google Places _or_ Yelp Fusion | TBD — Phase 5 |
 | LLM | TBD (explanation layer only — never plan logic) | Phase 6 |
 
@@ -169,7 +169,7 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | 1 — iOS prototype | ✅ Complete | SwiftUI shell with fake data (22 files, Dallas demo, EmergencyBanner) |
 | 2 — Auth + DB | ✅ Complete | Supabase schema (9 tables, 6 enums, RLS), Sign in with Apple |
 | 3 — FastAPI + engine | ✅ Complete | JWT auth, 18 endpoints, deterministic rules engine, 5 scenario acceptance tests |
-| 4 — Weather | 🔲 Pending | Weather API client (WeatherKit/OpenWeather), flag classifier, plan adjustments |
+| 4 — Weather | ✅ Complete | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
 | 5 — Food / Places | 🔲 Pending | Nearby food search, restaurant templates, recommended orders |
 | 6 — LLM layer | 🔲 Pending | Structured plan JSON → parent-friendly explanation (deliberately deferred) |
 | 7 — Feedback | 🔲 Pending | Post-tournament rating screen, what-worked / what-didn't |
