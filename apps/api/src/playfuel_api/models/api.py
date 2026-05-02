@@ -553,6 +553,64 @@ class MatchEvaluation(BaseModel):
     updated_at: datetime
 
 
+# ── Phase 7 Feedback models ──────────────────────────────────────────────────
+
+
+class FeedbackCreate(BaseModel):
+    """POST /v1/tournaments/{tid}/feedback request body.
+
+    Validation:
+      - ``overall_rating`` must be 1–5 if provided (optional — parent may submit
+        chips without a star rating).
+      - ``what_worked`` and ``what_didnt_work`` tokens must be from
+        ``FEEDBACK_CHIPS_WORKED`` vocab. Max 7 tokens per field.
+      - ``free_text`` capped at 500 characters.
+    """
+    model_config = _CAMEL
+
+    overall_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    what_worked: list[str] = Field(default_factory=list)
+    what_didnt_work: list[str] = Field(default_factory=list)
+    free_text: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("what_worked", mode="before")
+    @classmethod
+    def _check_what_worked(cls, v: list) -> list:
+        from playfuel_api.rules.feedback import (  # noqa: PLC0415
+            FEEDBACK_CHIPS_WORKED,
+            validate_chip_list,
+        )
+        return validate_chip_list(v or [], FEEDBACK_CHIPS_WORKED, "what_worked")
+
+    @field_validator("what_didnt_work", mode="before")
+    @classmethod
+    def _check_what_didnt_work(cls, v: list) -> list:
+        from playfuel_api.rules.feedback import (  # noqa: PLC0415
+            FEEDBACK_CHIPS_DIDNT_WORK,
+            validate_chip_list,
+        )
+        return validate_chip_list(v or [], FEEDBACK_CHIPS_DIDNT_WORK, "what_didnt_work")
+
+
+class FeedbackResponse(BaseModel):
+    """API response for GET / POST /v1/tournaments/{tid}/feedback.
+
+    Returned on both 201 (create) and 200 (update) to give iOS the full row.
+    ``plan_id`` is nullable — feedback row survives plan deletion (SET NULL).
+    """
+    model_config = _CAMEL
+
+    id: UUID
+    tournament_id: UUID
+    plan_id: Optional[UUID] = None
+    overall_rating: Optional[int] = None
+    what_worked: list[str] = []
+    what_didnt_work: list[str] = []
+    free_text: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
 class GeneratePlanResponse(BaseModel):
     """HTTP 200 response from POST /v1/tournaments/{tid}/plans/generate.
 
