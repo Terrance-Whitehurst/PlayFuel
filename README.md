@@ -68,7 +68,7 @@ _(Screenshots TBD when iOS build is recordable)_
 | Database | Supabase Postgres + Row-Level Security | — |
 | Settings | pydantic-settings | ≥ 2.3 |
 | Weather | Open-Meteo (free, keyless, global) | Phase 4 complete |
-| Places | Google Places _or_ Yelp Fusion | TBD — Phase 5 |
+| Places | Google Places (New) — `places.googleapis.com/v1/places:searchNearby` | Phase 5 complete |
 | LLM | TBD (explanation layer only — never plan logic) | Phase 6 |
 
 ---
@@ -170,7 +170,7 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | 2 — Auth + DB | ✅ Complete | Supabase schema (9 tables, 6 enums, RLS), Sign in with Apple |
 | 3 — FastAPI + engine | ✅ Complete | JWT auth, 18 endpoints, deterministic rules engine, 5 scenario acceptance tests |
 | 4 — Weather | ✅ Complete | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
-| 5 — Food / Places | 🔲 Pending | Nearby food search, restaurant templates, recommended orders |
+| 5 — Food / Places | ✅ Complete | Google Places (New) integration, cuisine-specific restaurant templates (12 buckets), recommended orders, safety lint |
 | 6 — LLM layer | 🔲 Pending | Structured plan JSON → parent-friendly explanation (deliberately deferred) |
 | 7 — Feedback | 🔲 Pending | Post-tournament rating screen, what-worked / what-didn't |
 | 8 — Beta | 🔲 Pending | TestFlight build, 5–10 junior tennis families |
