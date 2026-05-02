@@ -20,6 +20,7 @@
 		26383E81BED87E250ECACB0B /* SettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 6EAA16931681674D75171D1C /* SettingsView.swift */; };
 		2819CB8C07935F8521876AB7 /* FoodOption.swift in Sources */ = {isa = PBXBuildFile; fileRef = 63A8963D6167FAD62CA951AE /* FoodOption.swift */; };
 		2920D9C0EC80DD967DC708AE /* NextActionCard.swift in Sources */ = {isa = PBXBuildFile; fileRef = 87AE661B091859A7E90E4C6A /* NextActionCard.swift */; };
+		2AA01CAF4D5BDAC4010362F0 /* VenueSearchViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = 14AD865505C2D57B7FD200FE /* VenueSearchViewModel.swift */; };
 		397694D5FB5BA9A45705FAAC /* FoodOptionDetailSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = 9955DC10D597BB485D282CDF /* FoodOptionDetailSheet.swift */; };
 		3E6C828C968501222BF5227C /* Match.swift in Sources */ = {isa = PBXBuildFile; fileRef = 2FEF49588955B05641B5EE27 /* Match.swift */; };
 		42DD6CB67DB7F41B2A5EBE82 /* DurationFormatting.swift in Sources */ = {isa = PBXBuildFile; fileRef = 02E962C38D7B7C3D6EE1F7F9 /* DurationFormatting.swift */; };
@@ -90,6 +91,7 @@
 		127C059AB0E156D9BFF01D52 /* HeaderBubbleRow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HeaderBubbleRow.swift; sourceTree = "<group>"; };
 		136FAA9B0E2AACEC604CF6F4 /* PlayFuel.app */ = {isa = PBXFileReference; includeInIndex = 0; lastKnownFileType = wrapper.application; path = PlayFuel.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		14898B66B18811D2A1DDB799 /* MatchEvaluation.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MatchEvaluation.swift; sourceTree = "<group>"; };
+		14AD865505C2D57B7FD200FE /* VenueSearchViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VenueSearchViewModel.swift; sourceTree = "<group>"; };
 		14F6A58B35CC45E975FBC588 /* TimelineView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TimelineView.swift; sourceTree = "<group>"; };
 		167554474528A5A9A530B387 /* FoodSuggestions.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FoodSuggestions.swift; sourceTree = "<group>"; };
 		1CA25A481D0E08A294CA9AE4 /* PlayerDetailView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlayerDetailView.swift; sourceTree = "<group>"; };
@@ -316,6 +318,7 @@
 				53B03D40B2468D26075E6590 /* TournamentCreateView.swift */,
 				E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */,
 				A30AE19CFED4698BCC9E569E /* TournamentListView.swift */,
+				14AD865505C2D57B7FD200FE /* VenueSearchViewModel.swift */,
 				6F52B449265DCBA14E961E95 /* WeatherCardView.swift */,
 				66B42F8CD0AE47989FF9048E /* Sheets */,
 			);
@@ -460,6 +463,7 @@
 				FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */,
 				B48E8CF5C50296DC00C411DF /* User.swift in Sources */,
 				AB4AD8483F9892622D4AAD1C /* VenueMapSheet.swift in Sources */,
+				2AA01CAF4D5BDAC4010362F0 /* VenueSearchViewModel.swift in Sources */,
 				ED783DB00779757DDC31488C /* WeatherCardView.swift in Sources */,
 				49F5D0C77D8EF04341F37CA5 /* WeatherSheet.swift in Sources */,
 				AD64452F4938CC50EAFAB031 /* WeatherSnapshot.swift in Sources */,

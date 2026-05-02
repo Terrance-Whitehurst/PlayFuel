@@ -87,11 +87,20 @@ final class Repository: ObservableObject {
     ///
     /// `timeZone` is presented in the iOS form for future use but is NOT in the current API
     /// Pydantic model — it is omitted from the encoded request body.
+    ///
+    /// Venue address fields are optional (nil for legacy callers / tests). When present
+    /// they are sent to the API and persisted on the tournament row (columns exist per
+    /// migration 0002; venue_place_id added by migration 0012).
     func createTournament(
         name: String,
         venueName: String,
-        venueLat: Double,
-        venueLng: Double,
+        venueAddress: String? = nil,
+        venueCity: String? = nil,
+        venueRegion: String? = nil,
+        venuePostal: String? = nil,
+        venuePlaceId: String? = nil,
+        venueLat: Double? = nil,
+        venueLng: Double? = nil,
         startDate: Date,
         endDate: Date,
         timeZone: String
@@ -102,6 +111,11 @@ final class Repository: ObservableObject {
         let body = TournamentCreateRequest(
             name: name,
             venueName: venueName,
+            venueAddress: venueAddress,
+            venueCity: venueCity,
+            venueRegion: venueRegion,
+            venuePostal: venuePostal,
+            venuePlaceId: venuePlaceId,
             venueLat: venueLat,
             venueLng: venueLng,
             startDate: dateFmt.string(from: startDate),
