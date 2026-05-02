@@ -5,11 +5,16 @@ TTL default: 30 minutes (1800 s) — fresh enough for plan generation, low
 rate-limit pressure against Open-Meteo's 10 000 req/day limit.
 
 Behaviour matrix:
-    lat or lng is None                              → return None (no fetch)
-    cache hit  (fetched_at within TTL)              → return cached row
-    cache miss + fetch ok                           → persist + return new row
-    cache miss + fetch fails + stale exists         → return stale row (logged)
-    cache miss + fetch fails + no stale             → return None (logged)
+    lat or lng is None                              -> return None (no fetch)
+    cache hit  (fetched_at within TTL)              -> return cached row
+    cache miss + fetch ok                           -> persist + return new row
+    cache miss + fetch fails + stale exists         -> return stale row (logged)
+    cache miss + fetch fails + no stale             -> return None (logged)
+
+Forecast dispatch (WX-G1):
+    target_dt not provided OR <= 3h in future       -> fetch_current()
+    target_dt > 3h in future AND <= 7 days out      -> fetch_forecast_at()
+    target_dt > 7 days out                          -> log warning + fetch_current()
 
 The route (routes/plans.py) computes is_stale from fetched_at age after
 this function returns — cache.py does not set that flag itself.
@@ -33,6 +38,10 @@ from playfuel_api.weather.service import WeatherService
 _logger = logging.getLogger(__name__)
 _TABLE = "weather_snapshots"
 
+# WX-G1 forecast dispatch thresholds
+_FORECAST_THRESHOLD_SEC: int = 10_800   # 3 hours — beyond this use hourly forecast
+_FORECAST_MAX_DAYS: int = 7             # Open-Meteo hourly horizon (accuracy past 7d is low)
+
 
 async def get_or_fetch_weather(
     client: Client,
@@ -42,16 +51,22 @@ async def get_or_fetch_weather(
     lng: Optional[float],
     weather_service: WeatherService,
     ttl_seconds: int = 1800,
+    target_dt: Optional[datetime] = None,
 ) -> Optional[WeatherSnapshotRow]:
     """Return a fresh-or-cached WeatherSnapshotRow for the tournament.
 
     Args:
         client:          Supabase client (user-scoped, for RLS).
-        tournament_id:   Tournament UUID — the cache key.
+        tournament_id:   Tournament UUID -- the cache key.
         lat:             Venue latitude. If None, returns None immediately.
         lng:             Venue longitude. If None, returns None immediately.
         weather_service: Async HTTP client for Open-Meteo.
         ttl_seconds:     Cache freshness window (default 1800 = 30 min).
+        target_dt:       Optional target datetime for forecast dispatch (WX-G1).
+                         If provided and > _FORECAST_THRESHOLD_SEC in the future
+                         and within _FORECAST_MAX_DAYS, fetch_forecast_at() is
+                         used instead of fetch_current().
+                         Naive datetimes treated as UTC. None -> fetch_current().
 
     Returns:
         WeatherSnapshotRow if weather is available; None otherwise.
@@ -63,7 +78,7 @@ async def get_or_fetch_weather(
         )
         return None
 
-    # ── 1. Look up most recent snapshot for this tournament ─────────────────
+    # 1. Look up most recent snapshot for this tournament
     latest_result = (
         client.table(_TABLE)
         .select("*")
@@ -80,11 +95,38 @@ async def get_or_fetch_weather(
         cached = WeatherSnapshotRow(**latest_result.data[0])
         age = datetime.now(tz=timezone.utc) - cached.fetched_at
         if age <= timedelta(seconds=ttl_seconds):
-            return cached  # fresh cache hit — no provider call needed
+            return cached  # fresh cache hit -- no provider call needed
 
-    # ── 2. Cache miss (or stale) — attempt provider fetch ───────────────────
+    # 2. Cache miss (or stale) -- decide forecast vs. current, then fetch.
+    # Dispatch: if target_dt is >3h out and within 7 days, use fetch_forecast_at.
+    use_forecast = False
+    if target_dt is not None:
+        target_utc = (
+            target_dt.replace(tzinfo=timezone.utc)
+            if target_dt.tzinfo is None
+            else target_dt.astimezone(timezone.utc)
+        )
+        seconds_out = (target_utc - datetime.now(tz=timezone.utc)).total_seconds()
+        if seconds_out > _FORECAST_THRESHOLD_SEC:
+            days_out = (target_utc.date() - datetime.now(tz=timezone.utc).date()).days
+            if days_out > _FORECAST_MAX_DAYS:
+                _logger.warning(
+                    "Tournament %s scheduled_start is %d days out (>%d-day Open-Meteo "
+                    "forecast horizon); falling back to fetch_current",
+                    tournament_id,
+                    days_out,
+                    _FORECAST_MAX_DAYS,
+                )
+                # use_forecast stays False
+            else:
+                use_forecast = True
+
     try:
-        payload = await weather_service.fetch_current(lat, lng)
+        payload = (
+            await weather_service.fetch_forecast_at(lat, lng, target_dt)
+            if use_forecast
+            else await weather_service.fetch_current(lat, lng)
+        )
     except (httpx.HTTPError, ValueError) as exc:
         _logger.warning(
             "Weather provider fetch failed for tournament %s: %s", tournament_id, exc
@@ -96,7 +138,7 @@ async def get_or_fetch_weather(
             return cached  # stale fallback
         return None  # no snapshot at all
 
-    # ── 3. Classify and persist ──────────────────────────────────────────────
+    # 3. Classify and persist
     current = payload.get("current") or {}
     try:
         temp_f = float(current["temperature_2m"])

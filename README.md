@@ -2,7 +2,7 @@
 
 > Tournament-day operating system for junior tennis parents. iPhone-first.
 
-**Phase 1 complete · Phase 2 complete · Phase 3 complete · Phases 4–6 in progress**
+**Phase 1 complete · Phase 2 complete · Phase 3 complete · Phase 4 complete · Phase 5 complete · Phase 6 complete**
 
 ---
 
@@ -67,9 +67,9 @@ _(Screenshots TBD when iOS build is recordable)_
 | Auth | Supabase Auth + Sign in with Apple → HS256 JWT | supabase-py ≥ 2.5 · PyJWT ≥ 2.8 |
 | Database | Supabase Postgres + Row-Level Security | — |
 | Settings | pydantic-settings | ≥ 2.3 |
-| Weather | WeatherKit _or_ OpenWeather | TBD — Phase 4 (OQ-D) |
-| Places | Google Places _or_ Yelp Fusion | TBD — Phase 5 |
-| LLM | TBD (explanation layer only — never plan logic) | Phase 6 |
+| Weather | Open-Meteo (free, keyless, global) | Phase 4 complete |
+| Places | Google Places (New) — `places.googleapis.com/v1/places:searchNearby` | Phase 5 complete |
+| LLM | Anthropic `claude-3-5-haiku-latest` (explanation only) · TemplateProvider fallback | Phase 6 complete |
 
 ---
 
@@ -169,17 +169,20 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | 1 — iOS prototype | ✅ Complete | SwiftUI shell with fake data (22 files, Dallas demo, EmergencyBanner) |
 | 2 — Auth + DB | ✅ Complete | Supabase schema (9 tables, 6 enums, RLS), Sign in with Apple |
 | 3 — FastAPI + engine | ✅ Complete | JWT auth, 18 endpoints, deterministic rules engine, 5 scenario acceptance tests |
-| 4 — Weather | 🔲 Pending | Weather API client (WeatherKit/OpenWeather), flag classifier, plan adjustments |
-| 5 — Food / Places | 🔲 Pending | Nearby food search, restaurant templates, recommended orders |
-| 6 — LLM layer | 🔲 Pending | Structured plan JSON → parent-friendly explanation (deliberately deferred) |
-| 7 — Feedback | 🔲 Pending | Post-tournament rating screen, what-worked / what-didn't |
+| 4 — Weather | ✅ Complete | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
+| 5 — Food / Places | ✅ Complete | Google Places (New) integration, cuisine-specific restaurant templates (12 buckets), recommended orders, safety lint |
+| 6 — LLM layer | ✅ Complete | AnthropicProvider (tool-use structured output) + TemplateProvider fallback; safety lint; PII-stripped prompt input; `llm_summary JSONB` in `plans` table |
+| 7 — Feedback | ✅ Complete | Post-tournament rating screen, what-worked / what-didn't |
 | 8 — Beta | 🔲 Pending | TestFlight build, 5–10 junior tennis families |
 | Privacy | 🟡 In progress | COPPA review, App Store disclosures (PRIVACY_V1 drafted; legal review pending) |
-| Eval | 🔲 Pending | 5 canonical scenario tests (automated harness) |
+| Eval | ✅ Complete | 5 canonical scenario tests (automated harness) — 35 passing, 1 xfail (OQ-F rain delay) |
 
-The **LLM explanation layer (Phase 6) is deliberately deferred** to keep v1 fully deterministic.
-The rules engine — not a language model — owns all plan logic. The LLM will explain the plan
-in parent-friendly prose; it will never change or invent any value in it.
+The **LLM explanation layer (Phase 6) is complete** — `AnthropicProvider` (`claude-3-5-haiku-latest`)
+explains the structured rules-engine plan in parent-friendly prose. It never invents restaurants,
+menu items, weather facts, or medical advice. All output is safety-linted against the §C
+prohibited-phrase list before being stored. `TemplateProvider` remains the default for
+tests and demo (no API key required); `AnthropicProvider` activates via `LLM_PROVIDER=anthropic`
+or `auto` mode when `ANTHROPIC_API_KEY` is set.
 
 **Explicitly out of scope for MVP:** fine-tuning · on-device LLM · menu scraping · coach
 dashboard · recruiting · social network · player rankings · wearable integrations · push

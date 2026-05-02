@@ -758,6 +758,23 @@ enum FakeData {
         )
     ]
 
+    // MARK: - Tournament Feedback (phase7-feedback-spec.md §E.4)
+    //
+    // Dummy feedback for preview blocks. Hex-only UUID (FBFB-pattern).
+    // Safety check: no §C prohibited phrases in any field.
+
+    static let dallasFeedback = TournamentFeedback(
+        id: UUID(uuidString: "FBFBFBFB-0000-0000-0000-000000000001")!,
+        tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
+        planId: nil,
+        overallRating: 4,
+        whatWorked: ["food_timing", "hydration", "scenario_planning"],
+        whatDidntWork: ["schedule"],
+        freeText: nil,
+        createdAt: Date(timeIntervalSinceNow: -3600 * 2),
+        updatedAt: Date(timeIntervalSinceNow: -3600 * 2)
+    )
+
     // MARK: - Match Evaluations (POST_MATCH_EVAL_V1.md §G item 19)
     //
     // Dummy evals for preview blocks. Hex-only UUIDs (sequential EE-pattern).

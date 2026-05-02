@@ -56,6 +56,23 @@ struct PlanEnvelope: Codable, Sendable {
         type == .singles ? singlesPlans.first : doublesPlans.first
     }
 
+    // MARK: - Tournament Completion
+
+    /// True when the tournament is over — all plans have a scheduledStart in the past.
+    /// Returns false when allPlans is empty (no matches added yet, or still loading).
+    ///
+    /// Used by TournamentDashboardView to show the "Rate this tournament" CTA.
+    /// phase7-feedback-spec.md §E.1
+    var allMatchesPast: Bool {
+        guard !allPlans.isEmpty else { return false }
+        let iso = ISO8601DateFormatter()
+        return allPlans.allSatisfy { plan in
+            guard let str = plan.scheduledStart,
+                  let date = iso.date(from: str) else { return false }
+            return date < .now
+        }
+    }
+
     // MARK: - Default Selection
 
     /// Returns the plan whose match starts soonest after `now`.

@@ -4,9 +4,16 @@ Fixtures:
     mock_db            — MagicMock standing in for the Supabase Client.
     client_with_auth   — FastAPI TestClient with both auth + DB overridden.
     client_no_auth     — Plain TestClient with NO dependency overrides (real HTTPBearer).
+    _reset_rate_limit  — autouse; clears per-user rate-limit deques between every test.
 
 Auth override injects TEST_USER_ID so no real JWT secret is required in CI.
 DB override prevents any real Supabase network calls during unit / smoke tests.
+
+Rate-limit reset (SP-2): routes/plans.py keeps module-level in-memory deques to enforce
+per-user hourly / daily caps on plan generation.  Without a reset fixture these counters
+accumulate across tests — after the 10th generate_plan route call the 11th test trips
+the 429 limit regardless of intent.  The autouse fixture below clears the deques before
+every test, making plan-generation tests order-independent.
 """
 from unittest.mock import MagicMock
 from uuid import UUID
@@ -44,7 +51,35 @@ def client_with_auth(mock_db: MagicMock) -> TestClient:
     with TestClient(app) as tc:
         yield tc
 
-    app.dependency_overrides.clear()
+    # Pop only the overrides THIS fixture set — never call .clear() here.
+    # Using .clear() would wipe overrides set by concurrent async fixtures
+    # (e.g. async_client in test_auth_jwks.py) and cause order-dependent failures.
+    app.dependency_overrides.pop(verify_supabase_jwt, None)
+    app.dependency_overrides.pop(authed_client, None)
+
+
+@pytest.fixture(autouse=True)
+def _reset_rate_limit():
+    """Clear plan-generation rate-limit counters before (and after) every test.
+
+    routes/plans._hourly_calls and ._daily_calls are module-level defaultdict(deque)
+    singletons.  Each successful generate_plan call appends a timestamp. Without this
+    reset, tests that call the route accumulate entries across the entire pytest session.
+    After the 10th call the limit fires, causing unrelated tests to receive 429 instead
+    of 200 — a difficult-to-diagnose ordering-dependent flake.
+
+    This fixture is safe to be autouse because:
+      - Tests that explicitly test rate-limiting (test_rate_limit.py) pre-fill the
+        deques themselves after this fixture clears them.
+      - Tests that don't care about rate-limiting get a clean slate on every invocation.
+    """
+    from playfuel_api.routes.plans import _daily_calls, _hourly_calls
+
+    _hourly_calls.clear()
+    _daily_calls.clear()
+    yield
+    _hourly_calls.clear()
+    _daily_calls.clear()
 
 
 @pytest.fixture()

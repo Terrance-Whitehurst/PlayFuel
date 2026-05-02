@@ -227,3 +227,54 @@ def test_prohibited_phrases_list_is_populated() -> None:
     assert len(PROHIBITED_PHRASES) >= 8, (
         f"Expected ≥8 prohibited phrases from §C. Got {len(PROHIBITED_PHRASES)}."
     )
+
+
+# -- Test: check #4 -- hallucinated restaurant name caught (SEC-P6-1) ----------
+
+def test_hallucinated_restaurant_name_in_food_note_is_caught() -> None:
+    """Check 4: LLM-hallucinated restaurant name in food_note triggers a violation.
+
+    SEC-P6-1: at runtime food_recommendations is empty; food_categories has bucket
+    names. A multi-word Title-Case proper noun ('Caffe Luna Rosa') in food_note
+    that is NOT derivable from the input categories must be flagged as a violation.
+    """
+    inp = _base_input()
+    inp = inp.model_copy(update={
+        "food_recommendations": [],
+        "food_categories": ["italian_restaurant"],
+    })
+    exp = _clean_explanation(inp)
+    # Inject a hallucinated restaurant proper-noun into food_note.
+    exp = exp.model_copy(update={
+        "food_note": "Pick up food from Caffe Luna Rosa before the match.",
+    })
+    is_safe, violations = validate_explanation(exp, inp)
+    assert not is_safe, (
+        f"Expected violation for hallucinated restaurant name. Got safe. violations={violations}"
+    )
+    assert any(
+        "caffe luna rosa" in v.lower() or "hallucinated" in v.lower()
+        for v in violations
+    ), f"Expected hallucination violation message. Got: {violations}"
+
+
+def test_category_display_in_food_note_passes_check4() -> None:
+    """Check 4: food_note using category display text (no restaurant names) passes.
+
+    TemplateProvider produces: 'Nearby food options include: Italian restaurant.'
+    'Italian' is Title-Case but 'restaurant' is lowercase -- no multi-word Title-Case
+    match -- so check #4 does not fire.
+    """
+    inp = _base_input()
+    inp = inp.model_copy(update={
+        "food_recommendations": [],
+        "food_categories": ["italian_restaurant"],
+    })
+    exp = _clean_explanation(inp)
+    exp = exp.model_copy(update={
+        "food_note": "Nearby food options include: Italian restaurant.",
+    })
+    is_safe, violations = validate_explanation(exp, inp)
+    assert is_safe, (
+        f"Expected category-based food note to pass. Got violations: {violations}"
+    )

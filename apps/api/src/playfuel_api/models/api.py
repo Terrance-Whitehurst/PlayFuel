@@ -154,6 +154,10 @@ class WeatherBlock(BaseModel):
     is_stale: bool = False           # True when cache fallback was used (provider error)
     fetched_at: datetime
     provider: str
+    # WX-G2: wind + precip exposed so iOS WeatherCardView shows real values.
+    # None when the provider did not return the field (rare; iOS falls back to 0.0).
+    wind_mph: Optional[float] = None
+    precip_prob: Optional[float] = None
 
 
 # ─── Phase 4 timeline block — OQ-API-2 / OQ-TRIAGE-1 ───────────────────────────
@@ -355,12 +359,18 @@ class PlanExplanationInput(BaseModel):
     weather_flags: list[str] = []
     extreme_heat_risk: bool = False
     scenarios: list[ScenarioSummary] = []
-    food_recommendations: list[FoodRecommendationSummary] = []
+    food_recommendations: list[FoodRecommendationSummary] = []  # legacy; prefer food_categories
+    # SEC-P6-1: category bucket names only (no restaurant names, addresses, or place_ids).
+    # build_explanation_input() populates this field; food_recommendations stays empty
+    # at runtime. Tests that construct PlanExplanationInput directly may still use
+    # food_recommendations for backward compat — TemplateProvider falls back to it.
+    food_categories: list[str] = []
     bag_fallback_only: bool = False
     heat_emergency_text: Optional[str] = None
     user_disclaimer: str
     match_type: str = "singles"  # 'singles' | 'doubles' — drives partner-aware LLM prose
     # Player scouting extension (PLAYER_SCOUTING_V1.md §D) — additive, decode-safe
+    # SEC-P6-2: not populated by routes/plans.py — opponent notes stay server-side only.
     opponent_notes: list[OpponentNoteForLLM] = []
 
 
@@ -539,6 +549,64 @@ class MatchEvaluation(BaseModel):
     to_improve: list[str] = Field(default_factory=list)
     opponent_observations: Optional[str] = None
     key_moments: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ── Phase 7 Feedback models ──────────────────────────────────────────────────
+
+
+class FeedbackCreate(BaseModel):
+    """POST /v1/tournaments/{tid}/feedback request body.
+
+    Validation:
+      - ``overall_rating`` must be 1–5 if provided (optional — parent may submit
+        chips without a star rating).
+      - ``what_worked`` and ``what_didnt_work`` tokens must be from
+        ``FEEDBACK_CHIPS_WORKED`` vocab. Max 7 tokens per field.
+      - ``free_text`` capped at 500 characters.
+    """
+    model_config = _CAMEL
+
+    overall_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    what_worked: list[str] = Field(default_factory=list)
+    what_didnt_work: list[str] = Field(default_factory=list)
+    free_text: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("what_worked", mode="before")
+    @classmethod
+    def _check_what_worked(cls, v: list) -> list:
+        from playfuel_api.rules.feedback import (  # noqa: PLC0415
+            FEEDBACK_CHIPS_WORKED,
+            validate_chip_list,
+        )
+        return validate_chip_list(v or [], FEEDBACK_CHIPS_WORKED, "what_worked")
+
+    @field_validator("what_didnt_work", mode="before")
+    @classmethod
+    def _check_what_didnt_work(cls, v: list) -> list:
+        from playfuel_api.rules.feedback import (  # noqa: PLC0415
+            FEEDBACK_CHIPS_DIDNT_WORK,
+            validate_chip_list,
+        )
+        return validate_chip_list(v or [], FEEDBACK_CHIPS_DIDNT_WORK, "what_didnt_work")
+
+
+class FeedbackResponse(BaseModel):
+    """API response for GET / POST /v1/tournaments/{tid}/feedback.
+
+    Returned on both 201 (create) and 200 (update) to give iOS the full row.
+    ``plan_id`` is nullable — feedback row survives plan deletion (SET NULL).
+    """
+    model_config = _CAMEL
+
+    id: UUID
+    tournament_id: UUID
+    plan_id: Optional[UUID] = None
+    overall_rating: Optional[int] = None
+    what_worked: list[str] = []
+    what_didnt_work: list[str] = []
+    free_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 
