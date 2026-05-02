@@ -34,7 +34,7 @@ The deterministic backend owns timings, hydration logic, food categories, and we
 | **2 — Supabase** | #4 | Engineering3 (data) | Schema migrations, RLS policies, Sign in with Apple wired to Supabase Auth |
 | **3 — FastAPI + plan engine** | #5, #6 | Engineering1 (backend) + Engineering2 (mobile) | JWT verify, CRUD, `generate_match_scenarios()`, `POST /generate-plan`; mobile swaps fake data for live API |
 | **4 — Weather** | #7 ✅ | Engineering1 | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
-| **5 — Food / Places** | #8 | Engineering1 | Nearby search, categorizer, restaurant templates, recommended orders |
+| **5 — Food / Places** | #8 ✅ | Engineering1 | Google Places (New) integration, 12-bucket cuisine categorizer, restaurant templates, recommended orders, safety lint |
 | **6 — LLM explanation** | #9 | Engineering1 | Prompt, structured input contract, safety guardrails, store `llm_summary` next to `plan_json` |
 | **7 — Feedback & personalization** | #10 | Engineering2 | Post-tournament rating screen, what-worked / what-didn't, feed into player preferences |
 | **8 — Beta** | #11 | Planning + Engineering2 | TestFlight build, 5–10 junior tennis families, analytics, bug tracking |
