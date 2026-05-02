@@ -480,6 +480,11 @@ def test_post_tournament_persists_venue_place_id(client_with_auth, mock_db) -> N
     )
 
     assert resp.status_code == 201, f"Expected 201, got {resp.status_code}: {resp.text}"
+    # T7: tournament name must be persisted verbatim — this was missing before PR chore/cleanup-phases-5-7.
+    assert inserted_payload.get("name") == "Mike's Spring Open", (
+        "Tournament name was not persisted to DB. Expected 'Mike's Spring Open', "
+        f"got {inserted_payload.get('name')!r}"
+    )
     # All venue fields must appear in the INSERT payload
     assert inserted_payload.get("venue_name") == "Delray Beach Tennis Center"
     assert inserted_payload.get("venue_address") == "201 NW 1st Ave"
