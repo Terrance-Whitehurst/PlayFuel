@@ -11,6 +11,11 @@ AC-LLM-7: httpx.TimeoutException raised by mocked client → plans.py outer exce
 
 AC-LLM-8: build_explanation_input() output serialization contains NO user_id,
            place_id, raw venue_lat, or raw venue_lng values (PII is stripped at source).
+           Also: specific restaurant names are absent (SEC-P6-1) — food_categories
+           only contains bucket names, not restaurant names.
+
+AC-LLM-SEC-P6-2: build_explanation_input() never populates opponent_notes —
+           serialized output does not contain any sentinel note body string.
 
 Mocking strategy:
     - AC-LLM-5 / 6: patch `anthropic.Anthropic` (class in the installed module)
@@ -431,4 +436,70 @@ def test_build_explanation_input_strips_pii() -> None:
     )
     assert "italian_restaurant" in serialized, (
         "food recommendation category must appear in PlanExplanationInput output"
+    )
+
+
+# ── AC-LLM-SEC-P6-2: build_explanation_input() never populates opponent_notes ─────
+
+
+def test_build_explanation_input_strips_opponent_notes() -> None:
+    """SEC-P6-2: build_explanation_input() produces PlanExplanationInput with
+    empty opponent_notes — serialized output does not contain any sentinel note text.
+
+    The route previously attached notes via `exp_input.opponent_notes = ...` after
+    build_explanation_input() returned. That line is now removed. This test verifies
+    the builder itself never populates opponent_notes.
+    """
+    from datetime import datetime, timezone
+    from unittest.mock import MagicMock
+
+    _SENTINEL_NOTE_BODY = "OPPONENT_NOTE_LEAK_SENTINEL_xyz123"
+
+    # Build mock objects (same pattern as AC-LLM-8)
+    from playfuel_api.models.enums import FoodBucket, GapStatus, PickupBucket, ScenarioKind
+
+    mock_food_strategy = MagicMock()
+    mock_food_strategy.bucket = FoodBucket.quick_pickup
+
+    mock_pickup_strategy = MagicMock()
+    mock_pickup_strategy.bucket = PickupBucket.wait_until_end
+
+    mock_scenario = MagicMock()
+    mock_scenario.scenario = ScenarioKind.normal
+    mock_scenario.duration_min = 120
+    mock_scenario.gap_status = GapStatus.ok
+    mock_scenario.food_strategy = mock_food_strategy
+    mock_scenario.pickup_strategy = mock_pickup_strategy
+
+    mock_plan = MagicMock()
+    mock_plan.scenario_plans = [mock_scenario]
+    mock_plan.bag_fallback_only = False
+
+    mock_match = MagicMock()
+    mock_match.scheduled_start = datetime(2026, 6, 1, 9, 0, 0, tzinfo=timezone.utc)
+    mock_match.round_label = "QF"
+    mock_match.format = "singles"
+    mock_match.opponent_player_id = None
+
+    # Call build_explanation_input (does NOT receive notes — they were attached
+    # after-the-fact in the route, which is the code we removed)
+    result = build_explanation_input(
+        plan=mock_plan,
+        match=mock_match,
+        next_match=None,
+        snapshot=None,
+        food_options_list=[],
+        venue_name="Test Venue",
+    )
+
+    # Verify opponent_notes is empty by default
+    assert result.opponent_notes == [], (
+        f"build_explanation_input must not populate opponent_notes. Got: {result.opponent_notes!r}"
+    )
+
+    # Positive-absence check: serialize and confirm sentinel string is absent
+    serialized = result.model_dump_json()
+    assert _SENTINEL_NOTE_BODY not in serialized, (
+        f"Sentinel note body '{_SENTINEL_NOTE_BODY}' must not appear in PlanExplanationInput. "
+        f"Found in: {serialized}"
     )
