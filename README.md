@@ -2,7 +2,7 @@
 
 > Tournament-day operating system for junior tennis parents. iPhone-first.
 
-**Phase 1 complete · Phase 2 complete · Phase 3 complete · Phase 4 complete · Phase 5 complete · Phase 6 in progress**
+**Phase 1 complete · Phase 2 complete · Phase 3 complete · Phase 4 complete · Phase 5 complete · Phase 6 complete**
 
 ---
 
@@ -69,7 +69,7 @@ _(Screenshots TBD when iOS build is recordable)_
 | Settings | pydantic-settings | ≥ 2.3 |
 | Weather | Open-Meteo (free, keyless, global) | Phase 4 complete |
 | Places | Google Places (New) — `places.googleapis.com/v1/places:searchNearby` | Phase 5 complete |
-| LLM | TBD (explanation layer only — never plan logic) | Phase 6 |
+| LLM | Anthropic `claude-3-5-haiku-latest` (explanation only) · TemplateProvider fallback | Phase 6 complete |
 
 ---
 
@@ -171,15 +171,18 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | 3 — FastAPI + engine | ✅ Complete | JWT auth, 18 endpoints, deterministic rules engine, 5 scenario acceptance tests |
 | 4 — Weather | ✅ Complete | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
 | 5 — Food / Places | ✅ Complete | Google Places (New) integration, cuisine-specific restaurant templates (12 buckets), recommended orders, safety lint |
-| 6 — LLM layer | 🔲 Pending | Structured plan JSON → parent-friendly explanation (deliberately deferred) |
+| 6 — LLM layer | ✅ Complete | AnthropicProvider (tool-use structured output) + TemplateProvider fallback; safety lint; PII-stripped prompt input; `llm_summary JSONB` in `plans` table |
 | 7 — Feedback | 🔲 Pending | Post-tournament rating screen, what-worked / what-didn't |
 | 8 — Beta | 🔲 Pending | TestFlight build, 5–10 junior tennis families |
 | Privacy | 🟡 In progress | COPPA review, App Store disclosures (PRIVACY_V1 drafted; legal review pending) |
 | Eval | 🔲 Pending | 5 canonical scenario tests (automated harness) |
 
-The **LLM explanation layer (Phase 6) is deliberately deferred** to keep v1 fully deterministic.
-The rules engine — not a language model — owns all plan logic. The LLM will explain the plan
-in parent-friendly prose; it will never change or invent any value in it.
+The **LLM explanation layer (Phase 6) is complete** — `AnthropicProvider` (`claude-3-5-haiku-latest`)
+explains the structured rules-engine plan in parent-friendly prose. It never invents restaurants,
+menu items, weather facts, or medical advice. All output is safety-linted against the §C
+prohibited-phrase list before being stored. `TemplateProvider` remains the default for
+tests and demo (no API key required); `AnthropicProvider` activates via `LLM_PROVIDER=anthropic`
+or `auto` mode when `ANTHROPIC_API_KEY` is set.
 
 **Explicitly out of scope for MVP:** fine-tuning · on-device LLM · menu scraping · coach
 dashboard · recruiting · social network · player rankings · wearable integrations · push
