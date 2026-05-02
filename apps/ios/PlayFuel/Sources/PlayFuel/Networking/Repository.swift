@@ -14,6 +14,16 @@ final class Repository: ObservableObject {
 
     private let api: APIClient
 
+    /// Date formatter for tournament date fields ("yyyy-MM-dd" strings, UTC).
+    /// Static to avoid re-allocating DateFormatter on every `createTournament` call.
+    /// DateFormatter is expensive to construct (locale resolution, calendar setup).
+    private static let tournamentDateFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "UTC")
+        return fmt
+    }()
+
     /// Encoder for POST request bodies.
     /// .convertToSnakeCase maps Swift camelCase property names → API snake_case field names.
     /// .iso8601 handles Date → "2026-04-27T09:00:00Z" (accepted by FastAPI `datetime` fields).
@@ -23,6 +33,22 @@ final class Repository: ObservableObject {
         enc.dateEncodingStrategy = .iso8601
         return enc
     }()
+
+    // MARK: - Performance Instrumentation
+
+    /// Lightweight call-site timer. Printed to debug console only; never included in
+    /// release builds. Helps diagnose network latency per hot path.
+    ///
+    /// Usage:
+    ///   let t = Repository.clock()
+    ///   defer { Repository.lap(t, label: "myMethod") }
+    static func clock() -> Date { Date() }
+    static func lap(_ start: Date, label: String) {
+        #if DEBUG
+        let ms = Int(Date().timeIntervalSince(start) * 1_000)
+        print("[PlayFuel Perf] \(label): \(ms) ms")
+        #endif
+    }
 
     init(api: APIClient) {
         self.api = api
@@ -44,6 +70,8 @@ final class Repository: ObservableObject {
 
     /// Fetch all tournaments for the current user (RLS-filtered).
     func fetchTournaments() async throws -> [Tournament] {
+        let t = Repository.clock()
+        defer { Repository.lap(t, label: "fetchTournaments") }
         let dtos = try await api.send(
             Endpoints.listTournaments(baseURL: api.baseURL),
             as: .snake,
@@ -105,9 +133,9 @@ final class Repository: ObservableObject {
         endDate: Date,
         timeZone: String
     ) async throws -> Tournament {
-        let dateFmt = DateFormatter()
-        dateFmt.dateFormat = "yyyy-MM-dd"
-        dateFmt.timeZone = TimeZone(identifier: "UTC")
+        let t = Repository.clock()
+        defer { Repository.lap(t, label: "createTournament") }
+        let dateFmt = Repository.tournamentDateFormatter
         let body = TournamentCreateRequest(
             name: name,
             venueName: venueName,
@@ -338,6 +366,43 @@ final class Repository: ObservableObject {
         )
     }
 
+    // MARK: - Tournament Feedback (phase7-feedback-spec.md §C)
+
+    /// Fetch the caller's existing feedback for a tournament.
+    /// Returns nil when no feedback has been submitted yet (API returns 404).
+    func getFeedback(tournamentId: UUID) async throws -> TournamentFeedback? {
+        do {
+            let dto = try await api.send(
+                Endpoints.getFeedback(baseURL: api.baseURL, tournamentId: tournamentId),
+                as: .camel,
+                expecting: TournamentFeedbackDTO.self
+            )
+            return dto.toModel()
+        } catch APIError.notFound {
+            return nil
+        }
+    }
+
+    /// Submit (or update) feedback for a tournament.
+    /// Returns the stored feedback row. Both 201 (create) and 200 (update)
+    /// responses carry the same FeedbackResponse JSON shape.
+    func submitFeedback(
+        tournamentId: UUID,
+        request: TournamentFeedbackCreateRequest
+    ) async throws -> TournamentFeedback {
+        let bodyData = try postEncoder.encode(request)
+        let dto = try await api.send(
+            Endpoints.submitFeedback(
+                baseURL: api.baseURL,
+                tournamentId: tournamentId,
+                body: bodyData
+            ),
+            as: .camel,
+            expecting: TournamentFeedbackDTO.self
+        )
+        return dto.toModel()
+    }
+
     // MARK: - Plans
 
     /// Generate a plan for a tournament via the rules engine.
@@ -347,6 +412,8 @@ final class Repository: ObservableObject {
     ///
     /// HTTP 200 always (the backend returns 200 even for overrun scenarios per OQ-14/§G).
     func generatePlan(tournamentId: UUID) async throws -> PlanEnvelope {
+        let t = Repository.clock()
+        defer { Repository.lap(t, label: "generatePlan") }
         let dto = try await api.send(
             Endpoints.generatePlan(baseURL: api.baseURL, tournamentId: tournamentId),
             as: .camel,

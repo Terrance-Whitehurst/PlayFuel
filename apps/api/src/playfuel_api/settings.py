@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     #   openai    → OpenAIProvider    (requires 'openai'    SDK + key).
     llm_provider: str = "auto"
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-haiku-v3"
+    anthropic_model: str = "claude-3-5-haiku-latest"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     llm_max_tokens: int = 600

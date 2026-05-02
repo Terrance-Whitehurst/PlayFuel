@@ -243,6 +243,28 @@ enum Endpoints {
         return req
     }
 
+    // MARK: - Tournament Feedback (migration 0013 — phase7-feedback-spec.md §C)
+
+    /// GET /v1/tournaments/{tid}/feedback — fetch the caller's own feedback.
+    /// Returns 200 + FeedbackResponse when submitted; 404 when not yet submitted.
+    static func getFeedback(baseURL: URL, tournamentId: UUID) -> URLRequest {
+        URLRequest(url: baseURL.appendingPathComponent(
+            "v1/tournaments/\(tournamentId.uuidString)/feedback"
+        ))
+    }
+
+    /// POST /v1/tournaments/{tid}/feedback — create or update feedback.
+    /// UPSERT on (tournament_id, user_id): 201 on first submission, 200 on update.
+    static func submitFeedback(baseURL: URL, tournamentId: UUID, body: Data) -> URLRequest {
+        var req = URLRequest(url: baseURL.appendingPathComponent(
+            "v1/tournaments/\(tournamentId.uuidString)/feedback"
+        ))
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = body
+        return req
+    }
+
     // MARK: - Plans
 
     /// POST /v1/tournaments/{tid}/plans/generate — run rules engine + persist plan.

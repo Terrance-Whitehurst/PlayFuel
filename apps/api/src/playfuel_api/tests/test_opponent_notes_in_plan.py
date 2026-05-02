@@ -1,14 +1,16 @@
-"""Integration tests — opponent notes fed into generate_plan LLM input.
+"""Integration tests — SEC-P6-2: opponent notes are NOT sent to the LLM.
 
-Covers (PLAYER_SCOUTING_V1.md §D / spec §G acceptance criteria):
-  1. Match with opponent_player_id + 3 notes → llmSummary.summary contains
-     "Your notes mention 3 prior observations".
-  2. Match without opponent_player_id → no "prior observations" phrase in summary.
+SEC-P6-2 fix: routes/plans.py no longer attaches opponent_notes to exp_input.
+Opponent notes are tactical text that must not be serialised to a third-party API.
+
+Covers (updated for SEC-P6-2 contract):
+  1. Match with opponent_player_id + 3 notes → llmSummary.summary does NOT
+     contain any 'prior observations' phrase (notes stripped from LLM input).
+  2. Match without opponent_player_id → no 'prior observations' phrase in summary.
   3. Match with opponent_player_id but 0 notes → no phrase.
-  4. Redacted note (§C prohibited phrase) is dropped; count reflects surviving notes.
+  4. Notes with §C prohibited phrases — summary has no count phrase regardless.
   5. TemplateProvider never quotes note body verbatim in its output.
-  6. Two matches in tournament: first has opponent notes, second does not →
-     first plan has phrase, second plan does not.
+  6. Two matches in tournament: neither plan surfaces opponent notes in summary.
 """
 from __future__ import annotations
 
@@ -99,10 +101,20 @@ def _build_mock_db(
 
 
 def _generate_and_return_plan(client_with_auth, mock_db):
-    """Call generate_plan, patch async/places deps, return response body."""
+    """Call generate_plan, patch async/places deps, and force TemplateProvider.
+
+    Forces LLM_PROVIDER=template via patch so the test is deterministic regardless
+    of the runtime ANTHROPIC_API_KEY environment variable.  Without this patch,
+    if get_settings() is re-created after test_auth_jwks.cache_clear() with CWD at
+    the repo root (where the root .env has an Anthropic key but no LLM_PROVIDER),
+    the factory picks AnthropicProvider — which makes a real network call and fails.
+    """
+    from playfuel_api.services.llm import TemplateProvider
+
     with (
         patch("playfuel_api.routes.plans.get_or_fetch_weather", new_callable=AsyncMock) as mock_wx,
         patch("playfuel_api.routes.plans.find_nearby_food") as mock_places,
+        patch("playfuel_api.routes.plans.get_llm_provider", return_value=TemplateProvider()),
     ):
         mock_wx.return_value = None  # no weather — keeps test synchronous
         mock_places.return_value = []  # no food places needed for these tests
@@ -115,9 +127,13 @@ def _generate_and_return_plan(client_with_auth, mock_db):
 # ── Tests ──────────────────────────────────────────────────────────────────────
 
 
-def test_opponent_notes_phrase_present_with_3_notes(client_with_auth, mock_db):
-    """Match with opponent_player_id + 3 notes → summary contains
-    'Your notes mention 3 prior observations'."""
+def test_opponent_notes_stripped_from_llm_input(client_with_auth, mock_db):
+    """SEC-P6-2: opponent notes are NOT in llmSummary even when match has 3 notes.
+
+    The route no longer attaches opponent_notes to exp_input before calling
+    explain_plan(). The parent-facing summary must not reference note count
+    or note content — that information stays server-side only.
+    """
     notes = [
         _note_row("Moves well to the right side."),
         _note_row("Slice backhand is strong under pressure."),
@@ -147,10 +163,17 @@ def test_opponent_notes_phrase_present_with_3_notes(client_with_auth, mock_db):
     llm_summary = plan.get("llmSummary")
     assert llm_summary is not None, "llmSummary must be populated"
     summary = llm_summary["summary"]
-    assert "3 prior observations" in summary, (
-        f"Expected '3 prior observations' in summary. Got: {summary!r}"
+    # SEC-P6-2: notes stripped — no count phrase in parent-facing summary
+    assert "prior observation" not in summary, (
+        f"SEC-P6-2 violation: opponent note count leaked to LLM summary. Got: {summary!r}"
     )
-    assert "review the player profile for tactics" in summary
+    assert "review the player profile for tactics" not in summary, (
+        f"SEC-P6-2 violation: tactics reference leaked to LLM summary. Got: {summary!r}"
+    )
+    # Note body must also not appear (belt-and-suspenders; notes are never even attached)
+    assert "right side" not in summary.lower(), (
+        f"SEC-P6-2 violation: note body content in summary. Got: {summary!r}"
+    )
 
 
 def test_no_opponent_player_id_no_notes_phrase(client_with_auth, mock_db):
@@ -208,15 +231,16 @@ def test_opponent_player_id_but_zero_notes_no_phrase(client_with_auth, mock_db):
     )
 
 
-def test_redacted_notes_dropped_from_count(client_with_auth, mock_db):
-    """Notes with §C prohibited phrases are dropped; count reflects surviving notes only.
+def test_redacted_notes_no_count_in_summary(client_with_auth, mock_db):
+    """SEC-P6-2: even with notes sent (some redacted), NO count phrase appears in summary.
 
     3 notes sent: 2 tactical (clean), 1 with 'guarantees better performance'.
-    → summary says '2 prior observations', not 3.
+    With SEC-P6-2, ALL notes are stripped before reaching exp_input, so
+    the summary contains no 'prior observations' phrase at all.
     """
     notes = [
         _note_row("Strong serve to the T."),
-        _note_row("His training guarantees better performance in the heat."),  # redacted
+        _note_row("His training guarantees better performance in the heat."),  # would be redacted
         _note_row("Weak second serve."),
     ]
     match_row = _base_match(MID1, opp_player_id=PLAYER_ID)
@@ -237,8 +261,9 @@ def test_redacted_notes_dropped_from_count(client_with_auth, mock_db):
 
     assert resp.status_code == 200, resp.text
     summary = resp.json()["singlesPlans"][0]["llmSummary"]["summary"]
-    assert "2 prior observations" in summary, (
-        f"Expected '2 prior observations' after redacting 1 note. Got: {summary!r}"
+    # SEC-P6-2: route never attaches notes to exp_input — zero count in summary
+    assert "prior observation" not in summary, (
+        f"SEC-P6-2 violation: note count appeared in summary. Got: {summary!r}"
     )
 
 
@@ -276,8 +301,12 @@ def test_note_body_never_quoted_verbatim(client_with_auth, mock_db):
     )
 
 
-def test_singular_word_for_one_note(client_with_auth, mock_db):
-    """1 note → summary uses 'observation' (singular), not 'observations'."""
+def test_single_note_no_count_in_summary(client_with_auth, mock_db):
+    """SEC-P6-2: 1 note linked to match → summary still contains no 'observation' phrase.
+
+    Previously this test verified the count-acknowledgment feature. With SEC-P6-2,
+    notes are stripped from exp_input, so no count-phrase appears regardless of note count.
+    """
     notes = [_note_row("Good slice backhand.")]
     match_row = _base_match(MID1, opp_player_id=PLAYER_ID)
     mock = _build_mock_db([match_row], note_rows=notes)
@@ -297,15 +326,15 @@ def test_singular_word_for_one_note(client_with_auth, mock_db):
 
     assert resp.status_code == 200, resp.text
     summary = resp.json()["singlesPlans"][0]["llmSummary"]["summary"]
-    assert "1 prior observation" in summary, (
-        f"Expected singular 'observation'. Got: {summary!r}"
+    # SEC-P6-2: no note count phrase in summary
+    assert "prior observation" not in summary, (
+        f"SEC-P6-2 violation: note count in summary with 1 note. Got: {summary!r}"
     )
-    assert "observations" not in summary or "1 prior" in summary
 
 
-def test_two_matches_first_has_notes_second_does_not(client_with_auth, mock_db):
-    """Two matches in tournament: first with notes, second without.
-    First plan has phrase; second plan does not.
+def test_two_matches_neither_exposes_opponent_notes(client_with_auth, mock_db):
+    """SEC-P6-2: Two matches, first has notes linked, second does not.
+    Neither plan surfaces opponent notes in its llmSummary summary.
     """
     notes = [_note_row("Strong net game.")]
     match1 = _base_match(MID1, opp_player_id=PLAYER_ID)
@@ -315,9 +344,6 @@ def test_two_matches_first_has_notes_second_does_not(client_with_auth, mock_db):
     match2["scheduled_start"] = "2026-05-15T18:00:00+00:00"
     match2["display_order"] = 2
 
-    # notes_chain will be used for BOTH fetches; first match has 1 note,
-    # second fetch returns empty because opponent_player_id is None
-    # (fetch_opponent_notes_for_match returns [] early when no player ID).
     mock = _build_mock_db([match1, match2], note_rows=notes)
 
     from playfuel_api.auth import verify_supabase_jwt
@@ -340,9 +366,10 @@ def test_two_matches_first_has_notes_second_does_not(client_with_auth, mock_db):
     summary1 = plans[0]["llmSummary"]["summary"]
     summary2 = plans[1]["llmSummary"]["summary"]
 
-    assert "prior observation" in summary1, (
-        f"Plan 1 should mention notes. Got: {summary1!r}"
+    # SEC-P6-2: neither plan exposes opponent note count in parent-facing summary
+    assert "prior observation" not in summary1, (
+        f"SEC-P6-2 violation: plan 1 summary exposes notes. Got: {summary1!r}"
     )
     assert "prior observation" not in summary2, (
-        f"Plan 2 should NOT mention notes. Got: {summary2!r}"
+        f"Plan 2 correctly has no note phrase. Got: {summary2!r}"
     )

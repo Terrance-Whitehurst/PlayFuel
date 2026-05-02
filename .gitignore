@@ -10,3 +10,8 @@ supabase/.temp/
 # Xcode per-user UI state
 xcuserdata/
 *.xcuserstate
+
+# Environment files — NEVER commit these (contain secrets)
+# Real values go here locally; .env.example files contain placeholders only.
+.env
+**/.env
