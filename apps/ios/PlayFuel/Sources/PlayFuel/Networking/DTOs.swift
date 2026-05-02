@@ -385,15 +385,23 @@ struct TimelineEventDTO: Decodable {
 // so Swift camelCase property names map to the API's snake_case request fields.
 
 /// Request body for POST /v1/tournaments.
+/// Widened in feat/places-live to include MapKit-resolved venue address fields.
 /// NOTE: `time_zone` is collected by the iOS form but is NOT in the API's TournamentCreate
 /// Pydantic model (migration pending). Omitted here — the iOS form retains it for future use.
+/// postEncoder uses .convertToSnakeCase so camelCase → snake_case automatically:
+///   venueName → venue_name, venueAddress → venue_address, etc.
 struct TournamentCreateRequest: Encodable {
     let name: String
-    let venueName: String       // → venue_name
-    let venueLat: Double        // → venue_lat
-    let venueLng: Double        // → venue_lng
-    let startDate: String       // → start_date ("yyyy-MM-dd" string; API type is `date`)
-    let endDate: String         // → end_date
+    let venueName: String        // → venue_name
+    let venueAddress: String?    // → venue_address  (from MKPlacemark.thoroughfare)
+    let venueCity: String?       // → venue_city     (from MKPlacemark.locality)
+    let venueRegion: String?     // → venue_region   (from MKPlacemark.administrativeArea)
+    let venuePostal: String?     // → venue_postal   (from MKPlacemark.postalCode)
+    let venuePlaceId: String?    // → venue_place_id (nil for MapKit; reserved for Google Places)
+    let venueLat: Double?        // → venue_lat      (nil when no venue selected)
+    let venueLng: Double?        // → venue_lng      (nil when no venue selected)
+    let startDate: String        // → start_date ("yyyy-MM-dd" string; API type is `date`)
+    let endDate: String          // → end_date
 }
 
 /// Request body for POST /v1/tournaments/{tid}/matches.

@@ -15,9 +15,7 @@ struct TournamentCreateView: View {
     // MARK: - Form state
 
     @State private var name: String = ""
-    @State private var venueName: String = ""
-    @State private var latText: String = "32.78"
-    @State private var lngText: String = "-96.80"
+    @StateObject private var venueVM = VenueSearchViewModel()
     @State private var startDate: Date = Date()
     @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var selectedTimeZone: String = "America/Chicago"
@@ -39,12 +37,10 @@ struct TournamentCreateView: View {
 
     // MARK: - Validation
 
-    /// True when all required fields are non-empty, coordinates parse, and end ≥ start.
+    /// True when name is non-empty, a venue has been picked from autocomplete, and end ≥ start.
     private var isValid: Bool {
         !name.trimmingCharacters(in: .whitespaces).isEmpty &&
-        !venueName.trimmingCharacters(in: .whitespaces).isEmpty &&
-        Double(latText) != nil &&
-        Double(lngText) != nil &&
+        venueVM.selectedVenue != nil &&
         endDate >= startDate
     }
 
@@ -56,34 +52,59 @@ struct TournamentCreateView: View {
                 Section("Tournament") {
                     TextField("Name (required)", text: $name)
                         .autocorrectionDisabled()
-
-                    TextField("Venue name (required)", text: $venueName)
-                        .autocorrectionDisabled()
                 }
 
-                Section(
-                    header: Text("Venue Coordinates"),
-                    footer: Text("Defaults to Dallas demo coords. Geocoding arrives in a later version.")
-                ) {
-                    HStack {
-                        Text("Latitude")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("32.78", text: $latText)
-                            #if os(iOS)
-                            .keyboardType(.decimalPad)
-                            #endif
-                            .multilineTextAlignment(.trailing)
-                    }
-                    HStack {
-                        Text("Longitude")
-                            .foregroundStyle(.secondary)
-                        Spacer()
-                        TextField("-96.80", text: $lngText)
-                            #if os(iOS)
-                            .keyboardType(.decimalPad)
-                            #endif
-                            .multilineTextAlignment(.trailing)
+                Section("Venue") {
+                    if let v = venueVM.selectedVenue {
+                        // ── Selected state: show venue card + clear button ──
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text(v.venueName)
+                                .font(.body)
+                            if let addr = v.venueAddress {
+                                Text(addr)
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                            if let city = v.venueCity, let region = v.venueRegion {
+                                Text("\(city), \(region)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, 2)
+                        Button("Change venue", role: .destructive) {
+                            venueVM.clear()
+                        }
+                        .font(.caption)
+                    } else {
+                        // ── Search state: text field + suggestions ──
+                        TextField("Search for a venue…", text: $venueVM.query)
+                            .autocorrectionDisabled()
+                        if venueVM.isSearching {
+                            HStack {
+                                Spacer()
+                                ProgressView().controlSize(.small)
+                                Spacer()
+                            }
+                        }
+                        ForEach(venueVM.suggestions, id: \.self) { suggestion in
+                            Button {
+                                Task { await venueVM.select(suggestion) }
+                            } label: {
+                                VStack(alignment: .leading, spacing: 2) {
+                                    Text(suggestion.title)
+                                        .font(.body)
+                                        .foregroundStyle(Color.primary)
+                                    if !suggestion.subtitle.isEmpty {
+                                        Text(suggestion.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .padding(.vertical, 1)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
 
@@ -158,19 +179,20 @@ struct TournamentCreateView: View {
     // MARK: - Save
 
     private func save() async {
-        guard isValid, !isSaving else { return }
+        guard isValid, !isSaving, let venue = venueVM.selectedVenue else { return }
         isSaving = true
         errorMessage = nil
-
-        let lat = Double(latText) ?? 32.78
-        let lng = Double(lngText) ?? -96.80
 
         do {
             let tournament = try await appState.repository.createTournament(
                 name: name.trimmingCharacters(in: .whitespaces),
-                venueName: venueName.trimmingCharacters(in: .whitespaces),
-                venueLat: lat,
-                venueLng: lng,
+                venueName: venue.venueName,
+                venueAddress: venue.venueAddress,
+                venueCity: venue.venueCity,
+                venueRegion: venue.venueRegion,
+                venuePostal: venue.venuePostal,
+                venueLat: venue.venueLat,
+                venueLng: venue.venueLng,
                 startDate: startDate,
                 endDate: endDate,
                 timeZone: selectedTimeZone

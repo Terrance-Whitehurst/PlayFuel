@@ -42,6 +42,10 @@ class TournamentCreate(BaseModel):
     venue_postal: Optional[str] = None
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
+    # venue_place_id: stable place ID from a Places provider (e.g. Google Places).
+    # Nullable: MapKit results do not carry a stable place ID.
+    # Added migration 0012 (TOURNAMENT_LOCATION_V1.md §C.2).
+    venue_place_id: Optional[str] = None
 
 
 class TournamentUpdate(BaseModel):
@@ -55,6 +59,7 @@ class TournamentUpdate(BaseModel):
     venue_postal: Optional[str] = None
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
+    venue_place_id: Optional[str] = None
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
