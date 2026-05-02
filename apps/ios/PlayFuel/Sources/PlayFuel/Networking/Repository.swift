@@ -24,6 +24,22 @@ final class Repository: ObservableObject {
         return enc
     }()
 
+    // MARK: - Performance Instrumentation
+
+    /// Lightweight call-site timer. Printed to debug console only; never included in
+    /// release builds. Helps diagnose network latency per hot path.
+    ///
+    /// Usage:
+    ///   let t = Repository.clock()
+    ///   defer { Repository.lap(t, label: "myMethod") }
+    static func clock() -> Date { Date() }
+    static func lap(_ start: Date, label: String) {
+        #if DEBUG
+        let ms = Int(Date().timeIntervalSince(start) * 1_000)
+        print("[PlayFuel Perf] \(label): \(ms) ms")
+        #endif
+    }
+
     init(api: APIClient) {
         self.api = api
     }
@@ -44,6 +60,8 @@ final class Repository: ObservableObject {
 
     /// Fetch all tournaments for the current user (RLS-filtered).
     func fetchTournaments() async throws -> [Tournament] {
+        let t = Repository.clock()
+        defer { Repository.lap(t, label: "fetchTournaments") }
         let dtos = try await api.send(
             Endpoints.listTournaments(baseURL: api.baseURL),
             as: .snake,
@@ -105,6 +123,8 @@ final class Repository: ObservableObject {
         endDate: Date,
         timeZone: String
     ) async throws -> Tournament {
+        let t = Repository.clock()
+        defer { Repository.lap(t, label: "createTournament") }
         let dateFmt = DateFormatter()
         dateFmt.dateFormat = "yyyy-MM-dd"
         dateFmt.timeZone = TimeZone(identifier: "UTC")
@@ -384,6 +404,8 @@ final class Repository: ObservableObject {
     ///
     /// HTTP 200 always (the backend returns 200 even for overrun scenarios per OQ-14/§G).
     func generatePlan(tournamentId: UUID) async throws -> PlanEnvelope {
+        let t = Repository.clock()
+        defer { Repository.lap(t, label: "generatePlan") }
         let dto = try await api.send(
             Endpoints.generatePlan(baseURL: api.baseURL, tournamentId: tournamentId),
             as: .camel,
