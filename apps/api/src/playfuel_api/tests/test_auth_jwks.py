@@ -111,16 +111,29 @@ def _make_test_settings(supabase_url: str = _SUPABASE_URL) -> "Settings":  # noq
 
 @pytest.fixture(autouse=True)
 def evict_jwks_cache() -> Generator[None, None, None]:
-    """Clear the module-level JWKS client cache before and after each test.
+    """Clear the module-level JWKS client cache AND get_settings LRU cache before/after each test.
 
-    Prevents cross-test contamination (a warm cache from one test leaking
-    into another that expects a fresh fetch).
+    Prevents two distinct cross-test contamination paths:
+      1. _jwks_clients dict: a warm PyJWKClient from one test leaking into another.
+      2. get_settings() lru_cache: a Settings instance cached with empty supabase_jwt_secret
+         (e.g. from a test that ran without a .env file) causes HS256 validation failures
+         in subsequent tests that rely on the real JWT secret via async_client fixture.
+
+    Root cause of the collection-order flake in test_hs256_valid_token_returns_200:
+      - conftest.client_with_auth previously called app.dependency_overrides.clear(),
+        which could evict the get_settings override set by async_client before the
+        test body ran (in async pytest-asyncio fixture teardown ordering).
+      - conftest now uses surgical .pop() instead of .clear() (PR: chore/cleanup-phases-5-7).
+      - This fixture also clears get_settings.cache_clear() as a second defence layer.
     """
     from playfuel_api.auth import _jwks_clients
+    from playfuel_api.settings import get_settings
 
     _jwks_clients.clear()
+    get_settings.cache_clear()
     yield
     _jwks_clients.clear()
+    get_settings.cache_clear()
 
 
 @pytest.fixture()
