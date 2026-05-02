@@ -175,7 +175,7 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | 7 — Feedback | ✅ Complete | Post-tournament rating screen, what-worked / what-didn't |
 | 8 — Beta | 🔲 Pending | TestFlight build, 5–10 junior tennis families |
 | Privacy | 🟡 In progress | COPPA review, App Store disclosures (PRIVACY_V1 drafted; legal review pending) |
-| Eval | 🔲 Pending | 5 canonical scenario tests (automated harness) |
+| Eval | ✅ Complete | 5 canonical scenario tests (automated harness) — 35 passing, 1 xfail (OQ-F rain delay) |
 
 The **LLM explanation layer (Phase 6) is complete** — `AnthropicProvider` (`claude-3-5-haiku-latest`)
 explains the structured rules-engine plan in parent-friendly prose. It never invents restaurants,
