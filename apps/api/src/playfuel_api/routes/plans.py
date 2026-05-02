@@ -161,9 +161,13 @@ async def generate_plan(
         )
 
     # 5. Phase 5: food / places lookup (non-critical; shared across all matches — same venue).
+    #    tournament_id + db_client passed for cache read-through (migration 0012).
+    #    When venue coords are absent, skip lookup entirely — bag fallback fires downstream.
     raw_places = find_nearby_food(
-        venue_lat if venue_lat is not None else 0.0,
-        venue_lng if venue_lng is not None else 0.0,
+        venue_lat,
+        venue_lng,
+        tournament_id=tid,
+        db_client=client,
     ) if (venue_lat is not None and venue_lng is not None) else []
 
     # 6. Provider is the same for all plans in this request.
