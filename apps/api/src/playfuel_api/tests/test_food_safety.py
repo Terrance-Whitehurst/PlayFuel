@@ -73,11 +73,18 @@ def test_template_strings_have_no_prohibited_phrases(category: str) -> None:
 
 
 @pytest.mark.parametrize("category", sorted(_SUGGESTIONS.keys()))
-def test_template_has_at_least_one_main_option(category: str) -> None:
-    """Every template bucket has ≥1 item in main_options."""
+def test_template_has_at_least_three_main_options(category: str) -> None:
+    """Every template bucket has ≥3 items in main_options.
+
+    Threshold raised from >=1 to >=3 (GAP-5a, chore/cleanup-phases-5-7):
+    the 7 cuisine buckets added in Phase 5-polish all ship with >=3 options;
+    the 5 pre-existing buckets were tightened to match in food.py alongside
+    this test change.  Enforcing >=3 gives iOS enough content for a useful card.
+    """
     data, _ = _SUGGESTIONS[category]
-    assert len(data.get("main_options", [])) >= 1, (
-        f"{category}: main_options is empty or missing"
+    assert len(data.get("main_options", [])) >= 3, (
+        f"{category}: main_options has fewer than 3 items (GAP-5a threshold). "
+        "Add more options to food.py rather than lowering this threshold."
     )
 
 
@@ -91,11 +98,17 @@ def test_template_has_at_least_one_drink(category: str) -> None:
 
 
 @pytest.mark.parametrize("category", sorted(_SUGGESTIONS.keys()))
-def test_template_has_at_least_one_avoid(category: str) -> None:
-    """Every template bucket has ≥1 item in avoid."""
+def test_template_has_at_least_two_avoid(category: str) -> None:
+    """Every template bucket has ≥2 items in avoid.
+
+    Threshold raised from >=1 to >=2 (GAP-5a, chore/cleanup-phases-5-7):
+    a single avoid item is not actionable; two gives a clear pattern.
+    All 12 existing buckets already satisfy >=2 avoid before this change.
+    """
     data, _ = _SUGGESTIONS[category]
-    assert len(data.get("avoid", [])) >= 1, (
-        f"{category}: avoid is empty or missing"
+    assert len(data.get("avoid", [])) >= 2, (
+        f"{category}: avoid has fewer than 2 items (GAP-5a threshold). "
+        "Add more avoid items to food.py rather than lowering this threshold."
     )
 
 
