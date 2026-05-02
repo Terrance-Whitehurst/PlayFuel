@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 import pytest
 
-from playfuel_api.services.llm import TemplateProvider, get_llm_provider
+from playfuel_api.services.llm import AnthropicProvider, TemplateProvider, get_llm_provider
 
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
@@ -152,4 +152,25 @@ def test_factory_falls_back_to_template_when_openai_key_set_but_sdk_missing() ->
 
     assert isinstance(provider, TemplateProvider), (
         "Expected TemplateProvider fallback when OpenAI key is set but SDK missing"
+    )
+
+
+def test_factory_returns_anthropic_provider_when_sdk_installed_and_key_set() -> None:
+    """AC-LLM-9: LLM_PROVIDER=anthropic + key set + SDK installed → AnthropicProvider.
+
+    Now that 'anthropic>=0.40' is a declared dependency, the SDK is available.
+    Factory must return AnthropicProvider (not TemplateProvider) when explicitly
+    requested with a valid key.
+    """
+    with patch(
+        "playfuel_api.settings.get_settings",
+        return_value=_settings_with(
+            llm_provider="anthropic",
+            anthropic_key="sk-ant-test",
+        ),
+    ):
+        provider = get_llm_provider()
+
+    assert isinstance(provider, AnthropicProvider), (
+        f"Expected AnthropicProvider when SDK installed + key set. Got: {type(provider).__name__}"
     )

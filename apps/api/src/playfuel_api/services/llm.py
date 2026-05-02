@@ -256,15 +256,60 @@ class TemplateProvider:
 
 
 class AnthropicProvider:
-    """Anthropic Messages API provider (stub — implementation deferred).
+    """Anthropic Messages API provider — Phase 6 / Task #9.
 
     Gated on settings.ANTHROPIC_API_KEY. Performs a soft-import of the
     `anthropic` SDK inside __init__ — if the SDK is not installed, raises
     NotImplementedError with a clear install message.
 
+    Uses tool-use structured output to force the PlanExplanation schema.
     All output is wrapped in sanitize_or_fallback() before returning, so
     safety guarantees hold even if the LLM produces unexpected text.
+
+    Failure modes (no try/except here — routes/plans.py outer except handles them):
+        - httpx.TimeoutException → propagates up → plans.py sets llm_summary=None → 200
+        - ValueError (no tool_use block) → propagates up → same graceful degrade
+        - Any other exception → propagates up → same graceful degrade
     """
+
+    # Tool definition — forces Anthropic to return the PlanExplanation schema.
+    _EXPLAIN_TOOL: dict = {
+        "name": "explain_plan",
+        "description": "Produce a structured parent-friendly explanation of the tournament plan.",
+        "input_schema": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "string",
+                    "description": "2\u20134 sentence parent-friendly intro. \u2264180 words.",
+                },
+                "scenario_explanations": {
+                    "type": "object",
+                    "description": (
+                        "One entry per scenario key ('short', 'normal', 'long'). "
+                        "Each \u226480 words."
+                    ),
+                    "additionalProperties": {"type": "string"},
+                },
+                "weather_note": {
+                    "type": "string",
+                    "description": "1\u20132 sentences on weather conditions. Omit if no weather data.",
+                },
+                "food_note": {
+                    "type": "string",
+                    "description": "1\u20132 sentences on food picks. Omit if bag_fallback_only.",
+                },
+                "safety_note": {
+                    "type": "string",
+                    "description": (
+                        "Must include the verbatim user_disclaimer. "
+                        "Prepend heat_emergency_text verbatim if extreme_heat_risk."
+                    ),
+                },
+            },
+            "required": ["summary", "scenario_explanations", "safety_note"],
+        },
+    }
 
     def __init__(self, api_key: str, model: str) -> None:
         try:
@@ -283,15 +328,71 @@ class AnthropicProvider:
         self,
         inp: "PlanExplanationInput",  # noqa: F821
     ) -> "PlanExplanation":  # noqa: F821
+        import json
+        import time
+        from datetime import datetime, timezone
+
+        from playfuel_api.models.api import PlanExplanation
         from playfuel_api.services.llm_safety import sanitize_or_fallback
 
-        # Stub: real implementation calls self._anthropic.Anthropic(api_key=...).messages.create(...)
-        # with SYSTEM_PROMPT and inp.model_dump(mode='json') as the plan payload.
-        # Returns sanitize_or_fallback(parsed_response, inp).
-        raise NotImplementedError(
-            "AnthropicProvider.explain_plan() is a stub (OQ-LLM-1). "
-            "Set LLM_PROVIDER=template to use the deterministic TemplateProvider."
+        # Strip {{PLAN_JSON}} placeholder from system prompt.
+        # Plan JSON goes in the user message so the system prompt is stable
+        # and cacheable by Anthropic's prompt-caching feature.
+        system = SYSTEM_PROMPT.replace("{{PLAN_JSON}}", "")
+        user_content = json.dumps(inp.model_dump(mode="json"), default=str)
+
+        # Sync client with explicit timeout — routes/plans.py catches all exceptions.
+        client = self._anthropic.Anthropic(api_key=self._api_key, timeout=10.0)
+
+        t0 = time.monotonic()
+        response = client.messages.create(
+            model=self._model,
+            max_tokens=800,
+            temperature=0.3,
+            system=system,
+            messages=[{"role": "user", "content": user_content}],
+            tools=[self._EXPLAIN_TOOL],
+            tool_choice={"type": "tool", "name": "explain_plan"},
         )
+        latency_ms = int((time.monotonic() - t0) * 1000)
+
+        # Log usage at INFO level — no prompt or response content.
+        usage = getattr(response, "usage", None)
+        input_tokens = getattr(usage, "input_tokens", None) if usage else None
+        output_tokens = getattr(usage, "output_tokens", None) if usage else None
+        _logger.info(
+            "AnthropicProvider: model=%s latency_ms=%d input_tokens=%s output_tokens=%s",
+            self._model,
+            latency_ms,
+            input_tokens,
+            output_tokens,
+        )
+
+        # Extract the tool_use block from the response.
+        tool_block = next(
+            (b for b in response.content if getattr(b, "type", None) == "tool_use"),
+            None,
+        )
+        if tool_block is None:
+            raise ValueError(
+                "Anthropic response contained no tool_use block. "
+                f"Content types: {[getattr(b, 'type', '?') for b in response.content]}"
+            )
+
+        args = tool_block.input
+        raw = PlanExplanation(
+            summary=args.get("summary", ""),
+            scenario_explanations=args.get("scenario_explanations", {}),
+            weather_note=args.get("weather_note"),
+            food_note=args.get("food_note"),
+            safety_note=args.get("safety_note", inp.user_disclaimer),
+            provider="anthropic",
+            model=self._model,
+            generated_at=datetime.now(tz=timezone.utc),
+        )
+        # sanitize_or_fallback: if output contains §C prohibited phrases,
+        # discard and return TemplateProvider output instead.
+        return sanitize_or_fallback(raw, inp)
 
 
 # ── OpenAIProvider (stub — SDK not in pyproject.toml) ────────────────────────
