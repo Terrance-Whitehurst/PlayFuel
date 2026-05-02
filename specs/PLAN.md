@@ -36,7 +36,7 @@ The deterministic backend owns timings, hydration logic, food categories, and we
 | **4 — Weather** | #7 ✅ | Engineering1 | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
 | **5 — Food / Places** | #8 ✅ | Engineering1 | Google Places (New) integration, 12-bucket cuisine categorizer, restaurant templates, recommended orders, safety lint |
 | **6 — LLM explanation** | #9 ✅ | Engineering1 | AnthropicProvider (`claude-3-5-haiku-latest`) + TemplateProvider fallback; tool-use structured output; §C safety lint; PII-stripped input; `llm_summary JSONB` in `plans` |
-| **7 — Feedback & personalization** | #10 | Engineering2 | Post-tournament rating screen, what-worked / what-didn't, feed into player preferences |
+| **7 — Feedback & personalization** | #10 | Engineering2 | ✅ Post-tournament rating screen, what-worked / what-didn't, feed into player preferences |
 | **8 — Beta** | #11 | Planning + Engineering2 | TestFlight build, 5–10 junior tennis families, analytics, bug tracking |
 | **Cross-cutting — Privacy** | #12 | Planning | COPPA review, App Store privacy disclosures, data minimization, data deletion flow |
 | **Cross-cutting — Eval** | #13 | Planning + Engineering1 | 5 canonical scenario tests (cool 9/1, hot/humid, long gap, back-to-back, rain delay) |
