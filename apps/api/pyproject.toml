@@ -35,3 +35,6 @@ where = ["src"]
 [tool.pytest.ini_options]
 testpaths = ["src/playfuel_api/tests"]
 asyncio_mode = "auto"
+markers = [
+    "perf: performance profiling tests — slow by design, run with: pytest -m perf",
+]
