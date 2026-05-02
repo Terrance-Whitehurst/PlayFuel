@@ -553,6 +553,52 @@ struct MatchEvaluationCreateRequest: Encodable {
     let keyMoments: String?         // → key_moments
 }
 
+// MARK: - Tournament Feedback DTOs (migration 0013 — phase7-feedback-spec.md §C)
+//
+// Endpoints: GET/POST /v1/tournaments/{tid}/feedback
+// Response decoded with camelDecoder (model_config = _CAMEL → camelCase JSON output).
+// Request body encoded with postEncoder (.convertToSnakeCase → snake_case;
+// accepted by Pydantic via populate_by_name=True on _CAMEL models).
+
+/// Wire format for `public.feedback` row returned by feedback endpoints.
+/// Decoded with camelDecoder (.iso8601 dates, no key conversion).
+/// Field names match the camelCase aliases Pydantic emits via alias_generator=to_camel.
+struct TournamentFeedbackDTO: Decodable {
+    let id: UUID
+    let tournamentId: UUID
+    let planId: UUID?
+    let overallRating: Int?
+    let whatWorked: [String]
+    let whatDidntWork: [String]
+    let freeText: String?
+    let createdAt: Date
+    let updatedAt: Date
+
+    func toModel() -> TournamentFeedback {
+        TournamentFeedback(
+            id: id,
+            tournamentId: tournamentId,
+            planId: planId,
+            overallRating: overallRating,
+            whatWorked: whatWorked,
+            whatDidntWork: whatDidntWork,
+            freeText: freeText,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+/// Request body for POST /v1/tournaments/{tid}/feedback.
+/// Encoded with postEncoder (.convertToSnakeCase).
+/// Pydantic's populate_by_name=True accepts snake_case input on _CAMEL models.
+struct TournamentFeedbackCreateRequest: Encodable {
+    let overallRating: Int?      // → overall_rating
+    let whatWorked: [String]     // → what_worked
+    let whatDidntWork: [String]  // → what_didnt_work
+    let freeText: String?        // → free_text
+}
+
 // MARK: - MatchDTO.toModel()
 
 extension MatchDTO {

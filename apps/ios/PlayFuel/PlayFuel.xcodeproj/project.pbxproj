@@ -79,6 +79,8 @@
 		F4934C69B355BA6AEB2D58FF /* TournamentHistoryEntry.swift in Sources */ = {isa = PBXBuildFile; fileRef = 425EE5CF82673E4481137A43 /* TournamentHistoryEntry.swift */; };
 		F595DE549B9CF77D38C5A898 /* TournamentDashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E1BCAB0EA5098BFC15601319 /* TournamentDashboardView.swift */; };
 		FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */ = {isa = PBXBuildFile; fileRef = A30AE19CFED4698BCC9E569E /* TournamentListView.swift */; };
+		FB7A0002FB0002FB0002FB02 /* TournamentFeedback.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB7A0001FB0001FB0001FB01 /* TournamentFeedback.swift */; };
+		FB7A0004FB0004FB0004FB04 /* FeedbackChipVocab.swift in Sources */ = {isa = PBXBuildFile; fileRef = FB7A0003FB0003FB0003FB03 /* FeedbackChipVocab.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -155,6 +157,8 @@
 		EA04910F6D82636BBE65BCD8 /* PlanEnvelope.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = PlanEnvelope.swift; sourceTree = "<group>"; };
 		EC59EB7BC5AA3895B189FBF0 /* Repository.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Repository.swift; sourceTree = "<group>"; };
 		FFAA6A3A9295F34782002C64 /* SignInView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SignInView.swift; sourceTree = "<group>"; };
+		FB7A0001FB0001FB0001FB01 /* TournamentFeedback.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TournamentFeedback.swift; sourceTree = "<group>"; };
+		FB7A0003FB0003FB0003FB03 /* FeedbackChipVocab.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = FeedbackChipVocab.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXGroup section */
@@ -244,6 +248,8 @@
 				796A0EDD57748854929E6897 /* TimelineEvent.swift */,
 				D79888F3E040BD239741B1D5 /* Tournament.swift */,
 				425EE5CF82673E4481137A43 /* TournamentHistoryEntry.swift */,
+				FB7A0001FB0001FB0001FB01 /* TournamentFeedback.swift */,
+				FB7A0003FB0003FB0003FB03 /* FeedbackChipVocab.swift */,
 				AB91EF7D1C39218BE3F841E3 /* User.swift */,
 				0F4040044218FFA05AEED04B /* WeatherSnapshot.swift */,
 			);
@@ -460,6 +466,8 @@
 				F595DE549B9CF77D38C5A898 /* TournamentDashboardView.swift in Sources */,
 				C6DC4150F2A321008A3FA599 /* TournamentHistoryDetailSheet.swift in Sources */,
 				F4934C69B355BA6AEB2D58FF /* TournamentHistoryEntry.swift in Sources */,
+				FB7A0002FB0002FB0002FB02 /* TournamentFeedback.swift in Sources */,
+				FB7A0004FB0004FB0004FB04 /* FeedbackChipVocab.swift in Sources */,
 				FFAF17FE91EC910ABF295107 /* TournamentListView.swift in Sources */,
 				B48E8CF5C50296DC00C411DF /* User.swift in Sources */,
 				AB4AD8483F9892622D4AAD1C /* VenueMapSheet.swift in Sources */,
