@@ -42,6 +42,8 @@ SYSTEM_PROMPT: str = (
     "- Describe food options using the category types provided — do not name specific "
     "restaurants (e.g., say 'Italian restaurant nearby' not 'Caffe Luna Rosa').\n"
     "- Do not change the structured timing.\n"
+    "- Do not promise performance outcomes (e.g., 'this will help you win', "
+    "'boosts your game', 'gives you an edge'). Describe what to do, never what it will achieve.\n"
     "- Mention that injury or illness concerns should be handled by a qualified professional.\n"
     "- Keep the plan concise enough to read during a tournament.\n\n"
     "Structured plan:\n{{PLAN_JSON}}"
@@ -476,12 +478,28 @@ def get_llm_provider() -> LLMProvider:
         return TemplateProvider()
 
     if provider_name == "anthropic":
+        # SEC-P6-5: explicit 'anthropic' provider with no key — fail closed at startup,
+        # not silently at request time. Log ERROR and fall back to TemplateProvider.
+        if not settings.anthropic_api_key:
+            _logger.error(
+                "LLM_PROVIDER=anthropic is set but ANTHROPIC_API_KEY is missing or empty. "
+                "Falling back to TemplateProvider. "
+                "Set flyctl secrets set ANTHROPIC_API_KEY=<key> --app playfuel-api to activate."
+            )
+            return TemplateProvider()
         return AnthropicProvider(
             api_key=settings.anthropic_api_key,
             model=settings.anthropic_model,
         )
 
     if provider_name == "openai":
+        # Same startup guard for OpenAI.
+        if not settings.openai_api_key:
+            _logger.error(
+                "LLM_PROVIDER=openai is set but OPENAI_API_KEY is missing or empty. "
+                "Falling back to TemplateProvider."
+            )
+            return TemplateProvider()
         return OpenAIProvider(
             api_key=settings.openai_api_key,
             model=settings.openai_model,

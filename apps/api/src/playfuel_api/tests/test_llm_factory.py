@@ -30,7 +30,7 @@ def _settings_with(
     class _FakeSettings:
         llm_provider = "auto"
         anthropic_api_key = ""
-        anthropic_model = "claude-haiku-v3"
+        anthropic_model = "claude-3-5-haiku-latest"
         openai_api_key = ""
         openai_model = "gpt-4o-mini"
         llm_max_tokens = 600
@@ -173,4 +173,41 @@ def test_factory_returns_anthropic_provider_when_sdk_installed_and_key_set() -> 
 
     assert isinstance(provider, AnthropicProvider), (
         f"Expected AnthropicProvider when SDK installed + key set. Got: {type(provider).__name__}"
+    )
+
+
+def test_factory_explicit_anthropic_with_no_key_falls_back_to_template(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """SEC-P6-5: LLM_PROVIDER=anthropic explicit but ANTHROPIC_API_KEY empty/None
+    => factory logs ERROR at startup and returns TemplateProvider (not AnthropicProvider).
+
+    Verifies three sub-conditions:
+      (i)  returned provider is TemplateProvider
+      (ii) factory does not raise
+      (iii) ERROR log is emitted (so the misconfiguration is visible in server logs)
+    """
+    import logging
+
+    with patch(
+        "playfuel_api.settings.get_settings",
+        return_value=_settings_with(
+            llm_provider="anthropic",
+            anthropic_key=None,
+        ),
+    ), caplog.at_level(logging.ERROR, logger="playfuel_api.services.llm"):
+        provider = get_llm_provider()
+
+    # (i) must fall back to TemplateProvider
+    assert isinstance(provider, TemplateProvider), (
+        f"Expected TemplateProvider fallback when explicit anthropic + no key. "
+        f"Got: {type(provider).__name__}"
+    )
+    # (ii) factory must not raise — already verified by reaching this line
+
+    # (iii) ERROR log must be emitted
+    error_logs = [r for r in caplog.records if r.levelno >= logging.ERROR]
+    assert any("ANTHROPIC_API_KEY" in r.message for r in error_logs), (
+        f"Expected ERROR log mentioning ANTHROPIC_API_KEY. Got log records: "
+        f"{[r.message for r in error_logs]}"
     )

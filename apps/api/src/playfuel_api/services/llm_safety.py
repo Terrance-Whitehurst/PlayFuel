@@ -44,6 +44,21 @@ PROHIBITED_PHRASES: list[str] = [
     "injury is minor",
     "keep playing through pain",
     "solves injury risk",
+    # SEC-P6-4: performance-promise paraphrase variants (LLM common phrasings)
+    # These are verbatim substrings checked case-insensitively.
+    "boost your game",
+    "boosts your game",
+    "gives you an edge",
+    "give you an edge",
+    "improve your performance",
+    "improve performance",
+    "peak performance",
+    "competitive advantage",
+    "help you win",
+    "helps you win",
+    "win the match",
+    "maximize performance",
+    "maximise performance",
 ]
 
 # Canonical match durations as total minutes (§F / RULES_CONSTANTS_V1.md + DOUBLES_SPEC_V1.md §B).
