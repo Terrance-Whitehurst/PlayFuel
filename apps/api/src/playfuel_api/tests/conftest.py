@@ -44,7 +44,11 @@ def client_with_auth(mock_db: MagicMock) -> TestClient:
     with TestClient(app) as tc:
         yield tc
 
-    app.dependency_overrides.clear()
+    # Pop only the overrides THIS fixture set — never call .clear() here.
+    # Using .clear() would wipe overrides set by concurrent async fixtures
+    # (e.g. async_client in test_auth_jwks.py) and cause order-dependent failures.
+    app.dependency_overrides.pop(verify_supabase_jwt, None)
+    app.dependency_overrides.pop(authed_client, None)
 
 
 @pytest.fixture()
