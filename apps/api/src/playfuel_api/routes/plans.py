@@ -111,9 +111,14 @@ async def generate_plan(
 
     # 3. Read-through weather cache (returns None if no coords or fetch fails).
     #    WeatherService is created per-request; aclose() in finally ensures cleanup.
+    #    WX-G1: pass target_dt so the cache layer dispatches to fetch_forecast_at()
+    #    when the first match is scheduled > 3h in the future.
     settings = get_settings()
     weather_service = WeatherService(base_url=settings.open_meteo_base_url)
     snapshot: Optional[WeatherSnapshotRow] = None
+    target_dt: Optional[datetime] = (
+        match_rows[0].scheduled_start if match_rows else None
+    )
     try:
         snapshot = await get_or_fetch_weather(
             client,
@@ -122,6 +127,7 @@ async def generate_plan(
             lng=venue_lng,
             weather_service=weather_service,
             ttl_seconds=settings.weather_cache_ttl_sec,
+            target_dt=target_dt,
         )
     finally:
         await weather_service.aclose()
@@ -158,6 +164,9 @@ async def generate_plan(
             is_stale=is_stale,
             fetched_at=snapshot.fetched_at,
             provider=snapshot.provider,
+            # WX-G2: surface wind/precip from snapshot so iOS shows real values.
+            wind_mph=snapshot.wind_mph,
+            precip_prob=snapshot.precipitation_probability,
         )
 
     # 5. Phase 5: food / places lookup (non-critical; shared across all matches — same venue).

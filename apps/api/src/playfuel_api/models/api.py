@@ -154,6 +154,10 @@ class WeatherBlock(BaseModel):
     is_stale: bool = False           # True when cache fallback was used (provider error)
     fetched_at: datetime
     provider: str
+    # WX-G2: wind + precip exposed so iOS WeatherCardView shows real values.
+    # None when the provider did not return the field (rare; iOS falls back to 0.0).
+    wind_mph: Optional[float] = None
+    precip_prob: Optional[float] = None
 
 
 # ─── Phase 4 timeline block — OQ-API-2 / OQ-TRIAGE-1 ───────────────────────────
