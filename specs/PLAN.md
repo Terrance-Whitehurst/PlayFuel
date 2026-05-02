@@ -39,7 +39,7 @@ The deterministic backend owns timings, hydration logic, food categories, and we
 | **7 — Feedback & personalization** | #10 | Engineering2 | ✅ Post-tournament rating screen, what-worked / what-didn't, feed into player preferences |
 | **8 — Beta** | #11 | Planning + Engineering2 | TestFlight build, 5–10 junior tennis families, analytics, bug tracking |
 | **Cross-cutting — Privacy** | #12 | Planning | COPPA review, App Store privacy disclosures, data minimization, data deletion flow |
-| **Cross-cutting — Eval** | #13 | Planning + Engineering1 | 5 canonical scenario tests (cool 9/1, hot/humid, long gap, back-to-back, rain delay) |
+| **Cross-cutting — Eval** | #13 ✅ | Engineering1 | 5 canonical scenario tests (cool 9/1, hot/humid, long gap, back-to-back, rain delay) — 35 passing + 1 xfail (OQ-F); full-pipeline harness (weather+rules+envelope); LLM isolated via fixture; runtime 0.21s |
 
 ## 5. Parallelization plan (when greenlit)
 
