@@ -359,12 +359,18 @@ class PlanExplanationInput(BaseModel):
     weather_flags: list[str] = []
     extreme_heat_risk: bool = False
     scenarios: list[ScenarioSummary] = []
-    food_recommendations: list[FoodRecommendationSummary] = []
+    food_recommendations: list[FoodRecommendationSummary] = []  # legacy; prefer food_categories
+    # SEC-P6-1: category bucket names only (no restaurant names, addresses, or place_ids).
+    # build_explanation_input() populates this field; food_recommendations stays empty
+    # at runtime. Tests that construct PlanExplanationInput directly may still use
+    # food_recommendations for backward compat — TemplateProvider falls back to it.
+    food_categories: list[str] = []
     bag_fallback_only: bool = False
     heat_emergency_text: Optional[str] = None
     user_disclaimer: str
     match_type: str = "singles"  # 'singles' | 'doubles' — drives partner-aware LLM prose
     # Player scouting extension (PLAYER_SCOUTING_V1.md §D) — additive, decode-safe
+    # SEC-P6-2: not populated by routes/plans.py — opponent notes stay server-side only.
     opponent_notes: list[OpponentNoteForLLM] = []
 
 
