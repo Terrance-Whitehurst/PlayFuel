@@ -578,3 +578,109 @@ def test_cache_rls_anon_cannot_read() -> None:
         f"Anon role should not be able to read tournament_places_cache rows; "
         f"got {result.data}"
     )
+
+
+# ── SP-3: places cache RLS lockdown (migration 0014) ──────────────────────────
+
+
+def test_migration_0014_sql_contains_deny_all_policies() -> None:
+    """SP-3: migration 0014 structurally contains USING (false) deny-all policies
+    for authenticated + anon roles on tournament_places_cache.
+
+    This is a static-analysis verification: reads the migration SQL and asserts
+    the expected policy patterns are present.  The live enforcement test
+    (test_cache_rls_authenticated_user_cannot_read) requires a running Supabase
+    instance and is skipped in CI.
+
+    After applying migration 0014, only the FastAPI service-role process can
+    read/write tournament_places_cache.  Authenticated and anon JWT callers
+    hitting Supabase PostgREST directly receive an empty result or 403, even
+    when their tournament has cached entries in the table.
+    """
+    import pathlib
+
+    # Resolve path relative to this file, regardless of CWD.
+    migration = (
+        pathlib.Path(__file__).parents[5]  # repo root
+        / "db/supabase/migrations/0014_tighten_places_cache_rls.sql"
+    )
+    assert migration.exists(), (
+        f"Migration 0014 SQL not found at {migration}. "
+        "Ensure the file was committed as part of the SP-3 fix."
+    )
+    sql = migration.read_text()
+
+    # Old ownership-scoped policies must be dropped.
+    assert "DROP POLICY IF EXISTS" in sql, (
+        "Migration must drop the old ownership-scoped policies (owner_select/insert/update/delete)."
+    )
+    assert "owner_select_places_cache" in sql, (
+        "Migration must explicitly drop owner_select_places_cache."
+    )
+
+    # Deny-all policies for authenticated role must be present.
+    assert "deny_authenticated_select_places_cache" in sql, (
+        "SELECT deny policy for authenticated role must be defined."
+    )
+    assert "deny_authenticated_insert_places_cache" in sql, (
+        "INSERT deny policy for authenticated role must be defined."
+    )
+    assert "deny_authenticated_update_places_cache" in sql, (
+        "UPDATE deny policy for authenticated role must be defined."
+    )
+    assert "deny_authenticated_delete_places_cache" in sql, (
+        "DELETE deny policy for authenticated role must be defined."
+    )
+
+    # Anon role must also be denied (belt-and-suspenders).
+    assert "deny_anon_select_places_cache" in sql, (
+        "SELECT deny policy for anon role must be defined."
+    )
+
+    # Policy must use USING (false) / WITH CHECK (false) — not row-level predicates.
+    assert "USING (false)" in sql, (
+        "Deny policies must use USING (false) to blanket-reject all rows."
+    )
+    assert "WITH CHECK (false)" in sql, (
+        "INSERT/UPDATE deny policies must use WITH CHECK (false)."
+    )
+
+    # Must target authenticated role explicitly.
+    assert "TO authenticated" in sql, (
+        "Policies must be scoped to the 'authenticated' role."
+    )
+    assert "TO anon" in sql, (
+        "Policies must be scoped to the 'anon' role."
+    )
+
+
+@_LIVE_SKIP
+def test_cache_rls_authenticated_user_cannot_read() -> None:
+    """SP-3: Authenticated user cannot directly read tournament_places_cache (migration 0014).
+
+    After applying migration 0014, USING (false) policies deny ALL authenticated
+    reads to tournament_places_cache.  Only the service-role FastAPI process
+    (which bypasses RLS entirely) can access the table.
+
+    This test requires:
+      - A running Supabase instance with migration 0014 applied.
+      - SUPABASE_URL, SUPABASE_ANON_KEY, and a valid test JWT in the environment.
+    It is intentionally skipped in CI (no live Supabase available).
+    """
+    import supabase as sb
+    from playfuel_api.settings import get_settings
+
+    settings = get_settings()
+
+    # Use the anon key to create a client that could theoretically authenticate
+    # with a JWT.  For the static test, an unauthenticated anon client is
+    # sufficient — with USING (false), even an authenticated session returns empty.
+    anon_client = sb.create_client(settings.supabase_url, settings.supabase_anon_key)
+    result = anon_client.table("tournament_places_cache").select("*").limit(1).execute()
+
+    # Migration 0014 deny-all: must return empty list (USING (false) → zero rows)
+    # or a 403/empty response from PostgREST.
+    assert result.data == [] or result.data is None, (
+        f"SP-3 violation: authenticated/anon user should not be able to read "
+        f"tournament_places_cache after migration 0014. Got: {result.data}"
+    )

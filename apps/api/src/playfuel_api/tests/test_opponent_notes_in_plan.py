@@ -101,10 +101,20 @@ def _build_mock_db(
 
 
 def _generate_and_return_plan(client_with_auth, mock_db):
-    """Call generate_plan, patch async/places deps, return response body."""
+    """Call generate_plan, patch async/places deps, and force TemplateProvider.
+
+    Forces LLM_PROVIDER=template via patch so the test is deterministic regardless
+    of the runtime ANTHROPIC_API_KEY environment variable.  Without this patch,
+    if get_settings() is re-created after test_auth_jwks.cache_clear() with CWD at
+    the repo root (where the root .env has an Anthropic key but no LLM_PROVIDER),
+    the factory picks AnthropicProvider — which makes a real network call and fails.
+    """
+    from playfuel_api.services.llm import TemplateProvider
+
     with (
         patch("playfuel_api.routes.plans.get_or_fetch_weather", new_callable=AsyncMock) as mock_wx,
         patch("playfuel_api.routes.plans.find_nearby_food") as mock_places,
+        patch("playfuel_api.routes.plans.get_llm_provider", return_value=TemplateProvider()),
     ):
         mock_wx.return_value = None  # no weather — keeps test synchronous
         mock_places.return_value = []  # no food places needed for these tests
