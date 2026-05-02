@@ -347,6 +347,12 @@ class AnthropicProvider:
             ) from exc
         self._api_key = api_key
         self._model = model
+        # Opt-D: create the Anthropic client once in __init__ rather than per
+        # explain_plan() call. Within a single generate_plan request there are
+        # typically 1–3 matches, each calling explain_plan() separately. Reusing
+        # the client avoids repeated httpx.Client construction + TLS handshake.
+        # The client is lightweight to construct; pooling is the main benefit.
+        self._client = self._anthropic.Anthropic(api_key=self._api_key, timeout=10.0)
 
     def explain_plan(
         self,
@@ -365,13 +371,15 @@ class AnthropicProvider:
         system = SYSTEM_PROMPT.replace("{{PLAN_JSON}}", "")
         user_content = json.dumps(inp.model_dump(mode="json"), default=str)
 
-        # Sync client with explicit timeout — routes/plans.py catches all exceptions.
-        client = self._anthropic.Anthropic(api_key=self._api_key, timeout=10.0)
+        # Use the pre-built client from __init__ (Opt-D: connection pooling).
+        # routes/plans.py outer try/except handles any exceptions from this call.
 
         t0 = time.monotonic()
-        response = client.messages.create(
+        response = self._client.messages.create(
             model=self._model,
-            max_tokens=800,
+            max_tokens=500,  # Opt-C: reduced from 800. ~180 words fits in 250 tokens;
+                             # 500 gives 2× headroom. Anthropic latency scales with
+                             # output tokens — expected ~150–300ms p50 reduction.
             temperature=0.3,
             system=system,
             messages=[{"role": "user", "content": user_content}],

@@ -23,6 +23,7 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+import time
 from collections import defaultdict, deque
 from datetime import datetime, timedelta, timezone
 from threading import Lock
@@ -54,6 +55,94 @@ logger = logging.getLogger(__name__)
 _PLANS_TABLE = "plans"
 _MATCHES_TABLE = "matches"
 _WEATHER_TABLE = "weather_snapshots"
+_LLM_CACHE_TABLE = "llm_explanation_cache"
+_LLM_CACHE_TTL_DAYS: int = 7
+
+
+# ── LLM explanation cache helpers (Opt-B) ───────────────────────────────────────────────────
+# Cache key: SHA-256 of the sorted JSON of PlanExplanationInput (PII-stripped).
+# SEC-P6-2 invariant: opponent_notes are always empty in exp_input (build_explanation_input
+# never populates them), so the cache key is safe to share across requests
+# without leaking tactical content.
+# RLS: llm_explanation_cache has deny-all policies for authenticated/anon
+# (migration 0015). Only service-role API process reads/writes.
+
+
+def _llm_cache_key(exp_input: "PlanExplanationInput") -> str:  # noqa: F821
+    """Compute a deterministic SHA-256 cache key from the PII-stripped plan input.
+
+    opponent_notes are explicitly excluded from the hash (SEC-P6-2 invariant):
+      - In production, build_explanation_input() never populates opponent_notes.
+      - Explicit exclusion ensures PII cannot leak into the cache key even if
+        the production contract is violated.
+    """
+    import hashlib
+    import json
+
+    # Exclude opponent_notes before hashing — PII-safe cache key.
+    safe = exp_input.model_dump(exclude={"opponent_notes"})
+    return hashlib.sha256(
+        json.dumps(safe, default=str, sort_keys=True).encode()
+    ).hexdigest()
+
+
+def _read_llm_cache(
+    client: Any,
+    exp_input: "PlanExplanationInput",  # noqa: F821
+) -> "Optional[PlanExplanation]":  # noqa: F821
+    """Try to read a cached PlanExplanation. Returns None on miss, expiry, or error.
+
+    Never raises: errors are logged at DEBUG level and swallowed (cache is
+    non-critical augmentation — a miss just falls through to the LLM provider).
+    """
+    try:
+        from playfuel_api.models.api import PlanExplanation
+
+        cache_key = _llm_cache_key(exp_input)
+        result = (
+            client.table(_LLM_CACHE_TABLE)
+            .select("response_json, expires_at")
+            .eq("cache_key", cache_key)
+            .limit(1)
+            .execute()
+        )
+        if not result.data:
+            return None
+        row = result.data[0]
+        # Parse and check TTL
+        expires_str = row["expires_at"]
+        if isinstance(expires_str, str):
+            if expires_str.endswith("Z"):
+                expires_str = expires_str[:-1] + "+00:00"
+            expires_at = datetime.fromisoformat(expires_str)
+            if datetime.now(tz=timezone.utc) > expires_at:
+                return None  # Expired — treat as miss
+        return PlanExplanation.model_validate(row["response_json"])
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("LLM cache read error (non-critical): %s", exc)
+        return None
+
+
+def _write_llm_cache(
+    client: Any,
+    exp_input: "PlanExplanationInput",  # noqa: F821
+    explanation: "PlanExplanation",  # noqa: F821
+) -> None:
+    """Write a PlanExplanation to the cache. Errors are swallowed (non-critical)."""
+    try:
+        expires_at = datetime.now(tz=timezone.utc) + timedelta(days=_LLM_CACHE_TTL_DAYS)
+        cache_key = _llm_cache_key(exp_input)
+        client.table(_LLM_CACHE_TABLE).upsert(
+            {
+                "cache_key": cache_key,
+                "response_json": explanation.model_dump(mode="json", by_alias=True),
+                "model": explanation.model or "template",
+                "expires_at": expires_at.isoformat(),
+            },
+            on_conflict="cache_key",
+        ).execute()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug("LLM cache write error (non-critical): %s", exc)
 
 # ── Per-user rate limiting (SP-2) ──────────────────────────────────────────────
 # In-memory sliding-window counters keyed by JWT sub (user_id as str).
@@ -179,28 +268,61 @@ async def generate_plan(
             venue_lng = float(raw_lng)
         venue_name = tournament_result.data[0].get("venue_name") or ""
 
-    # 3. Read-through weather cache (returns None if no coords or fetch fails).
-    #    WeatherService is created per-request; aclose() in finally ensures cleanup.
-    #    WX-G1: pass target_dt so the cache layer dispatches to fetch_forecast_at()
-    #    when the first match is scheduled > 3h in the future.
+    # 3+5 (concurrent). Weather + places fetches are independent of each other.
+    #    Run both concurrently via asyncio.gather to save max(wx_ms, places_ms)
+    #    instead of paying wx_ms + places_ms in serial. Opt-A perf improvement.
+    #
+    #    Weather: async via WeatherService + get_or_fetch_weather.
+    #    Places:  sync (httpx.post inside GooglePlacesProvider); run in thread pool
+    #             via asyncio.to_thread so it doesn't block the event loop.
+    #             httpx.Client (sync) is thread-safe per httpx docs.
     settings = get_settings()
     weather_service = WeatherService(base_url=settings.open_meteo_base_url)
     snapshot: Optional[WeatherSnapshotRow] = None
     target_dt: Optional[datetime] = (
         match_rows[0].scheduled_start if match_rows else None
     )
-    try:
-        snapshot = await get_or_fetch_weather(
-            client,
+
+    import asyncio
+
+    async def _fetch_places_async() -> list:
+        """Run the sync find_nearby_food in a thread pool so it doesn't block."""
+        if venue_lat is None or venue_lng is None:
+            return []
+        return await asyncio.to_thread(
+            find_nearby_food,
+            venue_lat,
+            venue_lng,
             tid,
-            lat=venue_lat,
-            lng=venue_lng,
-            weather_service=weather_service,
-            ttl_seconds=settings.weather_cache_ttl_sec,
-            target_dt=target_dt,
+            client,
+        )
+
+    _wx_t0 = time.perf_counter()
+    _pl_t0 = time.perf_counter()
+    try:
+        snapshot, raw_places = await asyncio.gather(
+            get_or_fetch_weather(
+                client,
+                tid,
+                lat=venue_lat,
+                lng=venue_lng,
+                weather_service=weather_service,
+                ttl_seconds=settings.weather_cache_ttl_sec,
+                target_dt=target_dt,
+            ),
+            _fetch_places_async(),
         )
     finally:
         await weather_service.aclose()
+    _wx_ms = int((time.perf_counter() - _wx_t0) * 1000)
+    _pl_ms = int((time.perf_counter() - _pl_t0) * 1000)
+    logger.info(
+        "plan_gen: weather+places parallel fetch complete "
+        "weather_ms=%d places_ms=%d (wall) places_count=%d",
+        _wx_ms,
+        _pl_ms,
+        len(raw_places),
+    )
 
     # 4. Build weather_flags dict and WeatherBlock for plan response.
     weather_flags: Optional[dict[str, bool]] = None
@@ -239,17 +361,8 @@ async def generate_plan(
             precip_prob=snapshot.precipitation_probability,
         )
 
-    # 5. Phase 5: food / places lookup (non-critical; shared across all matches — same venue).
-    #    tournament_id + db_client passed for cache read-through (migration 0012).
-    #    When venue coords are absent, skip lookup entirely — bag fallback fires downstream.
-    raw_places = find_nearby_food(
-        venue_lat,
-        venue_lng,
-        tournament_id=tid,
-        db_client=client,
-    ) if (venue_lat is not None and venue_lng is not None) else []
-
     # 6. Provider is the same for all plans in this request.
+    # (Food/places result already in raw_places from the parallel gather above.)
     llm_provider = get_llm_provider()
     now_utc = datetime.now(tz=timezone.utc)
 
@@ -326,6 +439,7 @@ async def generate_plan(
 
         # 12. LLM explanation layer — TemplateProvider by default.
         #     Non-critical: sanitize_or_fallback() catches all provider errors.
+        #     Opt-B: check llm_explanation_cache first; on hit skip API call entirely.
         try:
             exp_input = build_explanation_input(
                 plan=plan,
@@ -338,9 +452,29 @@ async def generate_plan(
             # SEC-P6-2: opponent_notes are NOT attached to exp_input.
             # Notes are tactical text that must not be serialised to a third-party LLM.
             # exp_input.opponent_notes stays empty (PlanExplanationInput default: []).
-            raw_explanation = llm_provider.explain_plan(exp_input)
-            explanation = sanitize_or_fallback(raw_explanation, exp_input)
-            plan.llm_summary = explanation
+            _llm_t0 = time.perf_counter()
+            cached_explanation = _read_llm_cache(client, exp_input)
+            if cached_explanation is not None:
+                plan.llm_summary = cached_explanation
+                logger.info(
+                    "plan_gen: llm cache HIT match=%s provider=%s",
+                    str(match.id),
+                    cached_explanation.provider,
+                )
+            else:
+                raw_explanation = llm_provider.explain_plan(exp_input)
+                explanation = sanitize_or_fallback(raw_explanation, exp_input)
+                plan.llm_summary = explanation
+                _llm_ms = int((time.perf_counter() - _llm_t0) * 1000)
+                logger.info(
+                    "plan_gen: llm explain complete match=%s provider=%s duration_ms=%d",
+                    str(match.id),
+                    explanation.provider if explanation else None,
+                    _llm_ms,
+                )
+                # Write to cache (best-effort; errors swallowed).
+                if explanation is not None:
+                    _write_llm_cache(client, exp_input, explanation)
         except Exception:  # noqa: BLE001
             logger.warning(
                 "LLM explanation failed for match %s (%s); llmSummary will be null.",
