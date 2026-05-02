@@ -338,6 +338,43 @@ final class Repository: ObservableObject {
         )
     }
 
+    // MARK: - Tournament Feedback (phase7-feedback-spec.md §C)
+
+    /// Fetch the caller's existing feedback for a tournament.
+    /// Returns nil when no feedback has been submitted yet (API returns 404).
+    func getFeedback(tournamentId: UUID) async throws -> TournamentFeedback? {
+        do {
+            let dto = try await api.send(
+                Endpoints.getFeedback(baseURL: api.baseURL, tournamentId: tournamentId),
+                as: .camel,
+                expecting: TournamentFeedbackDTO.self
+            )
+            return dto.toModel()
+        } catch APIError.notFound {
+            return nil
+        }
+    }
+
+    /// Submit (or update) feedback for a tournament.
+    /// Returns the stored feedback row. Both 201 (create) and 200 (update)
+    /// responses carry the same FeedbackResponse JSON shape.
+    func submitFeedback(
+        tournamentId: UUID,
+        request: TournamentFeedbackCreateRequest
+    ) async throws -> TournamentFeedback {
+        let bodyData = try postEncoder.encode(request)
+        let dto = try await api.send(
+            Endpoints.submitFeedback(
+                baseURL: api.baseURL,
+                tournamentId: tournamentId,
+                body: bodyData
+            ),
+            as: .camel,
+            expecting: TournamentFeedbackDTO.self
+        )
+        return dto.toModel()
+    }
+
     // MARK: - Plans
 
     /// Generate a plan for a tournament via the rules engine.
