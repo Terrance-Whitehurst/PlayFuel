@@ -14,6 +14,16 @@ final class Repository: ObservableObject {
 
     private let api: APIClient
 
+    /// Date formatter for tournament date fields ("yyyy-MM-dd" strings, UTC).
+    /// Static to avoid re-allocating DateFormatter on every `createTournament` call.
+    /// DateFormatter is expensive to construct (locale resolution, calendar setup).
+    private static let tournamentDateFormatter: DateFormatter = {
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        fmt.timeZone = TimeZone(identifier: "UTC")
+        return fmt
+    }()
+
     /// Encoder for POST request bodies.
     /// .convertToSnakeCase maps Swift camelCase property names → API snake_case field names.
     /// .iso8601 handles Date → "2026-04-27T09:00:00Z" (accepted by FastAPI `datetime` fields).
@@ -125,9 +135,7 @@ final class Repository: ObservableObject {
     ) async throws -> Tournament {
         let t = Repository.clock()
         defer { Repository.lap(t, label: "createTournament") }
-        let dateFmt = DateFormatter()
-        dateFmt.dateFormat = "yyyy-MM-dd"
-        dateFmt.timeZone = TimeZone(identifier: "UTC")
+        let dateFmt = Repository.tournamentDateFormatter
         let body = TournamentCreateRequest(
             name: name,
             venueName: venueName,

@@ -291,8 +291,11 @@ struct MatchCreateView: View {
                 doublesFormat: matchType == .doubles ? doublesFormat : nil,
                 opponentPlayerId: opponentPlayerId
             )
-            // Reset plan envelope to idle so the dashboard prompts re-generation
-            // with the new match (Phase 7: envelope replaces single Plan).
+            // Invalidate the cached plan so the next `generatePlan(for:)` skips
+            // the stale cache and fetches a plan that includes the new match.
+            // Set envelope to .idle so the dashboard shows a spinner until the
+            // fresh plan arrives (new match must be reflected immediately).
+            appState.invalidatePlanCache(for: tournamentId)
             appState.currentPlanEnvelope = .idle
             dismiss()
         } catch {
