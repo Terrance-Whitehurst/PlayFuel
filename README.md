@@ -172,7 +172,7 @@ python3.12 -m pytest src/playfuel_api/tests/ -v
 | 4 — Weather | ✅ Complete | Open-Meteo client (keyless), `weather_snapshots`, flag classifier, forecast targeting for future-dated tournaments, wind/precip in API response |
 | 5 — Food / Places | ✅ Complete | Google Places (New) integration, cuisine-specific restaurant templates (12 buckets), recommended orders, safety lint |
 | 6 — LLM layer | ✅ Complete | AnthropicProvider (tool-use structured output) + TemplateProvider fallback; safety lint; PII-stripped prompt input; `llm_summary JSONB` in `plans` table |
-| 7 — Feedback | 🔲 Pending | Post-tournament rating screen, what-worked / what-didn't |
+| 7 — Feedback | ✅ Complete | Post-tournament rating screen, what-worked / what-didn't |
 | 8 — Beta | 🔲 Pending | TestFlight build, 5–10 junior tennis families |
 | Privacy | 🟡 In progress | COPPA review, App Store disclosures (PRIVACY_V1 drafted; legal review pending) |
 | Eval | 🔲 Pending | 5 canonical scenario tests (automated harness) |
