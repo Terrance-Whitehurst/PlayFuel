@@ -614,3 +614,107 @@ def test_post_feedback_empty_body_is_valid(client_with_auth, mock_db):
     assert body["overallRating"] is None
     assert body["whatWorked"] == []
     assert body["whatDidntWork"] == []
+
+
+# ── FB-F1 regression: upsert must be called (not insert) ─────────────────────
+
+
+def test_post_feedback_uses_upsert_not_insert(client_with_auth, mock_db):
+    """FB-F1 regression: POST must call .upsert() not .insert() on the feedback table.
+
+    The old SELECT-then-INSERT/UPDATE pattern raced on concurrent double-tap
+    submits: both requests could see no existing row, both attempt INSERT, the
+    second hits the UNIQUE(tournament_id, user_id) constraint -> 500 APIError.
+
+    The fix (chore/cleanup-phases-5-7) switches to DB-level .upsert() so the
+    conflict is handled atomically by Postgres.
+    """
+    feedback_check_chain = _make_chain([])   # no existing row -> is_create=True
+    feedback_write_chain = _make_chain([_FEEDBACK_ROW])
+
+    # Track which Supabase method is called on the write (second feedback call).
+    write_calls: list[str] = []
+    original_upsert = feedback_write_chain.upsert
+    original_insert = feedback_write_chain.insert
+
+    def _track_upsert(*args, **kwargs):
+        write_calls.append("upsert")
+        return feedback_write_chain
+
+    def _track_insert(*args, **kwargs):
+        write_calls.append("insert")
+        return feedback_write_chain
+
+    feedback_write_chain.upsert = _track_upsert
+    feedback_write_chain.insert = _track_insert
+
+    call_count = [0]
+
+    def _dispatch(name):
+        if name == "tournaments":
+            return _make_chain([_TOURNAMENT_ROW])
+        if name == "plans":
+            return _make_chain([_PLAN_ROW])
+        if name == "feedback":
+            call_count[0] += 1
+            return feedback_check_chain if call_count[0] == 1 else feedback_write_chain
+        return _make_chain([])
+
+    mock_db.table.side_effect = _dispatch
+
+    resp = client_with_auth.post(
+        f"/v1/tournaments/{_TOURNAMENT_ID}/feedback",
+        json=_VALID_BODY,
+    )
+    assert resp.status_code == 201, resp.text
+    assert "upsert" in write_calls, (
+        "FB-F1: route used insert instead of upsert. "
+        f"Actual write calls: {write_calls!r}. "
+        "A concurrent double-tap would 500 on the UNIQUE constraint."
+    )
+    assert "insert" not in write_calls, (
+        "FB-F1: route called insert() — should use upsert() exclusively for writes."
+    )
+
+
+# ── FB-LOG-1: operational logging wired ──────────────────────────────────────
+
+
+def test_post_feedback_logs_created(client_with_auth, mock_db, caplog):
+    """FB-LOG-1: POST (create) emits an INFO log with tournament_id and rating.
+
+    Confirms free_text is NOT in the log (user content must stay out of logs).
+    """
+    import logging
+
+    feedback_check_chain = _make_chain([])
+    feedback_write_chain = _make_chain([_FEEDBACK_ROW])
+    call_count = [0]
+
+    def _dispatch(name):
+        if name == "tournaments":
+            return _make_chain([_TOURNAMENT_ROW])
+        if name == "plans":
+            return _make_chain([_PLAN_ROW])
+        if name == "feedback":
+            call_count[0] += 1
+            return feedback_check_chain if call_count[0] == 1 else feedback_write_chain
+        return _make_chain([])
+
+    mock_db.table.side_effect = _dispatch
+
+    with caplog.at_level(logging.INFO, logger="playfuel_api.routes.feedback"):
+        resp = client_with_auth.post(
+            f"/v1/tournaments/{_TOURNAMENT_ID}/feedback",
+            json=_VALID_BODY,
+        )
+
+    assert resp.status_code == 201
+    assert any("created" in r.message and _TOURNAMENT_ID in r.message for r in caplog.records), (
+        "Expected INFO log with 'created' and tournament_id. "
+        f"Got records: {[r.message for r in caplog.records]}"
+    )
+    # free_text must not appear in any log record
+    assert not any("Great overall plan" in r.message for r in caplog.records), (
+        "free_text leaked into logs — must not log user content."
+    )

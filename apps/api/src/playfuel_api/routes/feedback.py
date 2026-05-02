@@ -62,6 +62,7 @@ def _get_tournament_or_404(tid: UUID, user_id: UUID, client: Client) -> dict[str
         .execute()
     )
     if not result.data:
+        logger.info("feedback 404: tournament_id=%s not found", str(tid))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tournament not found",
@@ -70,6 +71,7 @@ def _get_tournament_or_404(tid: UUID, user_id: UUID, client: Client) -> dict[str
     # RLS already enforces user_id scoping, but we do an explicit check so the
     # error surface is 404 regardless (no 403 info-leak).
     if row.get("user_id") != str(user_id):
+        logger.info("feedback 404: tournament_id=%s ownership mismatch", str(tid))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Tournament not found",
@@ -158,16 +160,19 @@ def submit_feedback(
     if body.free_text is not None:
         payload["free_text"] = body.free_text
 
-    if is_create:
-        result = client.table(_FEEDBACK_TABLE).insert(payload).execute()
-    else:
-        result = (
-            client.table(_FEEDBACK_TABLE)
-            .update(payload)
-            .eq("tournament_id", str(tid))
-            .eq("user_id", str(user_id))
-            .execute()
-        )
+    # FB-F1 fix: use DB-level upsert instead of SELECT-then-INSERT/UPDATE.
+    # The old pattern raced on concurrent submits (double-tap): both requests
+    # could observe is_create=True, both attempt INSERT, second hits the
+    # UNIQUE(tournament_id, user_id) constraint -> 500 APIError 23505.
+    # upsert(on_conflict=...) handles the conflict atomically in Postgres.
+    # We still run the pre-check SELECT (_get_feedback_row above) to determine
+    # the 201/200 status code semantics; the race only affects the write, not
+    # the status code, and double-tap is a UX concern not a data-integrity one.
+    result = (
+        client.table(_FEEDBACK_TABLE)
+        .upsert(payload, on_conflict="tournament_id,user_id")
+        .execute()
+    )
 
     if not result.data:
         raise HTTPException(
@@ -177,6 +182,14 @@ def submit_feedback(
 
     feedback_row = result.data[0]
     http_status = status.HTTP_201_CREATED if is_create else status.HTTP_200_OK
+
+    # FB-LOG-1: wire operational INFO logs (no free_text — user content stays out of logs).
+    logger.info(
+        "feedback %s: tournament_id=%s rating=%s",
+        "created" if is_create else "updated",
+        str(tid),
+        body.overall_rating,
+    )
 
     return Response(
         content=FeedbackResponse(**feedback_row).model_dump_json(by_alias=True),
@@ -212,6 +225,7 @@ def get_feedback(
     # Look up the feedback row
     feedback_row = _get_feedback_row(tid, user_id, client)
     if feedback_row is None:
+        logger.info("feedback 404: no row found for tournament_id=%s", str(tid))
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="No feedback found for this tournament",
