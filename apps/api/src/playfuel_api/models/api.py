@@ -245,6 +245,8 @@ class Plan(BaseModel):
     # ─ Nutrition-first IA additions (NUTRITION_FIRST_IA_V1.md §E) ──────────────────────────
     match_id: Optional[UUID] = None                     # alias: matchId; FK to matches.id; null for legacy/eval plans
     next_action: Optional["NextAction"] = None          # alias: nextAction; deterministic, rules-derived
+    # ─ feat/match-card-time — match schedule chip (ScheduleStripView) ──────────────────────
+    scheduled_start: Optional[str] = None               # alias: scheduledStart; ISO 8601 UTC from match.scheduled_start
 
 
 # ─── Phase 5 food option model — Task #8 ─────────────────────────────────────

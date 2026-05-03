@@ -417,6 +417,9 @@ async def generate_plan(
             bag_fallback_only=bag_fallback_only,
             match_type=match_type_key,
             match_id=match.id,
+            # feat/match-card-time: ISO 8601 UTC so iOS MatchChip shows device-local time.
+            # strftime("%Y-%m-%dT%H:%M:%SZ") is consistent with _fmt_time() in scenarios.py.
+            scheduled_start=match.scheduled_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
 
         # 11. Derive NextAction deterministically — rules engine, never LLM.

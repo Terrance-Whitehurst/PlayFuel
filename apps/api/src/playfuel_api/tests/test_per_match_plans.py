@@ -243,3 +243,38 @@ def test_doubles_plans_have_doubles_match_type(client_with_auth, mock_db) -> Non
     body = _run_generate(client_with_auth, mock_db, matches)
 
     assert body["doublesPlans"][0]["matchType"] == "doubles"
+
+
+def test_each_plan_has_scheduled_start_iso_utc(client_with_auth, mock_db) -> None:
+    """Each Plan carries scheduledStart as ISO 8601 UTC matching the match's scheduled_start.
+
+    feat/match-card-time: iOS MatchChip uses scheduledStart + asClockTimeFromISO to display
+    device-local clock time.  Previously this field was absent, causing the chip to show —.
+    """
+    matches = [
+        _base_match(MID_S1, "singles", None, "2026-05-15T09:00:00+00:00", 1),
+        _base_match(MID_S2, "singles", None, "2026-05-15T13:00:00+00:00", 2),
+    ]
+    body = _run_generate(client_with_auth, mock_db, matches)
+
+    plans = body["singlesPlans"]
+    assert len(plans) == 2
+
+    # Field must be present and non-null for every plan.
+    for plan in plans:
+        ss = plan.get("scheduledStart")
+        assert ss is not None, (
+            f"Plan {plan.get('matchId')} is missing scheduledStart. iOS MatchChip will show —."
+        )
+        # Must be parseable as ISO 8601 (contains 'T' separator and trailing 'Z').
+        assert "T" in ss and ss.endswith("Z"), (
+            f"scheduledStart must be ISO 8601 UTC (e.g. '2026-05-15T09:00:00Z'). Got: {ss!r}"
+        )
+
+    # Values match the two match inputs in order.
+    assert plans[0]["scheduledStart"] == "2026-05-15T09:00:00Z", (
+        f"Expected first plan scheduledStart='2026-05-15T09:00:00Z'. Got: {plans[0]['scheduledStart']!r}"
+    )
+    assert plans[1]["scheduledStart"] == "2026-05-15T13:00:00Z", (
+        f"Expected second plan scheduledStart='2026-05-15T13:00:00Z'. Got: {plans[1]['scheduledStart']!r}"
+    )
