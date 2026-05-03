@@ -404,6 +404,15 @@ async def generate_plan(
             for s in scenarios
             if s.food_strategy is not None
         })
+        # §G.5 no_next_match last-match fallback: all scenarios have food_strategy=None
+        # (no gap timing → no pickup scheduling), but venue food OPTIONS from Google
+        # Places are gap-independent.  When food_buckets is empty AND raw_places is
+        # non-empty, fall back to quick_pickup so restaurant recommendations still
+        # surface on the last match of the day.  The food TIMING text in each
+        # ScenarioPlan remains None (semantically correct — no next-match pressure);
+        # only the plan-level venue list is populated via the permissive fallback.
+        if not food_buckets and raw_places:
+            food_buckets = ["quick_pickup"]
         food_options, bag_fallback_only = assemble_food_options(raw_places, food_buckets)
 
         # 10. Assemble plan envelope.
@@ -417,6 +426,9 @@ async def generate_plan(
             bag_fallback_only=bag_fallback_only,
             match_type=match_type_key,
             match_id=match.id,
+            # feat/match-card-time: ISO 8601 UTC so iOS MatchChip shows device-local time.
+            # strftime("%Y-%m-%dT%H:%M:%SZ") is consistent with _fmt_time() in scenarios.py.
+            scheduled_start=match.scheduled_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
         )
 
         # 11. Derive NextAction deterministically — rules engine, never LLM.

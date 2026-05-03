@@ -6,8 +6,10 @@ import SwiftUI
 /// now reflect the selected format's short/normal/long values (DOUBLES_SPEC_V1.md §E.2).
 ///
 /// On save: POSTs to /v1/tournaments/{tid}/matches via `Repository.createMatch`,
-/// resets `appState.currentPlanEnvelope` to `.idle` (forces re-generation with the new match),
-/// then dismisses.
+/// invalidates the plan cache, sets `currentPlanEnvelope` to `.idle` so the dashboard
+/// shows a spinner, dismisses, then fires a background Task that calls
+/// `appState.generatePlan(for:)`. The Task outlives the sheet — dashboard observes
+/// the @Published change via @EnvironmentObject and updates when the plan arrives.
 ///
 /// Presented as a sheet from `TournamentDashboardView`.
 struct MatchCreateView: View {
@@ -291,13 +293,26 @@ struct MatchCreateView: View {
                 doublesFormat: matchType == .doubles ? doublesFormat : nil,
                 opponentPlayerId: opponentPlayerId
             )
-            // Invalidate the cached plan so the next `generatePlan(for:)` skips
-            // the stale cache and fetches a plan that includes the new match.
-            // Set envelope to .idle so the dashboard shows a spinner until the
-            // fresh plan arrives (new match must be reflected immediately).
+            // Invalidate the cached plan so the next `generatePlan(for:)` call
+            // fetches a fresh plan that includes the new match.
             appState.invalidatePlanCache(for: tournamentId)
+            // Show spinner immediately while the fresh plan loads.
             appState.currentPlanEnvelope = .idle
             dismiss()
+            // Re-generate the plan with the new match included.
+            //
+            // WHY THIS IS NEEDED:
+            // TournamentDashboardView uses `.task(id: tournament.id)` which only
+            // re-fires when tournament.id changes. Since the id is stable across
+            // match additions, dismissing MatchCreateView would leave the dashboard
+            // stuck on `.idle` (spinner) forever — nobody re-triggers generatePlan.
+            //
+            // This Task outlives the sheet dismissal: it is NOT bound to the view
+            // lifecycle (unlike .task modifier). AppState is global; the dashboard
+            // observes @Published changes via @EnvironmentObject and updates when
+            // the fresh plan arrives.
+            let capturedTid = tournamentId
+            Task { await appState.generatePlan(for: capturedTid) }
         } catch {
             errorMessage = (error as? LocalizedError)?.errorDescription
                 ?? error.localizedDescription

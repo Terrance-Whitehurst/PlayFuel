@@ -158,6 +158,7 @@ def build_plan_envelope(
     bag_fallback_only: bool = False,
     match_type: str = "singles",
     match_id: Optional[uuid.UUID] = None,
+    scheduled_start: Optional[str] = None,
 ) -> Plan:
     """Assemble the top-level Plan envelope from engine output.
 
@@ -170,6 +171,8 @@ def build_plan_envelope(
         timeline:         Optional list[TimelineEventOut] for plan response (Phase 4 OQ-API-2).
         food_options:     Optional list[FoodOption] from Phase 5 Places integration.
         bag_fallback_only: True when all buckets are bag_only (Phase 5).
+        scheduled_start:  ISO 8601 UTC string from match.scheduled_start (feat/match-card-time).
+                          Forwarded to Plan so iOS MatchChip can render device-local clock time.
 
     Returns:
         Plan — ready for HTTP response. Persist JSONB via
@@ -207,4 +210,5 @@ def build_plan_envelope(
         bag_fallback_only=bag_fallback_only,
         match_type=match_type,
         match_id=match_id,
+        scheduled_start=scheduled_start,
     )

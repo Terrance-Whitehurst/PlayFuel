@@ -137,18 +137,17 @@ private struct MatchChip: View {
     }
 
     // MARK: - Time String
+    //
+    // Uses the canonical asClockTimeFromISO extension (DateFormatting.swift) —
+    // same approach as ScenarioCardView after the fix/scenario-card-end-time hotfix.
+    // Backend emits ISO 8601 UTC (e.g. "2026-04-26T14:00:00Z"); the extension
+    // parses and reformats in the device's local timezone (e.g. "9:00 AM" in CDT).
+    // Non-ISO strings (FakeData human-readable) pass through unchanged.
+    // Nil scheduledStart → "—" (defensive for legacy plans pre-feat/match-card-time).
 
     private var timeString: String {
         guard let iso = plan.scheduledStart else { return "—" }
-        let fmt = ISO8601DateFormatter()
-        if let date = fmt.date(from: iso) {
-            let display = DateFormatter()
-            display.dateFormat = "h:mm a"
-            display.amSymbol = "AM"
-            display.pmSymbol = "PM"
-            return display.string(from: date)
-        }
-        return "—"
+        return iso.asClockTimeFromISO
     }
 
     // MARK: - Status

@@ -73,6 +73,24 @@ struct PlanEnvelope: Codable, Sendable {
         }
     }
 
+    // MARK: - Tournament-wide Timeline
+
+    /// All timeline events across every plan in the envelope, sorted chronologically.
+    ///
+    /// The backend emits a per-match timeline for each Plan (one match per plan).
+    /// The Full Day Timeline view should show ALL matches for the day, so this
+    /// property merges and sorts the per-plan timelines by their ISO 8601 `time`
+    /// string (lexicographic sort is correct for same-timezone ISO strings).
+    ///
+    /// FakeData uses human-readable time strings ("6:00 AM") in #Preview blocks —
+    /// sort order in previews is approximate but acceptable since previews are
+    /// Xcode-only.
+    var allTimeline: [TimelineEvent] {
+        allPlans
+            .flatMap { $0.timeline }
+            .sorted { $0.time < $1.time }
+    }
+
     // MARK: - Default Selection
 
     /// Returns the plan whose match starts soonest after `now`.

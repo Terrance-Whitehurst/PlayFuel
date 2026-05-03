@@ -273,9 +273,13 @@ struct TournamentDashboardView: View {
         scenariosSection(plan: plan)
 
         // #7 — Full Timeline button
-        if !plan.timeline.isEmpty {
+        // Shows timeline events for ALL matches in the tournament (not just the
+        // currently-selected match). envelope.allTimeline merges and sorts the
+        // per-match timelines chronologically so new matches appear immediately
+        // after plan re-generation. fix/full-day-timeline-multi-match.
+        if !envelope.allTimeline.isEmpty {
             NavigationLink {
-                TimelineView(tournament: tournament, timeline: plan.timeline)
+                TimelineView(tournament: tournament, timeline: envelope.allTimeline)
             } label: {
                 Label("Full Day Timeline", systemImage: "calendar.badge.clock")
                     .frame(maxWidth: .infinity)
