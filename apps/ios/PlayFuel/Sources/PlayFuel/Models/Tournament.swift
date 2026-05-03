@@ -25,4 +25,9 @@ struct Tournament: Codable, Identifiable, Hashable {
 
     /// Optional end date. Nil for single-day tournaments.
     let endDate: String?
+
+    /// Bracket size: 32 | 64 | 128 | 256.
+    /// Optional for backward compatibility with legacy API responses (pre-migration-0016).
+    /// No stored default per project rule (Codable structs + stored defaults break memberwise init).
+    let drawSize: Int?
 }

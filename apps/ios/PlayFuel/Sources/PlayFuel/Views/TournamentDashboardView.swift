@@ -99,6 +99,7 @@ struct TournamentDashboardView: View {
         .sheet(isPresented: $showingCreateMatch) {
             MatchCreateView(
                 tournamentId: tournament.id,
+                drawSize: tournament.drawSize ?? 32,
                 existingMatchCount: 0
             )
             .environmentObject(appState)

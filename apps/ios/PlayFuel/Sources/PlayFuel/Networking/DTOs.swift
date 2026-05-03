@@ -43,6 +43,7 @@ struct TournamentDTO: Decodable {
     let venueLng: Double?
     let startDate: String    // ISO date string kept as-is; matches iOS Tournament.startDate
     let endDate: String?
+    let drawSize: Int?       // draw_size → drawSize via .convertFromSnakeCase (migration 0016)
     let createdAt: Date?
     let updatedAt: Date?
 
@@ -57,7 +58,8 @@ struct TournamentDTO: Decodable {
             lat: venueLat ?? 0.0,
             lon: venueLng ?? 0.0,
             startDate: startDate,
-            endDate: endDate
+            endDate: endDate,
+            drawSize: drawSize
         )
     }
 }
@@ -90,6 +92,9 @@ struct MatchDTO: Decodable {
     let roundLabel: String?    // round_label → roundLabel
     let opponentLabel: String? // opponent_label → opponentLabel
     let courtLabel: String?    // court_label → courtLabel
+
+    // migration 0016 — numeric round. Decoded as-is (no camel conversion needed).
+    let round: Int?            // matches.round: 32=R32, 8=QF, 4=SF, 2=Final
 
     // Player Scouting — migration 0010. Decoded via .convertFromSnakeCase.
     let opponentPlayerId: UUID? // opponent_player_id → opponentPlayerId
@@ -400,6 +405,7 @@ struct TournamentCreateRequest: Encodable {
     let venueLng: Double?        // → venue_lng      (nil when no venue selected)
     let startDate: String        // → start_date ("yyyy-MM-dd" string; API type is `date`)
     let endDate: String          // → end_date
+    let drawSize: Int            // → draw_size (migration 0016; required by API)
 }
 
 /// Request body for POST /v1/tournaments/{tid}/matches.
@@ -419,6 +425,8 @@ struct MatchCreateRequest: Encodable {
     let doublesFormat: String?          // → doubles_format ("best_of_3" | "pro_set_8" | null)
     // Player Scouting — optional FK to scouted opponent
     let opponentPlayerId: UUID?         // → opponent_player_id (migration 0010)
+    // migration 0016 — numeric round; server auto-derives round_label from this value
+    let round: Int                      // → round (e.g. 32, 8, 4, 2)
 }
 
 // MARK: - Player Scouting DTOs (migration 0010)
@@ -624,10 +632,11 @@ extension MatchDTO {
             // roundLabel / opponentLabel / courtLabel use their `= nil` stored-property defaults
             // Phase 7: pass format + doublesFormat explicitly from the DB row
             format: format,
-            doublesFormat: doublesFormat
+            doublesFormat: doublesFormat,
             // opponentPlayerId uses its `= nil` stored-property default; populated via Codable
             // when Match is decoded directly. In MatchDTO.toModel() it defaults to nil because
             // MatchDTO carries it but Match.opponentPlayerId is set via Codable decode path.
+            roundNumeric: round  // migration 0016: numeric round from DB
         )
     }
 }

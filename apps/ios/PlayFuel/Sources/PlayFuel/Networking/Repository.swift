@@ -131,6 +131,7 @@ final class Repository: ObservableObject {
         venueLng: Double? = nil,
         startDate: Date,
         endDate: Date,
+        drawSize: Int = 32,
         timeZone: String
     ) async throws -> Tournament {
         let t = Repository.clock()
@@ -147,7 +148,8 @@ final class Repository: ObservableObject {
             venueLat: venueLat,
             venueLng: venueLng,
             startDate: dateFmt.string(from: startDate),
-            endDate: dateFmt.string(from: endDate)
+            endDate: dateFmt.string(from: endDate),
+            drawSize: drawSize
         )
         let bodyData = try postEncoder.encode(body)
         let dto = try await api.send(
@@ -172,7 +174,8 @@ final class Repository: ObservableObject {
         tournamentId: UUID,
         scheduledStart: Date,
         estimatedDurationMinutes: Int,
-        roundLabel: String?,
+        round: Int,
+        roundLabel: String? = nil,
         opponentLabel: String?,
         courtLabel: String?,
         estimatedNextMatchTime: Date?,
@@ -190,7 +193,8 @@ final class Repository: ObservableObject {
             displayOrder: displayOrder,
             format: matchType.rawValue,
             doublesFormat: doublesFormat?.rawValue,
-            opponentPlayerId: opponentPlayerId
+            opponentPlayerId: opponentPlayerId,
+            round: round
         )
         let bodyData = try postEncoder.encode(body)
         let dto = try await api.send(

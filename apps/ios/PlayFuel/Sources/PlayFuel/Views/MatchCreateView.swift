@@ -17,6 +17,9 @@ struct MatchCreateView: View {
     let tournamentId: UUID
     /// Passed from the parent so display_order defaults to existingMatchCount + 1.
     let existingMatchCount: Int
+    /// Tournament draw size — drives the round picker options (migration 0016).
+    /// Passed from TournamentDashboardView; defaults to 32 for legacy callers.
+    let drawSize: Int
 
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
@@ -36,7 +39,10 @@ struct MatchCreateView: View {
     /// Values reflect the selected (matchType, doublesFormat) combo from the §B table.
     @State private var durationIndex: Int = 1
 
-    @State private var roundLabelText: String = ""
+    // migration 0016: numeric round replaces free-text roundLabelText.
+    // Initialized to drawSize (earliest round = most likely first entry).
+    // Using @State with property-wrapper init syntax so drawSize is accessible.
+    @State private var selectedRound: Int
     @State private var opponentLabelText: String = ""
     @State private var courtLabelText: String = ""
 
@@ -50,6 +56,16 @@ struct MatchCreateView: View {
 
     /// Doubles format. Only used (and shown) when matchType == .doubles. Default: Best of 3.
     @State private var doublesFormat: DoublesFormat = .bestOf3
+
+    // MARK: - Init (needed to set selectedRound from drawSize)
+
+    init(tournamentId: UUID, drawSize: Int = 32, existingMatchCount: Int) {
+        self.tournamentId = tournamentId
+        self.drawSize = drawSize
+        self.existingMatchCount = existingMatchCount
+        // Initialize selectedRound to drawSize (earliest round; most common first entry)
+        _selectedRound = State(initialValue: drawSize)
+    }
 
     // MARK: - Player scouting state
 
@@ -140,8 +156,13 @@ struct MatchCreateView: View {
                     header: Text("Labels"),
                     footer: Text("All optional. Displayed on the match card.")
                 ) {
-                    TextField("Round (e.g. R16, QF, SF, F)", text: $roundLabelText)
-                        .autocorrectionDisabled()
+                    // migration 0016: numeric round picker replaces free-text field.
+                    Picker("Round", selection: $selectedRound) {
+                        ForEach(RoundVocab.roundOptions(for: drawSize), id: \.self) { r in
+                            Text(RoundVocab.label(for: r)).tag(r)
+                        }
+                    }
+                    .pickerStyle(.menu)
 
                     Button {
                         showPlayerSearch = true
@@ -274,7 +295,6 @@ struct MatchCreateView: View {
         errorMessage = nil
 
         // Trim optional label fields; send nil (not empty string) when blank.
-        let roundLabel    = trimmedOrNil(roundLabelText)
         let opponentLabel = trimmedOrNil(opponentLabelText)
         let courtLabel    = trimmedOrNil(courtLabelText)
         let nextMatch     = hasNextMatch ? nextMatchTime : nil
@@ -284,7 +304,9 @@ struct MatchCreateView: View {
                 tournamentId: tournamentId,
                 scheduledStart: scheduledStart,
                 estimatedDurationMinutes: durationOptions[durationIndex].minutes,
-                roundLabel: roundLabel,
+                round: selectedRound,
+                // roundLabel is intentionally nil — the API auto-derives it from `round`
+                roundLabel: nil,
                 opponentLabel: opponentLabel,
                 courtLabel: courtLabel,
                 estimatedNextMatchTime: nextMatch,
@@ -422,6 +444,7 @@ private struct PlayerSearchSheet: View {
     let state = AppState(repository: repo, authService: auth)
     return MatchCreateView(
         tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
+        drawSize: 64,
         existingMatchCount: 0
     )
     .environmentObject(state)
@@ -434,6 +457,7 @@ private struct PlayerSearchSheet: View {
     let state = AppState(repository: repo, authService: auth)
     return MatchCreateView(
         tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
+        drawSize: 64,
         existingMatchCount: 0
     )
     .environmentObject(state)
