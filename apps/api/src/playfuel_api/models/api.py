@@ -119,7 +119,8 @@ class ScenarioPlan(BaseModel):
 
     scenario: ScenarioKind
     duration_min: int
-    estimated_end: str        # e.g. "10:15 AM" — human-readable
+    estimated_end: str        # ISO 8601 UTC string, e.g. "2026-04-26T10:15:00Z"
+                               # iOS uses asClockTimeFromISO to convert to local time.
     gap_minutes: Optional[int] = None
     gap_status: GapStatus
     food_strategy: Optional[FoodStrategy] = None

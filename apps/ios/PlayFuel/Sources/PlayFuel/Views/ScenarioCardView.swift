@@ -86,7 +86,10 @@ struct ScenarioCardView: View {
                 Text("Est. End")
                     .font(.caption2)
                     .foregroundStyle(.white.opacity(0.75))
-                Text(plan.estimatedEnd)
+                // fix/scenario-card-end-time: backend now returns ISO 8601 UTC.
+                // asClockTimeFromISO converts to device-local time.
+                // FakeData strings (e.g. "10:15 AM") pass through unchanged.
+                Text(plan.estimatedEnd.asClockTimeFromISO)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
             }
