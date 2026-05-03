@@ -60,10 +60,19 @@ _NO_NEXT_MATCH_PICKUP_TEXT = (
 
 
 def _fmt_time(dt) -> str:
-    """Format a datetime as 'H:MM AM/PM' with no leading zero on the hour."""
-    h = dt.hour % 12 or 12
-    ampm = "AM" if dt.hour < 12 else "PM"
-    return f"{h}:{dt.minute:02d} {ampm}"
+    """Return ISO 8601 UTC string for estimated end time.
+
+    iOS uses `asClockTimeFromISO` (DateFormatting.swift) to convert this to the
+    device's local clock time.  The previous "H:MM AM/PM" format was computed
+    from the raw UTC hour, which caused a timezone bug: a user in UTC-5 who
+    entered 9 AM local saw "3:15 PM" instead of "10:15 AM" on the Short card.
+
+    The fix: always emit ISO 8601 UTC so the client can apply the correct
+    local-timezone conversion.
+    """
+    # scheduled_start is always UTC (iOS postEncoder uses .iso8601 which emits Z).
+    # strftime + 'Z' suffix is safe here; no tz-conversion needed.
+    return dt.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _make_scenario(

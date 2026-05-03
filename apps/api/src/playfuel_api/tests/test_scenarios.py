@@ -499,3 +499,72 @@ class TestScenario4_FullPipeline:
     def test_llm_summary_is_none(self):
         """Eval harness: LLM is never called from the rules engine path."""
         assert self.plan.llm_summary is None
+
+
+# ── Timezone regression — fix/scenario-card-end-time ─────────────────────────
+#
+# Bug: _fmt_time() formatted estimated_end as "H:MM AM/PM" using dt.hour on a UTC
+# datetime. A user in UTC-5 entering 9 AM local time caused the iOS app to display
+# "3:15 PM" (UTC) instead of "10:15 AM" (local) on the Short scenario card.
+#
+# Root cause: iOS encodes Date as UTC ISO 8601 (e.g. "2026-05-03T14:00:00Z" for
+# 9 AM CDT/EST). Backend computed 14:00 + 75 min = 15:15 UTC, formatted as "3:15 PM".
+# The gap_minutes (225) was correct because it's a duration (timezone-invariant),
+# which is why the gap pill was right but the estimated end was wrong.
+#
+# Fix: _fmt_time() now returns an ISO 8601 UTC string (e.g. "2026-05-03T15:15:00Z").
+# iOS DateFormatting.asClockTimeFromISO converts to device-local time correctly.
+#
+# Regression test: asserts ISO 8601 format AND correct UTC value for Scenario 1.
+
+import re as _re
+
+_ISO_8601_Z_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+class TestEstimatedEndISO:
+    """fix/scenario-card-end-time — estimated_end must be ISO 8601 UTC, not 'H:MM AM/PM'.
+
+    Ref: fix/scenario-card-end-time — timezone bug where UTC-formatted time was
+    displayed directly on iOS instead of being converted to device-local time.
+    """
+
+    def setup_method(self):
+        # Match 1 at 09:00 UTC (simulates "9 AM local" sent as UTC from iOS).
+        # Match 2 at 14:00 UTC (simulates "2 PM local" = 5 hours later).
+        m1 = _match(9, 0)
+        m2 = _match(14, 0, tid=m1.tournament_id)
+        scenarios = generate_match_scenarios(m1, m2)
+        self.short, self.normal, self.long_ = scenarios
+
+    def test_estimated_end_is_iso_8601(self):
+        """All three scenarios must return ISO 8601 UTC strings, not 'H:MM AM/PM'."""
+        for s in (self.short, self.normal, self.long_):
+            assert _ISO_8601_Z_RE.match(s.estimated_end), (
+                f"estimated_end must be ISO 8601 UTC (got {s.estimated_end!r}). "
+                "Fix: _fmt_time() must use strftime('%Y-%m-%dT%H:%M:%SZ')."
+            )
+
+    def test_short_estimated_end_correct_utc_value(self):
+        """Short: 09:00 UTC + 75 min = 10:15 UTC → '2026-04-26T10:15:00Z'."""
+        assert self.short.estimated_end == "2026-04-26T10:15:00Z", (
+            f"Short estimated_end wrong: {self.short.estimated_end!r}. "
+            "User in UTC-5 entering 9 AM local would see this as 10:15 AM — correct."
+        )
+
+    def test_normal_estimated_end_correct_utc_value(self):
+        """Normal: 09:00 UTC + 120 min = 11:00 UTC → '2026-04-26T11:00:00Z'."""
+        assert self.normal.estimated_end == "2026-04-26T11:00:00Z"
+
+    def test_long_estimated_end_correct_utc_value(self):
+        """Long: 09:00 UTC + 180 min = 12:00 UTC → '2026-04-26T12:00:00Z'."""
+        assert self.long_.estimated_end == "2026-04-26T12:00:00Z"
+
+    def test_gap_still_correct_after_iso_fix(self):
+        """Gap minutes are timezone-invariant (duration arithmetic) — must still be correct.
+
+        Short: 09:00 + 75 min = 10:15; next_match at 14:00; gap = 225 min.
+        This was CORRECT before the fix too — the bug only affected the display string.
+        """
+        assert self.short.gap_minutes == 225
+        assert self.short.gap_status == GapStatus.ok
