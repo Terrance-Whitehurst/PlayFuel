@@ -18,11 +18,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from supabase import Client
 
 from playfuel_api.auth import verify_supabase_jwt
 from playfuel_api.db import authed_client
+from playfuel_api.rules.constants import DRAW_SIZES
 
 router = APIRouter(prefix="/v1", tags=["tournaments"])
 
@@ -33,6 +34,7 @@ _TABLE = "tournaments"
 
 class TournamentCreate(BaseModel):
     name: str
+    draw_size: int                         # required — 32 | 64 | 128 | 256
     start_date: date
     end_date: Optional[date] = None
     venue_name: Optional[str] = None
@@ -47,9 +49,17 @@ class TournamentCreate(BaseModel):
     # Added migration 0012 (TOURNAMENT_LOCATION_V1.md §C.2).
     venue_place_id: Optional[str] = None
 
+    @field_validator("draw_size")
+    @classmethod
+    def validate_draw_size(cls, v: int) -> int:
+        if v not in DRAW_SIZES:
+            raise ValueError(f"draw_size must be one of {DRAW_SIZES}")
+        return v
+
 
 class TournamentUpdate(BaseModel):
     name: Optional[str] = None
+    draw_size: Optional[int] = None        # optional for partial update
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     venue_name: Optional[str] = None
@@ -60,6 +70,13 @@ class TournamentUpdate(BaseModel):
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
     venue_place_id: Optional[str] = None
+
+    @field_validator("draw_size")
+    @classmethod
+    def validate_draw_size(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in DRAW_SIZES:
+            raise ValueError(f"draw_size must be one of {DRAW_SIZES}")
+        return v
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────

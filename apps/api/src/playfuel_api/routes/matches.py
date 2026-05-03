@@ -18,11 +18,12 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from supabase import Client
 
 from playfuel_api.auth import verify_supabase_jwt
 from playfuel_api.db import authed_client
+from playfuel_api.rules.constants import ROUND_LABELS, VALID_ROUNDS
 
 router = APIRouter(prefix="/v1/tournaments", tags=["matches"])
 
@@ -37,12 +38,13 @@ _VALID_DOUBLES_FORMATS = {"best_of_3", "pro_set_8"}
 
 class MatchCreate(BaseModel):
     scheduled_start: datetime
+    round: int                              # required — players still alive (32=R32, 8=QF, 2=Final)
     estimated_duration_minutes: Optional[int] = None
     surface: Optional[str] = None
     format: Optional[str] = None            # 'singles' | 'doubles'
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
-    round_label: Optional[str] = None
+    round_label: Optional[str] = None      # kept for back-compat; server ALWAYS overwrites from round
     opponent_label: Optional[str] = None
     court_label: Optional[str] = None
     # Doubles-spec extension — migration 0007_doubles_support.sql
@@ -50,9 +52,17 @@ class MatchCreate(BaseModel):
     # Player scouting extension — migration 0010_players_and_notes.sql
     opponent_player_id: Optional[UUID] = None  # FK to players.id; SET NULL on player delete
 
+    @field_validator("round")
+    @classmethod
+    def validate_round(cls, v: int) -> int:
+        if v not in VALID_ROUNDS:
+            raise ValueError(f"round must be one of {sorted(VALID_ROUNDS)}")
+        return v
+
 
 class MatchUpdate(BaseModel):
     scheduled_start: Optional[datetime] = None
+    round: Optional[int] = None             # optional for partial update
     estimated_duration_minutes: Optional[int] = None
     actual_end_at: Optional[datetime] = None
     surface: Optional[str] = None
@@ -66,6 +76,13 @@ class MatchUpdate(BaseModel):
     doubles_format: Optional[str] = None   # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
     # Player scouting extension
     opponent_player_id: Optional[UUID] = None  # FK to players.id
+
+    @field_validator("round")
+    @classmethod
+    def validate_round(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in VALID_ROUNDS:
+            raise ValueError(f"round must be one of {sorted(VALID_ROUNDS)}")
+        return v
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -151,8 +168,33 @@ def create_match(
     """Create a match under a tournament. RLS verifies tournament ownership."""
     _validate_doubles_format(body.format, body.doubles_format)
     _validate_opponent_player_id(body.opponent_player_id, client)
+
+    # Cross-table round validation: round must not exceed the tournament's draw_size.
+    # Postgres CHECK on matches.round only validates the value is a power-of-2 bracket size;
+    # it cannot subquery across tables. Enforced here (draw-size-spec.md §4.2).
+    t_result = (
+        client.table("tournaments")
+        .select("draw_size")
+        .eq("id", str(tid))
+        .limit(1)
+        .execute()
+    )
+    if not t_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tournament not found",
+        )
+    draw_size: int = t_result.data[0]["draw_size"]
+    if body.round > draw_size:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"round {body.round} exceeds tournament draw size {draw_size}",
+        )
+
     payload = body.model_dump(exclude_none=True)
     payload["tournament_id"] = str(tid)
+    # Server is source of truth for round_label — always overwrite from the numeric round.
+    payload["round_label"] = ROUND_LABELS[body.round]
     # UUID → string for PostgREST
     if payload.get("opponent_player_id") is not None:
         payload["opponent_player_id"] = str(payload["opponent_player_id"])

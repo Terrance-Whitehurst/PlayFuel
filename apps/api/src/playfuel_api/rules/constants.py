@@ -67,3 +67,42 @@ WEATHER_THRESHOLDS: dict[str, float] = {
     "rain_risk":  40.0,   # precipitation_probability >= 40
 }
 # Derived: extreme_heat_risk = very_hot OR (hot AND humid) — §E.2
+
+# ─── Draw size + round vocab (draw-size-spec.md §3) ──────────────────────────
+#
+# draw_size: total bracket entries. The four values supported for junior draws.
+# round: number of players still alive at this bracket stage. 2 = Final.
+# round_label: short DB/wire abbreviation derived from round.
+#
+# Keep in sync with iOS RoundVocab.swift (Models/RoundVocab.swift).
+
+DRAW_SIZES: list[int] = [32, 64, 128, 256]
+
+ROUND_LABELS: dict[int, str] = {
+    256: "R256",
+    128: "R128",
+    64:  "R64",
+    32:  "R32",
+    16:  "R16",
+    8:   "QF",
+    4:   "SF",
+    2:   "F",
+}
+
+VALID_ROUNDS: set[int] = set(ROUND_LABELS.keys())
+
+
+def rounds_for_draw(draw_size: int) -> list[int]:
+    """Return valid round values for a draw size, largest first (earliest → latest bracket stage).
+
+    Examples:
+        rounds_for_draw(32)  → [32, 16, 8, 4, 2]
+        rounds_for_draw(64)  → [64, 32, 16, 8, 4, 2]
+        rounds_for_draw(256) → [256, 128, 64, 32, 16, 8, 4, 2]
+    """
+    rounds: list[int] = []
+    r = draw_size
+    while r >= 2:
+        rounds.append(r)
+        r //= 2
+    return rounds

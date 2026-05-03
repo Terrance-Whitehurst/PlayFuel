@@ -248,6 +248,7 @@ def test_match_create_with_valid_opponent_player_id_returns_201(client_with_auth
     PID = str(uuid4())
 
     player_chain = _make_chain([{"id": PID}])   # RLS returns the player (valid)
+    tournament_chain = _make_chain([{"draw_size": 32}])  # draw-size-spec: route fetches draw_size
     match_row = {
         "id": str(uuid4()),
         "tournament_id": TID,
@@ -258,7 +259,8 @@ def test_match_create_with_valid_opponent_player_id_returns_201(client_with_auth
         "format": "singles",
         "age_bracket": None,
         "display_order": 1,
-        "round_label": None,
+        "round_label": "R32",
+        "round": 32,
         "opponent_label": "Smith",
         "court_label": None,
         "doubles_format": None,
@@ -269,7 +271,7 @@ def test_match_create_with_valid_opponent_player_id_returns_201(client_with_auth
     match_chain = _make_chain([match_row])
 
     def _dispatch(name):
-        return {"players": player_chain, "matches": match_chain}.get(name, MagicMock())
+        return {"players": player_chain, "tournaments": tournament_chain, "matches": match_chain}.get(name, MagicMock())
 
     mock_db.table.side_effect = _dispatch
 
@@ -277,6 +279,7 @@ def test_match_create_with_valid_opponent_player_id_returns_201(client_with_auth
         f"/v1/tournaments/{TID}/matches",
         json={
             "scheduled_start": "2026-05-15T09:00:00+00:00",
+            "round": 32,
             "opponent_label": "Smith",
             "opponent_player_id": PID,
         },
@@ -301,6 +304,7 @@ def test_match_create_with_unknown_opponent_player_id_returns_404(client_with_au
         f"/v1/tournaments/{TID}/matches",
         json={
             "scheduled_start": "2026-05-15T09:00:00+00:00",
+            "round": 32,
             "opponent_player_id": UNKNOWN_PID,
         },
     )
