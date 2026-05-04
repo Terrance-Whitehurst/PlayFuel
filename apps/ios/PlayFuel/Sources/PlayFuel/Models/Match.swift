@@ -58,7 +58,7 @@ struct Match: Codable, Identifiable, Hashable {
     //
     // Numeric round value matching `matches.round` DB column.
     // e.g. 8 = Quarterfinal, 4 = Semifinal, 2 = Final.
-    // Optional with `= nil` default so existing FakeData/Match call sites are unaffected.
+    // No stored default — project rule: Codable structs + stored defaults break memberwise init.
 
     /// Numeric round value. 32 = Round of 32, 8 = Quarterfinal, 4 = Semifinal, 2 = Final.
     /// Use `RoundVocab.label(for:)` to get the display string.
