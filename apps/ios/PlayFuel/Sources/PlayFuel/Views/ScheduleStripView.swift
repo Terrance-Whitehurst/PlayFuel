@@ -146,8 +146,18 @@ private struct MatchChip: View {
     // Nil scheduledStart → "—" (defensive for legacy plans pre-feat/match-card-time).
 
     private var timeString: String {
-        guard let iso = plan.scheduledStart else { return "—" }
-        return iso.asClockTimeFromISO
+        if let iso = plan.scheduledStart, !iso.isEmpty {
+            return iso.asClockTimeFromISO
+        }
+        // Defensive fallback: derive from the timeline's `.match` event.
+        // Safe-guards against backend versions that pre-date commit d17b308
+        // (feat/match-card-time) and don't emit `scheduledStart` on the Plan
+        // envelope. The `.match` TimelineEvent has been emitted since Phase 4
+        // with `time = match.scheduled_start.isoformat()`.
+        if let matchEvent = plan.timeline.first(where: { $0.kind == .match }) {
+            return matchEvent.time.asClockTimeFromISO
+        }
+        return "—"
     }
 
     // MARK: - Status
@@ -170,7 +180,7 @@ private struct MatchChip: View {
     private var statusView: some View {
         switch matchStatus {
         case .upcoming:
-            Label("Upcoming", systemImage: "clock")
+            Label(timeString, systemImage: "clock")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         case .inProgress:
