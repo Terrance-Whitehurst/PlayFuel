@@ -38,11 +38,24 @@ _PLAN_PATH = f"/v1/tournaments/{TID}/plans/generate"
 # ── Helper: build a mock_db wired for the matches.insert call ─────────────────
 
 
-def _wire_match_insert(mock_db: MagicMock, return_row: dict) -> None:
-    """Configure mock_db so POST /matches insert returns return_row."""
-    chain = MagicMock()
-    chain.insert.return_value.execute.return_value.data = [return_row]
-    mock_db.table.return_value = chain
+def _wire_match_insert(mock_db: MagicMock, return_row: dict, draw_size: int = 32) -> None:
+    """Configure mock_db so POST /matches works (tournaments draw_size lookup + matches insert).
+
+    Updated for draw-size-spec: create_match now fetches tournaments.draw_size first,
+    then inserts into matches. Both table calls need wired mock chains.
+    """
+    tournaments_chain = MagicMock()
+    tournaments_chain.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = [
+        {"draw_size": draw_size}
+    ]
+
+    matches_chain = MagicMock()
+    matches_chain.insert.return_value.execute.return_value.data = [return_row]
+
+    mock_db.table.side_effect = lambda name: {
+        "tournaments": tournaments_chain,
+        "matches": matches_chain,
+    }.get(name, MagicMock())
 
 
 # ── Helper: build a mock_db for the plan generate route ──────────────────────
@@ -111,7 +124,7 @@ def test_match_create_singles_no_doubles_format_returns_201(client_with_auth, mo
     )
     resp = client_with_auth.post(
         _MATCH_PATH,
-        json={"scheduled_start": "2026-05-15T14:00:00+00:00", "format": "singles"},
+        json={"scheduled_start": "2026-05-15T14:00:00+00:00", "format": "singles", "round": 32},
     )
     assert resp.status_code == 201, resp.text
 
@@ -124,6 +137,7 @@ def test_match_create_singles_with_doubles_format_returns_400(client_with_auth, 
             "scheduled_start": "2026-05-15T14:00:00+00:00",
             "format": "singles",
             "doubles_format": "best_of_3",
+            "round": 32,
         },
     )
     assert resp.status_code == 400, resp.text
@@ -140,6 +154,7 @@ def test_match_create_doubles_no_format_returns_400(client_with_auth, mock_db):
         json={
             "scheduled_start": "2026-05-15T14:00:00+00:00",
             "format": "doubles",
+            "round": 32,
             # doubles_format intentionally omitted → null
         },
     )
@@ -158,6 +173,7 @@ def test_match_create_doubles_bogus_format_returns_400(client_with_auth, mock_db
             "scheduled_start": "2026-05-15T14:00:00+00:00",
             "format": "doubles",
             "doubles_format": "bogus",
+            "round": 32,
         },
     )
     assert resp.status_code == 400, resp.text
@@ -181,6 +197,7 @@ def test_match_create_doubles_best_of_3_returns_201(client_with_auth, mock_db):
             "scheduled_start": "2026-05-15T14:00:00+00:00",
             "format": "doubles",
             "doubles_format": "best_of_3",
+            "round": 32,
         },
     )
     assert resp.status_code == 201, resp.text
@@ -204,6 +221,7 @@ def test_match_create_doubles_pro_set_8_returns_201(client_with_auth, mock_db):
             "scheduled_start": "2026-05-15T14:00:00+00:00",
             "format": "doubles",
             "doubles_format": "pro_set_8",
+            "round": 32,
         },
     )
     assert resp.status_code == 201, resp.text

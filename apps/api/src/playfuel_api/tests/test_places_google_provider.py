@@ -466,6 +466,7 @@ def test_post_tournament_persists_venue_place_id(client_with_auth, mock_db) -> N
         "/v1/tournaments",
         json={
             "name": "Mike's Spring Open",
+            "draw_size": 64,
             "start_date": "2026-06-15",
             "end_date": "2026-06-15",
             "venue_name": "Delray Beach Tennis Center",
@@ -508,6 +509,7 @@ def test_post_tournament_without_place_id_still_works(client_with_auth, mock_db)
         "/v1/tournaments",
         json={
             "name": "No Place ID Open",
+            "draw_size": 32,
             "start_date": "2026-06-15",
             "venue_lat": 26.4615,
             "venue_lng": -80.0728,

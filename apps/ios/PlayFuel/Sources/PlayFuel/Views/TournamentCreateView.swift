@@ -20,6 +20,9 @@ struct TournamentCreateView: View {
     @State private var endDate: Date = Calendar.current.date(byAdding: .day, value: 1, to: Date()) ?? Date()
     @State private var selectedTimeZone: String = "America/Chicago"
 
+    // MARK: - Draw size (migration 0016)
+    @State private var drawSize: Int = 32
+
     // MARK: - Async state
 
     @State private var isSaving: Bool = false
@@ -106,6 +109,20 @@ struct TournamentCreateView: View {
                             .buttonStyle(.plain)
                         }
                     }
+                }
+
+                Section {
+                    Picker("Draw size", selection: $drawSize) {
+                        ForEach(RoundVocab.drawSizes, id: \.self) { size in
+                            Text(RoundVocab.drawSizeLabel(size)).tag(size)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                } header: {
+                    Text("Draw Size")
+                } footer: {
+                    Text("Number of players in the bracket. Check your entry confirmation email or the bracket sheet at the venue.")
                 }
 
                 Section("Dates") {
@@ -195,6 +212,7 @@ struct TournamentCreateView: View {
                 venueLng: venue.venueLng,
                 startDate: startDate,
                 endDate: endDate,
+                drawSize: drawSize,
                 timeZone: selectedTimeZone
             )
 

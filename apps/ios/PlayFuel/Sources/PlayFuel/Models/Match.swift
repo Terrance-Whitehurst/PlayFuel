@@ -54,6 +54,17 @@ struct Match: Codable, Identifiable, Hashable {
     /// Nil when format != "doubles". Maps to `matches.doubles_format` (migration 0007).
     let doublesFormat: String?
 
+    // MARK: - Draw size + round (migration 0016 — draw-size-spec.md §2)
+    //
+    // Numeric round value matching `matches.round` DB column.
+    // e.g. 8 = Quarterfinal, 4 = Semifinal, 2 = Final.
+    // Optional with `= nil` default so existing FakeData/Match call sites are unaffected.
+
+    /// Numeric round value. 32 = Round of 32, 8 = Quarterfinal, 4 = Semifinal, 2 = Final.
+    /// Use `RoundVocab.label(for:)` to get the display string.
+    /// No stored default per project rule (Codable structs + stored defaults break memberwise init).
+    let roundNumeric: Int?
+
     // MARK: - Player Scouting (migration 0010 — PLAYER_SCOUTING_V1.md §E.4)
     //
     // FK to `public.players.id`. Nil when the parent hasn’t linked a scouted opponent.
