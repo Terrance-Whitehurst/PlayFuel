@@ -159,6 +159,7 @@ def build_plan_envelope(
     match_type: str = "singles",
     match_id: Optional[uuid.UUID] = None,
     scheduled_start: Optional[str] = None,
+    is_done: bool = False,               # match-done-state-cards spec §C
 ) -> Plan:
     """Assemble the top-level Plan envelope from engine output.
 
@@ -211,4 +212,5 @@ def build_plan_envelope(
         match_type=match_type,
         match_id=match_id,
         scheduled_start=scheduled_start,
+        is_done=is_done,               # match-done-state-cards spec §C
     )

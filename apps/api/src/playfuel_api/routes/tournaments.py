@@ -18,7 +18,8 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic.alias_generators import to_camel
 from supabase import Client
 
 from playfuel_api.auth import verify_supabase_jwt
@@ -33,6 +34,10 @@ _TABLE = "tournaments"
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class TournamentCreate(BaseModel):
+    # camelCase aliases: iOS sends venueLat, venueLng, startDate, endDate etc.
+    # populate_by_name=True allows both snake_case (tests) and camelCase (iOS).
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     name: str
     draw_size: int                         # required — 32 | 64 | 128 | 256
     start_date: date
@@ -58,6 +63,9 @@ class TournamentCreate(BaseModel):
 
 
 class TournamentUpdate(BaseModel):
+    # camelCase aliases: iOS sends venueLat, venueLng, startDate, endDate etc.
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     name: Optional[str] = None
     draw_size: Optional[int] = None        # optional for partial update
     start_date: Optional[date] = None
@@ -169,6 +177,13 @@ def delete_tournament(
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> Response:
-    """Delete a tournament. RLS enforces ownership. Cascades to matches/plans."""
-    client.table(_TABLE).delete().eq("id", str(tid)).execute()
+    """Delete a tournament. RLS enforces ownership. Cascades to matches/plans.
+
+    Returns 404 when the row doesn't exist or RLS filtered it out (caller doesn't
+    own it). RLS makes 404 == 403 from the caller's POV — intentional per spec §C.1.
+    """
+    result = client.table(_TABLE).delete().eq("id", str(tid)).execute()
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Tournament not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

@@ -81,25 +81,45 @@ def test_mock_provider_within_plus_half_degree(provider):
     assert len(results) >= 3
 
 
-# ── Out-of-bbox: return [] ─────────────────────────────────────────────────────
+# ── Geo-agnostic: any coords return geo-offset fixtures ───────────────────────
 
 
-def test_mock_provider_outside_bbox_lat_returns_empty(provider):
-    """Coords outside bbox (lat+0.6°) return empty list."""
-    results = provider.search_nearby(DALLAS_LAT + 0.6, DALLAS_LNG, SEARCH_RADIUS, MAX_RESULTS)
-    assert results == [] or list(results) == []
+def test_mock_provider_outside_dallas_returns_geo_offset_fixtures(provider):
+    """Coords outside Dallas bbox still return geo-offset fixtures — no bbox gate.
+
+    Pre-fix, MockPlacesProvider had a Dallas bbox gate; any non-Dallas input
+    returned []. This assertion would have FAILED pre-fix (got [], expected >= 3).
+    """
+    austin_lat, austin_lng = 30.2672, -97.7431
+    results = list(provider.search_nearby(austin_lat, austin_lng, SEARCH_RADIUS, MAX_RESULTS))
+    assert len(results) >= 3, f"Expected ≥3 mock results for Austin coords; got {len(results)}"
+    for r in results:
+        assert abs(r.lat - austin_lat) <= 0.05, (
+            f"{r.name}.lat={r.lat} not within 0.05° of Austin lat={austin_lat}"
+        )
+        assert abs(r.lng - austin_lng) <= 0.05, (
+            f"{r.name}.lng={r.lng} not within 0.05° of Austin lng={austin_lng}"
+        )
 
 
-def test_mock_provider_lat_zero_lng_zero_returns_empty(provider):
-    """Null island (0.0, 0.0) returns empty list."""
-    results = provider.search_nearby(0.0, 0.0, SEARCH_RADIUS, MAX_RESULTS)
-    assert list(results) == []
+def test_mock_provider_null_island_still_returns_fixtures(provider):
+    """Null island (0.0, 0.0) returns geo-offset fixtures — no bbox gate."""
+    results = list(provider.search_nearby(0.0, 0.0, SEARCH_RADIUS, MAX_RESULTS))
+    assert len(results) >= 3, f"Expected ≥3 mock results for null island; got {len(results)}"
 
 
-def test_mock_provider_new_york_coords_return_empty(provider):
-    """New York coords (40.71, -74.01) return empty list."""
-    results = provider.search_nearby(40.71, -74.01, SEARCH_RADIUS, MAX_RESULTS)
-    assert list(results) == []
+def test_mock_provider_new_york_returns_geo_offset_fixtures(provider):
+    """New York coords return fixtures offset from NYC, not anchored to Dallas."""
+    nyc_lat, nyc_lng = 40.7128, -74.0060
+    results = list(provider.search_nearby(nyc_lat, nyc_lng, SEARCH_RADIUS, MAX_RESULTS))
+    assert len(results) >= 3, f"Expected ≥3 mock results for NYC coords; got {len(results)}"
+    for r in results:
+        assert abs(r.lat - nyc_lat) <= 0.05, (
+            f"{r.name}.lat={r.lat} not within 0.05° of NYC lat={nyc_lat}"
+        )
+        assert abs(r.lng - nyc_lng) <= 0.05, (
+            f"{r.name}.lng={r.lng} not within 0.05° of NYC lng={nyc_lng}"
+        )
 
 
 # ── RawPlace field completeness ────────────────────────────────────────────────

@@ -27,6 +27,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Iterable
 
+from playfuel_api.rules.chain_lookup import lookup_chain
+
 if TYPE_CHECKING:
     from playfuel_api.services.places import RawPlace
 
@@ -508,8 +510,8 @@ def assemble_food_options(
         bag_fallback_only=True when every bucket is "bag_only" — iOS renders
         the bag-food banner instead of a restaurant list.
     """
-    # Lazy import to avoid circular dependency (FoodOption is in models.api).
-    from playfuel_api.models.api import FoodOption
+    # Lazy import to avoid circular dependency (FoodOption, FoodSuggestions are in models.api).
+    from playfuel_api.models.api import FoodOption, FoodSuggestions  # noqa: PLC0415
 
     # If all scenarios are bag_only, skip restaurant lookup entirely.
     non_bag = [b for b in food_buckets if b != "bag_only"]
@@ -531,7 +533,21 @@ def assemble_food_options(
             continue
 
         category = categorize_place(place.types, place.name)
-        sugg, is_draft = suggestions_for(category)
+
+        # Chain registry lookup — runs before template fallback (spec §D).
+        # Populated chain entries override suggestions and set is_draft=False.
+        # Stub entries (as_of='TBD') are skipped by lookup_chain.
+        chain_entry = lookup_chain(place.name)
+        if chain_entry:
+            sugg = FoodSuggestions(**chain_entry["suggestions"])
+            is_draft = False
+            chain_matched = True
+            chain_as_of = chain_entry["as_of"]
+        else:
+            sugg, is_draft = suggestions_for(category)
+            chain_matched = False
+            chain_as_of = None
+
         order_text = derive_recommended_order(sugg)
 
         options.append(
@@ -547,6 +563,8 @@ def assemble_food_options(
                 suggestions=sugg,
                 lat=getattr(place, "lat", None),
                 lng=getattr(place, "lng", None),
+                chain_matched=chain_matched,
+                chain_as_of=chain_as_of,
             )
         )
 

@@ -288,6 +288,11 @@ async def generate_plan(
     async def _fetch_places_async() -> list:
         """Run the sync find_nearby_food in a thread pool so it doesn't block."""
         if venue_lat is None or venue_lng is None:
+            logger.warning(
+                "plan generated without venue coords — food_options will be empty "
+                "(tournament_id=%s)",
+                tid,
+            )
             return []
         return await asyncio.to_thread(
             find_nearby_food,
@@ -323,6 +328,22 @@ async def generate_plan(
         _pl_ms,
         len(raw_places),
     )
+
+    # B.3: Warn once per request when raw_places=0 despite valid venue coords.
+    # This fires when the Places provider silently returned [] — common causes:
+    #   401 → GOOGLE_PLACES_API_KEY invalid or expired (check Fly secret rotation)
+    #   403 → billing not enabled on the Google Cloud project
+    #   429 → quota exceeded
+    # When this fires, every match in this request will have bag_fallback_only=True
+    # and empty food_options (user sees no nearby food locations).
+    if not raw_places and venue_lat is not None and venue_lng is not None:
+        logger.warning(
+            "plan_gen: raw_places=0 despite valid venue coords (%.4f, %.4f) — "
+            "Places provider returned empty. Check GOOGLE_PLACES_API_KEY validity, "
+            "billing enabled, and quota at console.cloud.google.com. "
+            "Rotate key: flyctl secrets set GOOGLE_PLACES_API_KEY=<new-key> --app playfuel-api",
+            venue_lat, venue_lng,
+        )
 
     # 4. Build weather_flags dict and WeatherBlock for plan response.
     weather_flags: Optional[dict[str, bool]] = None
@@ -415,6 +436,15 @@ async def generate_plan(
             food_buckets = ["quick_pickup"]
         food_options, bag_fallback_only = assemble_food_options(raw_places, food_buckets)
 
+        # B.2: Per-match diagnostic log — surfaces food pipeline state for each match.
+        # Log: match ID, derived food buckets, number of raw Places results,
+        # number of food options assembled, and whether bag fallback fired.
+        # When raw_places=0 on every match, the B.3 warning above explains why.
+        logger.info(
+            "plan_gen: match=%s buckets=%s raw_places=%d food_options=%d bag_fallback=%s",
+            str(match.id), food_buckets, len(raw_places), len(food_options), bag_fallback_only,
+        )
+
         # 10. Assemble plan envelope.
         plan = build_plan_envelope(
             tid,
@@ -429,6 +459,8 @@ async def generate_plan(
             # feat/match-card-time: ISO 8601 UTC so iOS MatchChip shows device-local time.
             # strftime("%Y-%m-%dT%H:%M:%SZ") is consistent with _fmt_time() in scenarios.py.
             scheduled_start=match.scheduled_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
+            # match-done-state-cards spec §C: forward parent-toggle done state
+            is_done=match.is_done,
         )
 
         # 11. Derive NextAction deterministically — rules engine, never LLM.

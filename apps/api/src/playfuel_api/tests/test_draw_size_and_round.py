@@ -68,16 +68,6 @@ def _wire_match_create(mock_db: MagicMock, draw_size: int, match_row: dict) -> N
     mock_db.table.side_effect = _dispatch
 
 
-def _wire_match_tournament_not_found(mock_db: MagicMock) -> None:
-    """Configure mock_db so the tournament draw_size lookup returns no rows → 404."""
-    tournaments_chain = MagicMock()
-    tournaments_chain.select.return_value.eq.return_value.limit.return_value.execute.return_value.data = []
-
-    mock_db.table.side_effect = lambda name: (
-        tournaments_chain if name == "tournaments" else MagicMock()
-    )
-
-
 def _base_match_row(round_: int) -> dict:
     return {
         "id": MID,
@@ -137,9 +127,13 @@ def test_tournament_create_missing_draw_size_returns_422(client_with_auth, mock_
     )
     assert resp.status_code == 422, resp.text
     body = resp.json()
-    # Pydantic 422 detail list; check at least one error references draw_size
+    # Pydantic 422 detail list; check at least one error references draw_size.
+    # With alias_generator=to_camel on TournamentCreate, Pydantic reports the
+    # alias ("drawSize") in the error loc — accept either form.
     errors = body.get("detail", [])
-    assert any("draw_size" in str(e) for e in errors), f"Expected draw_size error, got: {body}"
+    assert any("draw_size" in str(e) or "drawSize" in str(e) for e in errors), (
+        f"Expected draw_size/drawSize error, got: {body}"
+    )
 
 
 def test_tournament_create_invalid_draw_size_returns_422(client_with_auth, mock_db):

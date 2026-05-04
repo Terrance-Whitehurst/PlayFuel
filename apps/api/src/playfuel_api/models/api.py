@@ -247,6 +247,8 @@ class Plan(BaseModel):
     next_action: Optional["NextAction"] = None          # alias: nextAction; deterministic, rules-derived
     # ─ feat/match-card-time — match schedule chip (ScheduleStripView) ──────────────────────
     scheduled_start: Optional[str] = None               # alias: scheduledStart; ISO 8601 UTC from match.scheduled_start
+    # ─ match-done-state-cards spec §C ─────────────────────────────────────────────
+    is_done: bool = False                               # alias: isDone; forwarded from match.is_done at plan-gen time
 
 
 # ─── Phase 5 food option model — Task #8 ─────────────────────────────────────
@@ -303,6 +305,9 @@ class FoodOption(BaseModel):
     suggestions: FoodSuggestions = Field(default_factory=FoodSuggestions)
     lat: Optional[float] = None   # venue-relative latitude; None for non-geo providers
     lng: Optional[float] = None   # venue-relative longitude; None for non-geo providers
+    # ─ chain-menu-items feature (chain-menu-items spec §J) ──────────────────────
+    chain_matched: bool = False           # True when a curated chain registry entry was matched
+    chain_as_of: Optional[str] = None     # ISO date of registry curation (e.g. '2026-05-04')
 
 
 

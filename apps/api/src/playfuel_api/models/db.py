@@ -76,6 +76,9 @@ class MatchRow(BaseModel):
     doubles_format: Optional[str] = None  # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
     # Player scouting extension — migration 0010_players_and_notes.sql
     opponent_player_id: Optional[UUID] = None  # FK to players.id; null when no scouted opponent
+    # match-done-state-cards spec §C — migration 0017_match_done_state.sql
+    is_done: bool = False
+    done_at: Optional[datetime] = None
     created_at: datetime
     updated_at: datetime
 

@@ -161,13 +161,16 @@ def test_assemble_food_options_suggestions_non_empty_for_fast_casual_bowl() -> N
 
 
 def test_assemble_food_options_dallas_mock_provider_fixtures_have_coords() -> None:
-    """All 4 Dallas mock fixtures surface non-None lat/lng through assemble_food_options."""
+    """All 5 Dallas mock fixtures surface non-None lat/lng through assemble_food_options.
+
+    Domino's Pizza was added as the 5th fixture (geo-agnostic fix session).
+    """
     from playfuel_api.services.places import MockPlacesProvider
 
     raw = list(MockPlacesProvider().search_nearby(32.78, -96.80, 4828, 10))
     options, bag_only = assemble_food_options(raw, ["light_meal"])
     assert bag_only is False
-    assert len(options) == 4, f"Expected 4 Dallas fixtures, got {len(options)}"
+    assert len(options) == 5, f"Expected 5 Dallas fixtures, got {len(options)}"
     for opt in options:
         assert opt.lat is not None, f"{opt.name}.lat must not be None"
         assert opt.lng is not None, f"{opt.name}.lng must not be None"

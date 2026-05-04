@@ -198,8 +198,11 @@ def test_cache_hit_skips_http() -> None:
     assert results[0].formatted_address == "123 Main St, Delray Beach, FL"
 
 
-def test_http_5xx_cache_empty_raises() -> None:
-    """HTTP 5xx + empty cache → PlacesProviderError raised."""
+def test_http_5xx_no_cache_falls_through_to_mock() -> None:
+    """HTTP 5xx + empty cache → falls back to MockPlacesProvider (≥3 results, no raise).
+
+    Pre-fix, this path raised PlacesProviderError, leaving food_options=[].
+    """
     db = _make_db_client(cache_row=None)  # no stale data either
     provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
 
@@ -207,10 +210,12 @@ def test_http_5xx_cache_empty_raises() -> None:
         "playfuel_api.services.places.httpx.post",
         return_value=_make_error_response(503),
     ):
-        with pytest.raises(PlacesProviderError, match="unavailable"):
-            provider.search_nearby(
-                DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
-            )
+        results = provider.search_nearby(
+            DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
+        )
+
+    assert len(results) >= 3, f"Expected ≥3 mock results on 5xx fallback; got {len(results)}"
+    assert all(r.provider == "mock" for r in results), "Fallback results must have provider='mock'"
 
 
 def test_http_5xx_stale_cache_returns_stale(caplog) -> None:
@@ -258,8 +263,11 @@ def test_http_5xx_stale_cache_returns_stale(caplog) -> None:
     )
 
 
-def test_http_4xx_returns_empty(caplog) -> None:
-    """HTTP 4xx (non-401) → empty list + log warning. No exception raised."""
+def test_http_4xx_falls_through_to_mock(caplog) -> None:
+    """HTTP 4xx (non-401) → falls back to MockPlacesProvider + log warning.
+
+    Pre-fix, this path returned [] leaving food_options=[].
+    """
     db = _make_db_client(cache_row=None)
     provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
 
@@ -272,14 +280,19 @@ def test_http_4xx_returns_empty(caplog) -> None:
                 DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
             )
 
-    assert results == []
+    assert len(results) >= 3, f"Expected ≥3 mock results on 4xx fallback; got {len(results)}"
+    assert all(r.provider == "mock" for r in results), "Fallback results must have provider='mock'"
     assert any("400" in msg for msg in caplog.messages), (
         f"Expected 400 warning; got: {caplog.messages}"
     )
 
 
-def test_http_401_logs_rotation_warning(caplog) -> None:
-    """HTTP 401 → empty list + explicit 'API key invalid' rotation warning."""
+def test_http_401_logs_rotation_warning_and_falls_through_to_mock(caplog) -> None:
+    """HTTP 401 → falls back to MockPlacesProvider (≥3 results) + rotation warning.
+
+    Pre-fix, this path returned [] leaving food_options=[].
+    The rotation warning must still fire so ops know the key needs rotation.
+    """
     db = _make_db_client(cache_row=None)
     provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
 
@@ -292,7 +305,8 @@ def test_http_401_logs_rotation_warning(caplog) -> None:
                 DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
             )
 
-    assert results == []
+    assert len(results) >= 3, f"Expected ≥3 mock results on 401 fallback; got {len(results)}"
+    assert all(r.provider == "mock" for r in results), "Fallback results must have provider='mock'"
     rotation_logged = any(
         "rotation" in msg.lower() or "invalid" in msg.lower()
         for msg in caplog.messages

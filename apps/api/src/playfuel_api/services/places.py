@@ -17,10 +17,10 @@ Cache strategy:
   - Read-through: check cache before HTTP call; return cached payload on hit
   - Write-on-miss: upsert into cache after successful Google Places call
   - Failure modes:
-      4xx → log + return [] (bad key / quota; don't raise — food is non-critical)
-      5xx/timeout + cache empty → raise PlacesProviderError (caller swallows → [])
+      4xx → log + fall back to MockPlacesProvider (no raise — food non-critical)
       5xx/timeout + cache stale → return stale + log warning
-      401 → log "API key invalid — check rotation" + return []
+      5xx/timeout + cache empty → fall back to MockPlacesProvider (no raise)
+      401 → log "API key invalid — check rotation" + fall back to MockPlacesProvider
 
 # TODO: rotate the GOOGLE_PLACES_API_KEY after smoke test (key was shared in chat)
 """
@@ -41,12 +41,12 @@ _logger = logging.getLogger(__name__)
 PLACES_CACHE_TTL_SEC: int = 86_400
 _CACHE_TABLE = "tournament_places_cache"
 
-# ── Dallas demo bounding box ──────────────────────────────────────────────────
-# MockPlacesProvider returns fixtures only within ±0.5° of (32.78, -96.80).
-# This matches the seed venue coords (32.776664, -96.796988).
-_DALLAS_LAT = 32.78
-_DALLAS_LNG = -96.80
-_DALLAS_RADIUS_DEG = 0.5
+# ── MockPlacesProvider fixture offsets ──────────────────────────────────────
+# Reference origin: Dallas demo venue (32.78, −96.80). Each template stores a
+# lat/lng offset from this origin.  search_nearby applies these offsets to the
+# CALLER'S lat/lng, making MockPlacesProvider work for any city, not just Dallas.
+_DALLAS_LAT = 32.78   # offset reference — documentation only, NOT a bbox gate
+_DALLAS_LNG = -96.80  # offset reference — documentation only, NOT a bbox gate
 
 
 # ── Data model ────────────────────────────────────────────────────────────────
@@ -180,11 +180,11 @@ class GooglePlacesProvider:
         On cache hit: return cached payload (no HTTP call).
         On cache miss: call Google, upsert result, return fresh data.
 
-    Error handling (per delegation brief):
-        4xx (incl. 401): log + return [] (no raise)
+    Error handling:
+        4xx (incl. 401): log + fall back to MockPlacesProvider (no raise)
         401 specifically: log "API key invalid — check rotation"
-        5xx / timeout + cache empty: raise PlacesProviderError (caller → [])
         5xx / timeout + cache has stale row: return stale + log warning
+        5xx / timeout + cache empty: fall back to MockPlacesProvider (no raise)
 
     API key: settings.google_places_api_key
     # TODO: rotate GOOGLE_PLACES_API_KEY after smoke test (key was shared in chat)
@@ -334,10 +334,10 @@ class GooglePlacesProvider:
             )
         except httpx.TimeoutException as exc:
             _logger.warning("Google Places request timed out: %s", exc)
-            return self._handle_http_error(tournament_id, place_type, is_timeout=True)
+            return self._handle_http_error(tournament_id, place_type, lat, lng, radius_m, max_results, is_timeout=True)
         except httpx.RequestError as exc:
             _logger.warning("Google Places request failed (transport): %s", exc)
-            return self._handle_http_error(tournament_id, place_type, is_timeout=True)
+            return self._handle_http_error(tournament_id, place_type, lat, lng, radius_m, max_results, is_timeout=True)
 
         # HTTP error handling
         if resp.status_code == 401:
@@ -346,7 +346,12 @@ class GooglePlacesProvider:
                 "Check GOOGLE_PLACES_API_KEY rotation. "
                 "Fly secret: flyctl secrets set GOOGLE_PLACES_API_KEY=<new-key> --app playfuel-api"
             )
-            return []
+            _logger.warning(
+                "Google Places 401 — falling back to MockPlacesProvider for venue (%.4f, %.4f)",
+                lat,
+                lng,
+            )
+            return list(MockPlacesProvider().search_nearby(lat, lng, radius_m, max_results, tournament_id=tournament_id))
 
         if resp.status_code >= 400 and resp.status_code < 500:
             _logger.warning(
@@ -354,7 +359,13 @@ class GooglePlacesProvider:
                 resp.status_code,
                 resp.text[:200],
             )
-            return []
+            _logger.warning(
+                "Google Places %d — falling back to MockPlacesProvider for venue (%.4f, %.4f)",
+                resp.status_code,
+                lat,
+                lng,
+            )
+            return list(MockPlacesProvider().search_nearby(lat, lng, radius_m, max_results, tournament_id=tournament_id))
 
         if resp.status_code >= 500:
             _logger.warning(
@@ -362,7 +373,7 @@ class GooglePlacesProvider:
                 resp.status_code,
                 resp.text[:200],
             )
-            return self._handle_http_error(tournament_id, place_type, is_timeout=False)
+            return self._handle_http_error(tournament_id, place_type, lat, lng, radius_m, max_results, is_timeout=False)
 
         # Parse successful response
         try:
@@ -403,10 +414,17 @@ class GooglePlacesProvider:
         self,
         tournament_id: UUID | None,
         place_type: str,
+        lat: float,
+        lng: float,
+        radius_m: int,
+        max_results: int,
         *,
         is_timeout: bool,
     ) -> list[RawPlace]:
-        """On HTTP 5xx or timeout: return stale cache if available, else raise."""
+        """On HTTP 5xx or timeout: return stale cache if available, else fall back to MockPlacesProvider.
+
+        Never raises — MockPlacesProvider is the final safety net when Google is unavailable.
+        """
         if tournament_id is not None:
             stale = self._read_stale_cache(tournament_id, place_type)
             if stale is not None:
@@ -415,89 +433,121 @@ class GooglePlacesProvider:
                     tournament_id,
                 )
                 return stale
-        raise PlacesProviderError(
-            "Google Places unavailable (5xx/timeout) and no cached data available"
+        _logger.warning(
+            "Google Places HTTP error (is_timeout=%s) — no stale cache; "
+            "falling back to MockPlacesProvider for venue (%.4f, %.4f)",
+            is_timeout,
+            lat,
+            lng,
         )
+        return list(MockPlacesProvider().search_nearby(lat, lng, radius_m, max_results))
 
 
 # ── MockPlacesProvider (deterministic Dallas demo fixture) ─────────────────────
 
 
 # fmt: off
-# Coordinates are best-guess Uptown Dallas offsets centred on
-# venue (32.776664, -96.796988).  Real Place API geometry will
-# replace these when GooglePlacesProvider is implemented (OQ-FOOD-DECK-3).
-_DALLAS_FIXTURE: list[RawPlace] = [
-    RawPlace(
-        name="Chipotle Mexican Grill",
-        types=["restaurant", "meal_takeaway", "food", "establishment"],
-        distance_meters=1200,
-        drive_time_minutes=4,
-        place_id="mock_chipotle_dallas_001",
-        provider="mock",
-        lat=32.7825,
-        lng=-96.7975,
-    ),
-    RawPlace(
-        name="Jimmy John's",
-        types=["restaurant", "sandwich_shop", "food", "establishment"],
-        distance_meters=800,
-        drive_time_minutes=3,
-        place_id="mock_jimmyjohns_dallas_001",
-        provider="mock",
-        lat=32.7820,
-        lng=-96.8025,
-    ),
-    RawPlace(
-        name="Central Market",
-        types=["supermarket", "grocery_store", "food", "establishment"],
-        distance_meters=3500,
-        drive_time_minutes=9,
-        place_id="mock_centralmarket_dallas_001",
-        provider="mock",
-        lat=32.7755,
-        lng=-96.7920,
-    ),
-    RawPlace(
-        name="Starbucks",
-        types=["cafe", "bakery", "food", "establishment"],
-        distance_meters=600,
-        drive_time_minutes=2,
-        place_id="mock_starbucks_dallas_001",
-        provider="mock",
-        lat=32.7805,
-        lng=-96.7990,
-    ),
+# Fixture templates: each entry stores offsets from the caller's (lat, lng).
+# Offsets are computed relative to Dallas demo center (_DALLAS_LAT/_DALLAS_LNG)
+# so that distances and drive-times remain realistic.  Applying offsets to ANY
+# input coords makes the mock work for Austin, NYC, or any other city.
+#
+# Offset math (origin = 32.78, -96.80):
+#   Chipotle   32.7825 → +0.0025  / -96.7975 → +0.0025
+#   Jimmy John's 32.7820 → +0.0020  / -96.8025 → -0.0025
+#   Central Market 32.7755 → -0.0045  / -96.7920 → +0.0080
+#   Starbucks  32.7805 → +0.0005  / -96.7990 → +0.0010
+#   Domino's   (new)   → +0.0030  /           → -0.0015
+_FIXTURE_TEMPLATES: list[dict] = [
+    {
+        "name": "Chipotle Mexican Grill",
+        "types": ["restaurant", "meal_takeaway", "food", "establishment"],
+        "distance_meters": 1200,
+        "drive_time_minutes": 4,
+        "place_id": "mock_chipotle_001",
+        "lat_offset": 0.0025,
+        "lng_offset": 0.0025,
+    },
+    {
+        "name": "Jimmy John's",
+        "types": ["restaurant", "sandwich_shop", "food", "establishment"],
+        "distance_meters": 800,
+        "drive_time_minutes": 3,
+        "place_id": "mock_jimmyjohns_001",
+        "lat_offset": 0.0020,
+        "lng_offset": -0.0025,
+    },
+    {
+        "name": "Central Market",
+        "types": ["supermarket", "grocery_store", "food", "establishment"],
+        "distance_meters": 3500,
+        "drive_time_minutes": 9,
+        "place_id": "mock_centralmarket_001",
+        "lat_offset": -0.0045,
+        "lng_offset": 0.0080,
+    },
+    {
+        "name": "Starbucks",
+        "types": ["cafe", "bakery", "food", "establishment"],
+        "distance_meters": 600,
+        "drive_time_minutes": 2,
+        "place_id": "mock_starbucks_001",
+        "lat_offset": 0.0005,
+        "lng_offset": 0.0010,
+    },
+    {
+        "name": "Domino's Pizza",
+        "types": ["restaurant", "pizza_restaurant", "food", "establishment"],
+        "distance_meters": 450,
+        "drive_time_minutes": 2,
+        "place_id": "mock_dominos_001",
+        "lat_offset": 0.0030,
+        "lng_offset": -0.0015,
+    },
 ]
 # fmt: on
 
 
 class MockPlacesProvider:
-    """Deterministic Dallas demo fixture.
+    """Geo-agnostic deterministic fixture provider.
 
-    Returns ≥ 3 places near (32.78, −96.80) ± 0.5° so the Dallas seed always
-    renders foodOptions with the mock provider. Returns [] outside that bbox.
+    Returns 4–5 RawPlace objects for ANY (lat, lng) input by applying fixed
+    offsets from the caller's coordinates.  No bbox gate — works for Dallas,
+    Austin, New York, or any other city.
+
+    Use-when: PLACES_PROVIDER=mock (explicit), or as fallback when
+    GooglePlacesProvider receives a 4xx / 5xx / timeout response.
 
     Fixture roster (stable across test runs):
         Chipotle Mexican Grill  — fast_casual_bowl, ~1200 m, 4 min
         Jimmy John's            — sandwich_shop,    ~800 m,  3 min
         Central Market          — grocery_prepared, ~3500 m, 9 min
         Starbucks               — breakfast_cafe,   ~600 m,  2 min
+        Domino's Pizza          — pizza,            ~450 m,  2 min
     """
 
     def search_nearby(
         self,
         lat: float,
         lng: float,
-        radius_m: int,  # noqa: ARG002  (radius not used for bbox mock)
+        radius_m: int,  # noqa: ARG002  (mock ignores radius — offset-based)
         max_results: int,
         tournament_id: UUID | None = None,  # noqa: ARG002  (no cache for mock)
     ) -> Sequence[RawPlace]:
-        if abs(lat - _DALLAS_LAT) > _DALLAS_RADIUS_DEG:
-            return []
-        if abs(lng - _DALLAS_LNG) > _DALLAS_RADIUS_DEG:
-            return []
-        return _DALLAS_FIXTURE[:max_results]
+        """Return up to max_results fixture places centred on (lat, lng)."""
+        return [
+            RawPlace(
+                name=t["name"],
+                types=t["types"],
+                distance_meters=t["distance_meters"],
+                drive_time_minutes=t["drive_time_minutes"],
+                place_id=t["place_id"],
+                provider="mock",
+                lat=lat + t["lat_offset"],
+                lng=lng + t["lng_offset"],
+            )
+            for t in _FIXTURE_TEMPLATES[:max_results]
+        ]
 
 
 # ── Factory ───────────────────────────────────────────────────────────────────
