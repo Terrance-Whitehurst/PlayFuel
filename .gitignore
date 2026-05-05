@@ -15,3 +15,12 @@ xcuserdata/
 # Real values go here locally; .env.example files contain placeholders only.
 .env
 **/.env
+
+# Python bytecode / build cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Swift Package Manager build cache
+.build/
+**/.build/
