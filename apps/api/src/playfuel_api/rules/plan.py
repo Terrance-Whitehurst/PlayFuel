@@ -32,7 +32,7 @@ from playfuel_api.models.db import MatchRow
 from playfuel_api.models.enums import GapStatus, ScheduleConfidence, TimelineEventKind
 from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION
 from playfuel_api.rules.duration_format import friendly_duration
-from playfuel_api.rules.hard_coded_strings import HEAT_EMERGENCY_TEXT
+from playfuel_api.rules.hard_coded_strings import HEAT_EMERGENCY_TEXT, heat_emergency_text as _get_heat_emergency_text
 
 # Optional import to avoid circular at module level — imported inline inside function
 _next_action_mod = None
@@ -160,6 +160,7 @@ def build_plan_envelope(
     match_id: Optional[uuid.UUID] = None,
     scheduled_start: Optional[str] = None,
     is_done: bool = False,               # match-done-state-cards spec §C
+    venue_country: Optional[str] = None, # Phase C-infrastructure: country-specific emergency number
 ) -> Plan:
     """Assemble the top-level Plan envelope from engine output.
 
@@ -191,10 +192,12 @@ def build_plan_envelope(
                 seen.add(w)
 
     # §E.2 / §H.2: heat emergency text — attached when extreme_heat_risk is True.
-    # v1.1 HEAT_EMERGENCY_TEXT — pending legal sign-off (OQ-06 / OQ-11).
+    # v1.1 wording; pending legal sign-off (OQ-06 / OQ-11).
+    # Phase C-infrastructure: uses venue_country to select the country-appropriate
+    # emergency number. heat_emergency_text(None) == HEAT_EMERGENCY_TEXT byte-identical.
     heat_text: Optional[str] = None
     if weather_flags and weather_flags.get("flag_extreme_heat_risk"):
-        heat_text = HEAT_EMERGENCY_TEXT
+        heat_text = _get_heat_emergency_text(venue_country)
 
     return Plan(
         plan_id=uuid.uuid4(),

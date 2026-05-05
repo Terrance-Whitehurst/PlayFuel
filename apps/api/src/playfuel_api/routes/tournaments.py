@@ -13,13 +13,14 @@ Endpoints:
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from pydantic.alias_generators import to_camel
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from supabase import Client
 
 from playfuel_api.auth import verify_supabase_jwt
@@ -29,6 +30,27 @@ from playfuel_api.rules.constants import DRAW_SIZES
 router = APIRouter(prefix="/v1", tags=["tournaments"])
 
 _TABLE = "tournaments"
+
+
+# ── Shared validators ─────────────────────────────────────────────────────────
+
+def _validate_iana_tz(v: Optional[str]) -> Optional[str]:
+    """Open-set IANA timezone validation via stdlib zoneinfo.
+
+    Accepts any identifier in the system/tzdata timezone database.
+    Rejects unknown identifiers (e.g. 'America/Mexico' — no city, typo)
+    with a descriptive ValueError so Pydantic returns 422.
+
+    Open-set (not an allowlist) so it stays valid as the iOS picker grows
+    and non-iOS API clients supply arbitrary valid IANA zone names.
+    """
+    if v is None:
+        return v
+    try:
+        ZoneInfo(v)
+    except ZoneInfoNotFoundError as e:
+        raise ValueError(f"Unknown IANA time zone: {v!r}") from e
+    return v
 
 
 # ── Request bodies ────────────────────────────────────────────────────────────
@@ -53,6 +75,32 @@ class TournamentCreate(BaseModel):
     # Nullable: MapKit results do not carry a stable place ID.
     # Added migration 0012 (TOURNAMENT_LOCATION_V1.md §C.2).
     venue_place_id: Optional[str] = None
+    # Phase A international rollout — migration 0018.
+    # time_zone: IANA tz identifier (e.g. "America/Mexico_City"). Client-supplied.
+    # venue_country: ISO 3166-1 alpha-2 (e.g. "US", "MX", "CA"). Auto-populated
+    #   from MKPlacemark.isoCountryCode on iOS when venue search resolves a placemark.
+    # Phase A.1 hardening: both fields validated before reaching the DB.
+    time_zone: Optional[str] = Field(
+        None, max_length=50,
+        description="IANA time zone identifier (e.g. 'America/Mexico_City').",
+    )
+    venue_country: Optional[str] = Field(
+        None, max_length=2, pattern=r'^[A-Z]{2}$',
+        description="ISO 3166-1 alpha-2 country code (e.g. 'US', 'MX', 'CA').",
+    )
+    # Phase C-infrastructure: per-tournament language preference for LLM explanation.
+    # Literal enforces the Tier-1 allowlist — prevents prompt injection (INTL-SEC-5).
+    # None → English default at runtime; client-supplied 'es' → Spanish once
+    # Phase C-translations delivers the Spanish system prompt.
+    preferred_language: Optional[Literal["en", "es"]] = Field(
+        None,
+        description="Language for plan explanations ('en' | 'es'). Defaults to 'en' when None.",
+    )
+
+    @field_validator("time_zone")
+    @classmethod
+    def _check_iana_tz(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_iana_tz(v)
 
     @field_validator("draw_size")
     @classmethod
@@ -78,6 +126,27 @@ class TournamentUpdate(BaseModel):
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
     venue_place_id: Optional[str] = None
+    # Phase A international rollout — migration 0018.
+    # Phase A.1 hardening: both fields validated before reaching the DB.
+    time_zone: Optional[str] = Field(
+        None, max_length=50,
+        description="IANA time zone identifier (e.g. 'America/Mexico_City').",
+    )
+    venue_country: Optional[str] = Field(
+        None, max_length=2, pattern=r'^[A-Z]{2}$',
+        description="ISO 3166-1 alpha-2 country code (e.g. 'US', 'MX', 'CA').",
+    )
+    # Phase C-infrastructure: per-tournament language preference.
+    # Literal enforces Tier-1 allowlist (INTL-SEC-5 compliance).
+    preferred_language: Optional[Literal["en", "es"]] = Field(
+        None,
+        description="Language for plan explanations ('en' | 'es'). Defaults to 'en' when None.",
+    )
+
+    @field_validator("time_zone")
+    @classmethod
+    def _check_iana_tz(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_iana_tz(v)
 
     @field_validator("draw_size")
     @classmethod

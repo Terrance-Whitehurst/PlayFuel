@@ -343,6 +343,7 @@ def test_weather_block_exposes_wind_precip():
     """WeatherBlock(wind_mph=8.5, precip_prob=10.0) serialises to windMph + precipProb."""
     block = WeatherBlock(
         temp_f=88.0,
+        temp_c=31.1,  # Phase B: canonical metric value (88°F ≈ 31.1°C)
         humidity_pct=72.0,
         condition=WeatherCondition.clear,
         flag_hot=True,
@@ -368,6 +369,7 @@ def test_weather_block_wind_precip_default_none():
     """WeatherBlock without wind/precip -> both default to None, not 0.0."""
     block = WeatherBlock(
         temp_f=65.0,
+        temp_c=18.3,  # Phase B: canonical metric value (65°F ≈ 18.3°C)
         humidity_pct=40.0,
         condition=WeatherCondition.clear,
         flag_hot=False,

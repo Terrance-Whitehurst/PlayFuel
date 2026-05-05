@@ -141,7 +141,7 @@ async def get_or_fetch_weather(
     # 3. Classify and persist
     current = payload.get("current") or {}
     try:
-        temp_f = float(current["temperature_2m"])
+        temp_c = float(current["temperature_2m"])          # Phase B: Open-Meteo returns °C
         humidity_pct = float(current["relative_humidity_2m"])
         weather_code = int(current["weather_code"])
     except (KeyError, TypeError, ValueError) as exc:
@@ -156,21 +156,29 @@ async def get_or_fetch_weather(
 
     wind_raw = current.get("wind_speed_10m")
     precip_raw = current.get("precipitation_probability")
-    wind_mph = float(wind_raw) if wind_raw is not None else 0.0
+    wind_kmh = float(wind_raw) if wind_raw is not None else 0.0  # Phase B: Open-Meteo returns km/h
     precip_pp = float(precip_raw) if precip_raw is not None else 0.0
 
     flags = classify_weather(
-        temp_f=temp_f,
+        temp_c=temp_c,
         humidity_pct=humidity_pct,
-        wind_mph=wind_mph,
+        wind_kmh=wind_kmh,
         precipitation_probability=precip_pp,
     )
 
+    # Phase B: dual-write metric (canonical) + computed imperial (backward compat).
+    # temp_f / wind_mph column names are legacy; metric values are stored in temp_c / wind_kmh.
+    # Old iOS clients reading tempF/windMph keep working; new iOS reads tempC/windKph.
+    temp_f_computed: float = (temp_c * 9.0 / 5.0) + 32.0
+    wind_mph_computed: float = wind_kmh / 1.609 if wind_raw is not None else 0.0
+
     insert_row = {
         "tournament_id": str(tournament_id),
-        "temp_f": temp_f,
+        "temp_c": temp_c,
+        "temp_f": temp_f_computed,
         "humidity_pct": humidity_pct,
-        "wind_mph": float(wind_raw) if wind_raw is not None else None,
+        "wind_kmh": float(wind_raw) if wind_raw is not None else None,
+        "wind_mph": wind_mph_computed if wind_raw is not None else None,
         "precipitation_probability": float(precip_raw) if precip_raw is not None else None,
         "condition": condition.value,
         "flag_hot": flags["flag_hot"],

@@ -50,6 +50,16 @@ def _wire_match_insert(mock_db: MagicMock, return_row: dict, draw_size: int = 32
     ]
 
     matches_chain = MagicMock()
+    # Round progression uniqueness check: no existing match in this stream → []
+    # Chain: .select("id").eq.eq.eq.limit(1).execute().data
+    (
+        matches_chain.select.return_value
+        .eq.return_value
+        .eq.return_value
+        .eq.return_value
+        .limit.return_value
+        .execute.return_value.data
+    ) = []
     matches_chain.insert.return_value.execute.return_value.data = [return_row]
 
     mock_db.table.side_effect = lambda name: {

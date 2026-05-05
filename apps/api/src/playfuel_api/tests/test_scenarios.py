@@ -253,15 +253,15 @@ def test_scenario_5_rain_risk_flag_is_classified():
     Ref: SCENARIO_ACCEPTANCE.md §Scenario 5 — Must Include (first bullet).
     """
     flags = classify_weather(
-        temp_f=70.0,
+        temp_c=21.1,   # 70°F ≈ 21.1°C (Phase B metric)
         humidity_pct=60.0,
-        wind_mph=5.0,
+        wind_kmh=8.0,  # 5 mph ≈ 8.0 km/h
         precipitation_probability=55.0,
     )
     assert flags["flag_rain_risk"] is True, (
         "precipitation_probability=55% must set flag_rain_risk=True (threshold >= 40%)"
     )
-    # Sanity: 70°F → not hot, not cold, not extreme
+    # Sanity: 21.1°C is below hot threshold (29.4°C) → not hot, not cold, not extreme
     assert flags["flag_hot"] is False
     assert flags["flag_extreme_heat_risk"] is False
 
@@ -306,8 +306,8 @@ class TestScenario1_FullPipeline:
         m2 = _match(13, 0, tid=m1.tournament_id)
         scenarios = generate_match_scenarios(m1, m2)
         self.weather = classify_weather(
-            temp_f=65.0, humidity_pct=40.0, wind_mph=5.0, precipitation_probability=10.0
-        )
+            temp_c=18.3, humidity_pct=40.0, wind_kmh=8.0, precipitation_probability=10.0
+        )  # 65°F ≈ 18.3°C, 5 mph ≈ 8.0 km/h (Phase B metric)
         self.plan = build_plan_envelope(m1.tournament_id, scenarios, weather_flags=self.weather)
 
     def test_cool_weather_flags_not_set(self):
@@ -360,8 +360,8 @@ class TestScenario2_FullPipeline:
         m2 = _match(12, 0, tid=m1.tournament_id)
         scenarios = generate_match_scenarios(m1, m2)
         self.weather = classify_weather(
-            temp_f=88.0, humidity_pct=72.0, wind_mph=8.0, precipitation_probability=0.0
-        )
+            temp_c=31.1, humidity_pct=72.0, wind_kmh=12.9, precipitation_probability=0.0
+        )  # 88°F ≈ 31.1°C, 8 mph ≈ 12.9 km/h (Phase B metric)
         self.plan = build_plan_envelope(m1.tournament_id, scenarios, weather_flags=self.weather)
 
     def test_hot_and_humid_flags_set(self):
@@ -415,8 +415,8 @@ class TestScenario3_FullPipeline:
         m2 = _match(16, 0, tid=m1.tournament_id)
         self.scenarios = generate_match_scenarios(m1, m2)
         self.weather = classify_weather(
-            temp_f=72.0, humidity_pct=50.0, wind_mph=5.0, precipitation_probability=0.0
-        )
+            temp_c=22.2, humidity_pct=50.0, wind_kmh=8.0, precipitation_probability=0.0
+        )  # 72°F ≈ 22.2°C, 5 mph ≈ 8.0 km/h (Phase B metric)
         self.plan = build_plan_envelope(m1.tournament_id, self.scenarios, weather_flags=self.weather)
 
     def test_plan_schedule_confidence_is_high(self):
@@ -472,8 +472,8 @@ class TestScenario4_FullPipeline:
         m2 = _match(11, 0, tid=m1.tournament_id)
         scenarios = generate_match_scenarios(m1, m2)
         self.weather = classify_weather(
-            temp_f=72.0, humidity_pct=50.0, wind_mph=5.0, precipitation_probability=0.0
-        )
+            temp_c=22.2, humidity_pct=50.0, wind_kmh=8.0, precipitation_probability=0.0
+        )  # 72°F ≈ 22.2°C, 5 mph ≈ 8.0 km/h (Phase B metric)
         self.plan = build_plan_envelope(m1.tournament_id, scenarios, weather_flags=self.weather)
 
     def test_plan_schedule_confidence_is_low(self):

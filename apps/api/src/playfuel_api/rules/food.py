@@ -25,6 +25,7 @@ confirmation. All DRAFT items need content review before App Store submission.
 """
 from __future__ import annotations
 
+import math
 from typing import TYPE_CHECKING, Iterable
 
 from playfuel_api.rules.chain_lookup import lookup_chain
@@ -88,6 +89,54 @@ _NAME_HEURISTICS: list[tuple[tuple[str, ...], str]] = [
     (("chipotle", "cava", "qdoba", "moe's"), "fast_casual_bowl"),
     (("jimmy john", "subway", "jersey mike", "potbelly", "firehouse"), "sandwich_shop"),
 ]
+
+# ── Food-primary exclusion filter ───────────────────────────────────────────────────
+#
+# FOOD_PLACES_FILTER_V1.md §D.2 — post-fetch defense-in-depth filter.
+# Runs in assemble_food_options() as Pass 1 (before the drive-time Pass 2).
+# Also catches mixed-use venues (e.g. Central Market = [supermarket, restaurant])
+# that the Google includedTypes filter cannot exclude on its own.
+#
+# The _INCLUDED_TYPES list in services/places.py (§C) is the API-level defense;
+# this filter is the Python-level defense. Both must be maintained together.
+
+_NON_FOOD_PRIMARY_TYPES: frozenset[str] = frozenset({
+    "supermarket",
+    "grocery_store",
+    "grocery_or_supermarket",   # older Google taxonomy alias
+    "convenience_store",
+    "gas_station",
+    "fuel",                     # Google alias for gas_station
+    "pharmacy",
+    "drugstore",                # Google alias for pharmacy
+    "liquor_store",
+    "wholesale_store",
+    "department_store",
+    "shopping_mall",
+    "hardware_store",
+    "car_wash",
+    "auto_parts_store",
+})
+
+
+def _is_food_primary(place: "RawPlace") -> bool:
+    """Return True if place is food-primary — i.e. has NO non-food-primary type.
+
+    A venue is excluded if ANY of its Google types appears in
+    _NON_FOOD_PRIMARY_TYPES, regardless of whether it also has a food type.
+    This handles mixed-use venues (e.g. Central Market = supermarket+restaurant).
+
+    Args:
+        place: RawPlace from any provider.
+
+    Returns:
+        True  → keep (no non-food-primary type found)
+        False → exclude (at least one non-food-primary type found, or types empty)
+    """
+    if not place.types:
+        # Empty/missing types: conservative exclusion. FOOD_PLACES_FILTER_V1 §D.2.
+        return False
+    return not _NON_FOOD_PRIMARY_TYPES.intersection(set(place.types))
 
 
 def categorize_place(types: Iterable[str], name: str = "") -> str:
@@ -476,6 +525,48 @@ def derive_recommended_order(suggestions: "FoodSuggestions") -> str:  # type: ig
     return ". ".join(parts)
 
 
+# ── Distance sort helpers ─────────────────────────────────────────────────────────────
+#
+# FOOD_PLACES_FILTER_V1.md §E — haversine sort from venue coordinates.
+# Replaces the old (drive_time_minutes, distance_meters) compound sort key.
+
+
+def _haversine_m(lat1: float, lng1: float, lat2: float, lng2: float) -> float:
+    """Return great-circle distance in metres between two lat/lng points.
+
+    Accuracy: within 0.5% for distances < 500 km (sufficient for 3-mile radius).
+    Formula: Haversine, Earth radius = 6_371_000 m.
+    FOOD_PLACES_FILTER_V1.md §E.2.
+    """
+    R = 6_371_000.0
+    phi1, phi2 = math.radians(lat1), math.radians(lat2)
+    dphi = math.radians(lat2 - lat1)
+    dlam = math.radians(lng2 - lng1)
+    a = math.sin(dphi / 2) ** 2 + math.cos(phi1) * math.cos(phi2) * math.sin(dlam / 2) ** 2
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def _distance_key(o: "FoodOption", venue_lat: float | None, venue_lng: float | None) -> float:  # type: ignore[name-defined]
+    """Distance from venue to food option, in metres. Smaller = closer.
+
+    Primary:        haversine from venue coords to place coords.
+    Fallback:       place.distance_meters (mock fixtures; Google returns this when
+                    places.distanceMeters is in the field mask).
+    Final fallback: 9_999_999.0 — sorts last without being dropped.
+    FOOD_PLACES_FILTER_V1.md §E.3.
+    """
+    if (
+        venue_lat is not None
+        and venue_lng is not None
+        and o.lat is not None
+        and o.lng is not None
+    ):
+        return _haversine_m(venue_lat, venue_lng, o.lat, o.lng)
+    if o.distance_meters is not None:
+        return float(o.distance_meters)
+    return 9_999_999.0
+
+
 # ── Scenario bucket → filter policy ──────────────────────────────────────────
 #
 # Maps food_bucket value → policy dict with:
@@ -494,6 +585,8 @@ def assemble_food_options(
     raw_places: list,  # list[RawPlace]
     food_buckets: list[str],  # unique bucket names present across scenarios
     *,
+    venue_lat: float | None = None,   # from TournamentRow.venue_lat — FOOD_PLACES_FILTER_V1 §F.2
+    venue_lng: float | None = None,   # from TournamentRow.venue_lng — FOOD_PLACES_FILTER_V1 §F.2
     max_results: int = 6,
 ) -> tuple[list, bool]:
     """Build FoodOption list from raw Places results + scenario food buckets.
@@ -525,8 +618,13 @@ def assemble_food_options(
         for b in non_bag
     )
 
+    # Pass 1: food-primary filter — drops supermarkets, gas stations, pharmacies,
+    # and mixed-use venues (e.g. Central Market = [supermarket, restaurant]).
+    # FOOD_PLACES_FILTER_V1 §D.2. Runs BEFORE the drive-time Pass 2.
+    food_primary_places = [p for p in raw_places if _is_food_primary(p)]
+
     options: list[FoodOption] = []
-    for place in raw_places:
+    for place in food_primary_places:  # Pass 2: drive-time budget filter
         drive = place.drive_time_minutes
         # Filter by drive-time budget (None drive time → include conservatively).
         if drive is not None and drive > max_drive:
@@ -568,12 +666,7 @@ def assemble_food_options(
             )
         )
 
-    # Sort: ascending drive_time (None last), then ascending distance.
-    def _sort_key(o: FoodOption) -> tuple:
-        return (
-            o.drive_time_minutes if o.drive_time_minutes is not None else 9999,
-            o.distance_meters if o.distance_meters is not None else 9999999,
-        )
-
-    options.sort(key=_sort_key)
+    # Sort: ascending haversine distance from venue (FOOD_PLACES_FILTER_V1 §E).
+    # Replaces old (drive_time_minutes, distance_meters) compound sort key.
+    options.sort(key=lambda o: _distance_key(o, venue_lat, venue_lng))
     return options[:max_results], False

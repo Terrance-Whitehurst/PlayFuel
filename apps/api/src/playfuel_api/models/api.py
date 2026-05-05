@@ -23,7 +23,7 @@ GapStatus / FoodBucket etc. enums have matching raw values.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -139,10 +139,14 @@ class WeatherBlock(BaseModel):
     is_stale=True signals iOS that the cache fallback was used (provider error).
     All seven flag fields are passed through so iOS EmergencyBanner logic
     mirrors the backend classification exactly.
+
+    Phase B: metric fields added alongside legacy imperial for backward compat.
+    iOS should prefer tempC/windKph; old builds still read tempF/windMph.
     """
     model_config = _CAMEL
 
-    temp_f: float
+    temp_f: float                       # legacy imperial — keep for backward compat
+    temp_c: float                       # °C canonical (Phase B+)
     humidity_pct: float
     condition: WeatherCondition
     flag_hot: bool
@@ -152,12 +156,13 @@ class WeatherBlock(BaseModel):
     flag_windy: bool
     flag_rain_risk: bool
     flag_extreme_heat_risk: bool
-    is_stale: bool = False           # True when cache fallback was used (provider error)
+    is_stale: bool = False              # True when cache fallback was used (provider error)
     fetched_at: datetime
     provider: str
     # WX-G2: wind + precip exposed so iOS WeatherCardView shows real values.
     # None when the provider did not return the field (rare; iOS falls back to 0.0).
-    wind_mph: Optional[float] = None
+    wind_mph: Optional[float] = None    # legacy imperial — keep for backward compat
+    wind_kmh: Optional[float] = None    # km/h canonical (Phase B+)
     precip_prob: Optional[float] = None
 
 
@@ -362,7 +367,8 @@ class PlanExplanationInput(BaseModel):
     match_start_iso: str
     match_round_label: Optional[str] = None
     next_match_estimated_iso: Optional[str] = None
-    weather_temp_f: Optional[float] = None
+    weather_temp_f: Optional[float] = None   # legacy imperial; used to compute temp_c when needed
+    weather_temp_c: Optional[float] = None   # °C canonical (Phase B+); preferred by _build_weather_note()
     weather_humidity_pct: Optional[int] = None
     weather_flags: list[str] = []
     extreme_heat_risk: bool = False
@@ -380,6 +386,10 @@ class PlanExplanationInput(BaseModel):
     # Player scouting extension (PLAYER_SCOUTING_V1.md §D) — additive, decode-safe
     # SEC-P6-2: not populated by routes/plans.py — opponent notes stay server-side only.
     opponent_notes: list[OpponentNoteForLLM] = []
+    # Phase C-infrastructure: language preference for LLM system-prompt selection.
+    # Literal enforces Tier-1 allowlist — INTL-SEC-5 compliance.
+    # _resolve_system_prompt() uses this as a dict key, never interpolated into prompts.
+    preferred_language: Optional[Literal["en", "es"]] = None
 
 
 class PlanExplanation(BaseModel):

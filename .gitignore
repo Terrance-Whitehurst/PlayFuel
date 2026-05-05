@@ -1,5 +1,5 @@
-# Multi-Team Chat — agent session data
-.pi/multi-team/sessions/
+# Local agent team config + session data — not part of the app
+.pi/
 
 # Claude Code agent state
 .claude/

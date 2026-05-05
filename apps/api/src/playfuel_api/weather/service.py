@@ -61,8 +61,8 @@ class WeatherService:
                 "wind_speed_10m,"
                 "precipitation_probability"
             ),
-            "temperature_unit": "fahrenheit",
-            "wind_speed_unit": "mph",
+            "temperature_unit": "celsius",    # Phase B: metric pipeline
+            "wind_speed_unit": "kmh",           # Phase B: metric pipeline
         }
         resp = await self._client.get(url, params=params)
         resp.raise_for_status()
@@ -118,8 +118,8 @@ class WeatherService:
             ),
             "start_date": start_date,
             "end_date": end_date,
-            "temperature_unit": "fahrenheit",
-            "wind_speed_unit": "mph",
+            "temperature_unit": "celsius",    # Phase B: metric pipeline
+            "wind_speed_unit": "kmh",           # Phase B: metric pipeline
             "timezone": "UTC",
         }
         resp = await self._client.get(url, params=params)

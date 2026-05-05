@@ -54,6 +54,11 @@ class TournamentRow(BaseModel):
     venue_lng: Optional[float] = None
     start_date: date
     end_date: Optional[date] = None
+    # Phase A international rollout — migration 0018.
+    time_zone: Optional[str] = None       # IANA tz identifier
+    venue_country: Optional[str] = None   # ISO 3166-1 alpha-2
+    # Phase C-infrastructure — migration 0020.
+    preferred_language: Optional[str] = None  # 'en' | 'es'; None = English default
     created_at: datetime
     updated_at: datetime
 
@@ -86,8 +91,10 @@ class MatchRow(BaseModel):
 class WeatherSnapshotRow(BaseModel):
     id: UUID
     tournament_id: UUID
-    temp_f: float
+    temp_f: float                      # legacy imperial — computed from temp_c on new rows
     humidity_pct: float
+    temp_c: Optional[float] = None     # °C canonical (Phase B+); None on pre-Phase-B rows
+    wind_kmh: Optional[float] = None   # km/h canonical (Phase B+); None on pre-Phase-B rows
     wind_mph: Optional[float] = None
     precipitation_probability: Optional[float] = None
     condition: WeatherCondition

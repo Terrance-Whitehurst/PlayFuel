@@ -122,15 +122,35 @@ _FIELD_MASK = (
     "places.types,"
     "places.location,"
     "places.rating,"
-    "places.priceLevel"
+    "places.priceLevel,"
+    "places.distanceMeters"   # NEW — enables distance-based sort (FOOD_PLACES_FILTER_V1 §F.1)
 )
-# Place types to include (Google Places (New) type list)
-_INCLUDED_TYPES = [
+# Place types to include (Google Places (New) type list).
+# Food-primary only — FOOD_PLACES_FILTER_V1.md §C.
+# supermarket/grocery REMOVED — this was the root cause of Publix surfacing (§C).
+_INCLUDED_TYPES: list[str] = [
+    # ── Core food-primary ────────────────────────────────────────────────────
     "restaurant",
     "cafe",
+    "coffee_shop",
     "bakery",
-    "supermarket",
     "fast_food_restaurant",
+    "meal_takeaway",
+    "meal_delivery",
+    # ── Format-specific (cuisine buckets already in _TYPE_MAP) ───────────────
+    "sandwich_shop",
+    "pizza_restaurant",
+    "italian_restaurant",
+    "mexican_restaurant",
+    "chinese_restaurant",
+    "japanese_restaurant",
+    "american_restaurant",
+    "breakfast_restaurant",
+    "brunch_restaurant",
+    # ── Hydration/snack ──────────────────────────────────────────────────────
+    "juice_bar",
+    "ice_cream_shop",
+    "diner",
 ]
 
 

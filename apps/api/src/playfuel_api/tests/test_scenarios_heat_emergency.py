@@ -5,15 +5,17 @@ set when flag_extreme_heat_risk=True, or absent when False.
 
 extreme_heat_risk formula (verified from rules/weather.py):
     flag_extreme_heat_risk = flag_very_hot OR (flag_hot AND flag_humid)
-    flag_hot      : temp_f >= 85
-    flag_very_hot : temp_f >= 90
+    flag_hot      : temp_c >= 29.4°C  (was 85°F)
+    flag_very_hot : temp_c >= 32.2°C  (was 90°F)
     flag_humid    : humidity_pct >= 65
 
+Phase B: all test values converted from °F to °C.
+
 Cases:
-    (88, 72) → hot AND humid    → extreme_heat_risk=True  → text set
-    (65, 40) → neither          → extreme_heat_risk=False → text None
-    (88, 40) → hot, NOT humid   → extreme_heat_risk=False → text None (boundary regression)
-    (92, 30) → very_hot         → extreme_heat_risk=True  → text set
+    (31.1, 72) → hot AND humid    → extreme_heat_risk=True  → text set  [was 88°F]
+    (18.3, 40) → neither          → extreme_heat_risk=False → text None  [was 65°F]
+    (31.1, 40) → hot, NOT humid   → extreme_heat_risk=False → text None  [was 88°F boundary]
+    (33.3, 30) → very_hot         → extreme_heat_risk=True  → text set  [was 92°F]
 
 Rule: never re-type HEAT_EMERGENCY_TEXT — always import the constant.
 """
@@ -56,17 +58,17 @@ def _make_scenarios():
 
 # ── Parametrize table ─────────────────────────────────────────────────────────
 
-@pytest.mark.parametrize("temp_f,humidity_pct,expect_extreme", [
-    (88.0, 72.0, True),   # Dallas-style: hot AND humid → extreme
-    (65.0, 40.0, False),  # Cool day: neither flag → not extreme
-    (88.0, 40.0, False),  # Hot-but-not-humid boundary regression: hot alone ≠ extreme
-    (92.0, 30.0, True),   # Very hot alone is sufficient for extreme
+@pytest.mark.parametrize("temp_c,humidity_pct,expect_extreme", [
+    (31.1, 72.0, True),   # hot AND humid → extreme  [was 88°F]
+    (18.3, 40.0, False),  # Cool day: neither flag → not extreme  [was 65°F]
+    (31.1, 40.0, False),  # Hot-but-not-humid boundary: hot alone ≠ extreme  [was 88°F]
+    (33.3, 30.0, True),   # Very hot alone is sufficient for extreme  [was 92°F]
 ])
-def test_extreme_heat_risk_flag(temp_f, humidity_pct, expect_extreme):
+def test_extreme_heat_risk_flag(temp_c, humidity_pct, expect_extreme):
     """classify_weather correctly sets flag_extreme_heat_risk for boundary cases."""
-    flags = classify_weather(temp_f, humidity_pct)
+    flags = classify_weather(temp_c, humidity_pct)
     assert flags["flag_extreme_heat_risk"] == expect_extreme, (
-        f"temp_f={temp_f}, humidity={humidity_pct}: "
+        f"temp_c={temp_c}, humidity={humidity_pct}: "
         f"expected flag_extreme_heat_risk={expect_extreme}, "
         f"got {flags['flag_extreme_heat_risk']}"
     )
@@ -75,9 +77,12 @@ def test_extreme_heat_risk_flag(temp_f, humidity_pct, expect_extreme):
 # ── Heat-emergency-text plumbing tests ────────────────────────────────────────
 
 def test_dallas_heat_plan_has_emergency_text():
-    """(88, 72) → flag_extreme_heat_risk=True → plan.heat_emergency_text == HEAT_EMERGENCY_TEXT."""
+    """(31.1°C, 72%) → flag_extreme_heat_risk=True → plan.heat_emergency_text == HEAT_EMERGENCY_TEXT.
+
+    Phase B: 31.1°C was 88°F. hot=True (31.1>=29.4), humid=True (72>=65), extreme=True.
+    """
     scenarios = _make_scenarios()
-    flags = classify_weather(88.0, 72.0)
+    flags = classify_weather(31.1, 72.0)
     assert flags["flag_extreme_heat_risk"] is True  # precondition
 
     plan = build_plan_envelope(uuid4(), scenarios, weather_flags=flags)
@@ -91,9 +96,12 @@ def test_dallas_heat_plan_has_emergency_text():
 
 
 def test_cool_day_plan_has_no_emergency_text():
-    """(65, 40) → flag_extreme_heat_risk=False → plan.heat_emergency_text is None."""
+    """(18.3°C, 40%) → flag_extreme_heat_risk=False → plan.heat_emergency_text is None.
+
+    Phase B: 18.3°C was 65°F. Below hot threshold (29.4°C) → no heat flags.
+    """
     scenarios = _make_scenarios()
-    flags = classify_weather(65.0, 40.0)
+    flags = classify_weather(18.3, 40.0)
     assert flags["flag_extreme_heat_risk"] is False  # precondition
 
     plan = build_plan_envelope(uuid4(), scenarios, weather_flags=flags)
@@ -104,16 +112,16 @@ def test_cool_day_plan_has_no_emergency_text():
 
 
 def test_hot_but_not_humid_plan_has_no_emergency_text():
-    """(88, 40) → hot only, not extreme → plan.heat_emergency_text is None.
+    """(31.1°C, 40%) → hot only, not extreme → plan.heat_emergency_text is None.
 
-    Boundary regression: 88°F is hot (>=85) but 40% humidity < 65% threshold.
-    very_hot requires >=90°F. So extreme_heat_risk = False.
+    Phase B: 31.1°C (was 88°F) is hot (>=29.4°C) but 40% humidity < 65% threshold.
+    very_hot requires >=32.2°C. So extreme_heat_risk = False.
     """
     scenarios = _make_scenarios()
-    flags = classify_weather(88.0, 40.0)
-    assert flags["flag_hot"] is True           # hot threshold met
-    assert flags["flag_humid"] is False        # humid threshold NOT met
-    assert flags["flag_very_hot"] is False     # very_hot threshold NOT met
+    flags = classify_weather(31.1, 40.0)
+    assert flags["flag_hot"] is True           # hot threshold met (31.1 >= 29.4)
+    assert flags["flag_humid"] is False        # humid threshold NOT met (40 < 65)
+    assert flags["flag_very_hot"] is False     # very_hot threshold NOT met (31.1 < 32.2)
     assert flags["flag_extreme_heat_risk"] is False  # final assertion
 
     plan = build_plan_envelope(uuid4(), scenarios, weather_flags=flags)
@@ -124,10 +132,13 @@ def test_hot_but_not_humid_plan_has_no_emergency_text():
 
 
 def test_very_hot_plan_has_emergency_text():
-    """(92, 30) → very_hot alone is sufficient → plan.heat_emergency_text == HEAT_EMERGENCY_TEXT."""
+    """(33.3°C, 30%) → very_hot alone is sufficient → plan.heat_emergency_text == HEAT_EMERGENCY_TEXT.
+
+    Phase B: 33.3°C was 92°F. very_hot=True (33.3>=32.2) → extreme_heat_risk=True.
+    """
     scenarios = _make_scenarios()
-    flags = classify_weather(92.0, 30.0)
-    assert flags["flag_very_hot"] is True        # precondition
+    flags = classify_weather(33.3, 30.0)
+    assert flags["flag_very_hot"] is True        # precondition (33.3 >= 32.2)
     assert flags["flag_extreme_heat_risk"] is True
 
     plan = build_plan_envelope(uuid4(), scenarios, weather_flags=flags)

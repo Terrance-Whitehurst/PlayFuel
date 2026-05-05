@@ -14,9 +14,9 @@ from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION, SCENARIO_DURAT
 # ── Version ───────────────────────────────────────────────────────────────────
 
 
-def test_version_is_1_1_0():
-    """Version must be '1.1.0' after doubles-spec dict shape change."""
-    assert RULES_CONSTANTS_VERSION == "1.1.0"
+def test_version_is_2_0_0():
+    """Version must be '2.1.0' after Phase C-infrastructure additions."""
+    assert RULES_CONSTANTS_VERSION == "2.1.0"
 
 
 # ── Duration table — all three keys ───────────────────────────────────────────

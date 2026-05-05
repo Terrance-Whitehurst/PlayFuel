@@ -169,6 +169,44 @@ def _validate_scheduled_start_in_range(
         )
 
 
+def _validate_round_progression(
+    tournament_id: UUID,
+    match_format: Optional[str],
+    round_value: int,
+    client: Client,
+    exclude_match_id: Optional[UUID] = None,
+) -> None:
+    """Reject if another match in the same stream already has this round value.
+
+    'Stream' is defined by (tournament_id, format). Enforces the no-duplicate
+    invariant per round-progression-and-formats.md §D.4. Linear-progression
+    (R64→R32→…) is enforced on the iOS side, not here.
+
+    Skipped entirely when match_format is None (stream undetermined — caller did
+    not supply format, so we cannot determine which stream to check).
+    """
+    if match_format is None:
+        return
+    query = (
+        client.table(_TABLE)
+        .select("id")
+        .eq("tournament_id", str(tournament_id))
+        .eq("format", match_format)
+        .eq("round", round_value)
+    )
+    if exclude_match_id is not None:
+        query = query.neq("id", str(exclude_match_id))
+    result = query.limit(1).execute()
+    if result.data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Round {round_value} already exists for {match_format} in this tournament. "
+                "Use a different round or edit the existing match."
+            ),
+        )
+
+
 def _validate_doubles_format(format_val: Optional[str], doubles_format: Optional[str]) -> None:
     """Validate that doubles_format is consistent with the match format field.
 
@@ -239,6 +277,13 @@ def create_match(
             t_start_str,
             t_row.get("end_date"),
         )
+    # Round progression: no duplicate round per (tournament, format) stream — §D.4
+    _validate_round_progression(
+        tournament_id=tid,
+        match_format=body.format,
+        round_value=body.round,
+        client=client,
+    )
 
     payload = body.model_dump(exclude_none=True)
     payload["tournament_id"] = str(tid)
@@ -310,6 +355,15 @@ def update_match(
                     t_start_str,
                     t_res.data[0].get("end_date"),
                 )
+    # Round progression: no duplicate round per (tournament, format) stream — §D.4
+    if body.round is not None:
+        _validate_round_progression(
+            tournament_id=tid,
+            match_format=body.format,
+            round_value=body.round,
+            client=client,
+            exclude_match_id=mid,
+        )
     # match-done-state-cards spec §C: handle is_done / done_at flip logic
     if body.is_done is True and body.done_at is None:
         # false → true transition with no explicit done_at: server sets it now

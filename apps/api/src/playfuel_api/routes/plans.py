@@ -249,9 +249,11 @@ async def generate_plan(
     match_rows = [MatchRow(**m) for m in matches_result.data]
 
     # 2. Load tournament venue coords + name for weather fetch and LLM input.
+    # Phase C-infrastructure: also fetch venue_country (emergency number substitution)
+    # and preferred_language (LLM system-prompt selection).
     tournament_result = (
         client.table("tournaments")
-        .select("venue_lat, venue_lng, venue_name")
+        .select("venue_lat, venue_lng, venue_name, venue_country, preferred_language")
         .eq("id", str(tid))
         .limit(1)
         .execute()
@@ -259,6 +261,8 @@ async def generate_plan(
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
     venue_name: str = ""
+    venue_country: Optional[str] = None
+    preferred_language: Optional[str] = None
     if tournament_result.data:
         raw_lat = tournament_result.data[0].get("venue_lat")
         raw_lng = tournament_result.data[0].get("venue_lng")
@@ -267,6 +271,8 @@ async def generate_plan(
         if raw_lng is not None:
             venue_lng = float(raw_lng)
         venue_name = tournament_result.data[0].get("venue_name") or ""
+        venue_country = tournament_result.data[0].get("venue_country")  # None for legacy rows
+        preferred_language = tournament_result.data[0].get("preferred_language")  # None = English default
 
     # 3+5 (concurrent). Weather + places fetches are independent of each other.
     #    Run both concurrently via asyncio.gather to save max(wx_ms, places_ms)
@@ -363,8 +369,21 @@ async def generate_plan(
             datetime.now(tz=timezone.utc) - snapshot.fetched_at
         ).total_seconds()
         is_stale = age_sec > settings.weather_cache_ttl_sec
+        # Phase B: derive temp_c and wind_kmh for new rows; compute from legacy
+        # imperial for old pre-Phase-B rows (snapshot.temp_c is None on those).
+        snap_temp_c: float = (
+            snapshot.temp_c
+            if snapshot.temp_c is not None
+            else (snapshot.temp_f - 32.0) * 5.0 / 9.0
+        )
+        snap_wind_kmh: Optional[float] = (
+            snapshot.wind_kmh
+            if snapshot.wind_kmh is not None
+            else (snapshot.wind_mph * 1.609 if snapshot.wind_mph is not None else None)
+        )
         weather_block = WeatherBlock(
             temp_f=snapshot.temp_f,
+            temp_c=snap_temp_c,
             humidity_pct=snapshot.humidity_pct,
             condition=snapshot.condition,
             flag_hot=snapshot.flag_hot,
@@ -379,6 +398,7 @@ async def generate_plan(
             provider=snapshot.provider,
             # WX-G2: surface wind/precip from snapshot so iOS shows real values.
             wind_mph=snapshot.wind_mph,
+            wind_kmh=snap_wind_kmh,
             precip_prob=snapshot.precipitation_probability,
         )
 
@@ -434,7 +454,12 @@ async def generate_plan(
         # only the plan-level venue list is populated via the permissive fallback.
         if not food_buckets and raw_places:
             food_buckets = ["quick_pickup"]
-        food_options, bag_fallback_only = assemble_food_options(raw_places, food_buckets)
+        food_options, bag_fallback_only = assemble_food_options(
+            raw_places,
+            food_buckets,
+            venue_lat=venue_lat,
+            venue_lng=venue_lng,
+        )
 
         # B.2: Per-match diagnostic log — surfaces food pipeline state for each match.
         # Log: match ID, derived food buckets, number of raw Places results,

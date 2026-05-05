@@ -163,16 +163,20 @@ def test_food_note_names_recommendations_without_inventing(provider: TemplatePro
 
 
 def test_weather_note_includes_temp_when_present(provider: TemplateProvider) -> None:
-    """weather_note contains the temperature when weather data is provided."""
+    """weather_note contains the temperature when weather data is provided.
+
+    Phase B: _build_weather_note() renders Celsius. Passing weather_temp_f=95.0
+    (legacy field) converts to 35°C via (95-32)*5/9. Assert '35' in the note.
+    """
     result = provider.explain_plan(_make_input(temp_f=95.0))
     assert result.weather_note is not None
-    assert "95" in result.weather_note, (
-        f"Expected temperature '95' in weather_note: {result.weather_note!r}"
+    assert "35" in result.weather_note, (
+        f"Expected temperature '35' (°C) in weather_note: {result.weather_note!r}"
     )
 
 
 def test_weather_note_is_none_when_no_weather_data(provider: TemplateProvider) -> None:
-    """weather_note is None when temp_f is None (no weather data available)."""
+    """weather_note is None when weather_temp_f and weather_temp_c are both None (no weather data)."""
     result = provider.explain_plan(_make_input(temp_f=None, humidity=None))
     assert result.weather_note is None
 
