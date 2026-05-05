@@ -12,17 +12,19 @@ Endpoints:
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import date, datetime, timezone
 from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic.alias_generators import to_camel
 from supabase import Client
 
 from playfuel_api.auth import verify_supabase_jwt
 from playfuel_api.db import authed_client
+from playfuel_api.rules.constants import ROUND_LABELS, VALID_ROUNDS
 
 router = APIRouter(prefix="/v1/tournaments", tags=["matches"])
 
@@ -36,13 +38,18 @@ _VALID_DOUBLES_FORMATS = {"best_of_3", "pro_set_8"}
 
 
 class MatchCreate(BaseModel):
+    # camelCase aliases: iOS sends scheduledStart, ageBracket, displayOrder, etc.
+    # populate_by_name=True allows both snake_case (tests) and camelCase (iOS).
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     scheduled_start: datetime
+    round: int                              # required — players still alive (32=R32, 8=QF, 2=Final)
     estimated_duration_minutes: Optional[int] = None
     surface: Optional[str] = None
     format: Optional[str] = None            # 'singles' | 'doubles'
     age_bracket: Optional[str] = None
     display_order: Optional[int] = None
-    round_label: Optional[str] = None
+    round_label: Optional[str] = None      # kept for back-compat; server ALWAYS overwrites from round
     opponent_label: Optional[str] = None
     court_label: Optional[str] = None
     # Doubles-spec extension — migration 0007_doubles_support.sql
@@ -50,9 +57,20 @@ class MatchCreate(BaseModel):
     # Player scouting extension — migration 0010_players_and_notes.sql
     opponent_player_id: Optional[UUID] = None  # FK to players.id; SET NULL on player delete
 
+    @field_validator("round")
+    @classmethod
+    def validate_round(cls, v: int) -> int:
+        if v not in VALID_ROUNDS:
+            raise ValueError(f"round must be one of {sorted(VALID_ROUNDS)}")
+        return v
+
 
 class MatchUpdate(BaseModel):
+    # camelCase aliases: iOS sends scheduledStart, ageBracket, doublesFormat, etc.
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     scheduled_start: Optional[datetime] = None
+    round: Optional[int] = None             # optional for partial update
     estimated_duration_minutes: Optional[int] = None
     actual_end_at: Optional[datetime] = None
     surface: Optional[str] = None
@@ -66,6 +84,16 @@ class MatchUpdate(BaseModel):
     doubles_format: Optional[str] = None   # 'best_of_3' | 'pro_set_8'; null when format != 'doubles'
     # Player scouting extension
     opponent_player_id: Optional[UUID] = None  # FK to players.id
+    # match-done-state-cards spec §C — migration 0017
+    is_done: Optional[bool] = None
+    done_at: Optional[datetime] = None
+
+    @field_validator("round")
+    @classmethod
+    def validate_round(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in VALID_ROUNDS:
+            raise ValueError(f"round must be one of {sorted(VALID_ROUNDS)}")
+        return v
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -113,6 +141,72 @@ def _validate_opponent_player_id(
         )
 
 
+def _validate_scheduled_start_in_range(
+    scheduled_start: datetime,
+    start_date_str: str,
+    end_date_str: Optional[str],
+) -> None:
+    """Validate that scheduled_start falls within the tournament date range (inclusive).
+
+    Date-level comparison only — no venue_tz field exists in the tournament schema.
+    We extract the date portion of scheduled_start directly (.date()), which is
+    UTC-aligned for tz-aware datetimes and local-naive for naive datetimes. For
+    the vast majority of daylight tennis matches this is accurate. Adding a
+    venue_tz field to remove the UTC-midnight edge case is tracked as OQ-DATE-1.
+
+    end_date defaults to start_date when null (single-day tournament).
+    """
+    match_date = scheduled_start.date()
+    t_start = date.fromisoformat(start_date_str)
+    t_end = date.fromisoformat(end_date_str) if end_date_str else t_start
+    if not (t_start <= match_date <= t_end):
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                "Match start must fall within the tournament date range "
+                f"({t_start.isoformat()} through {t_end.isoformat()} inclusive)."
+            ),
+        )
+
+
+def _validate_round_progression(
+    tournament_id: UUID,
+    match_format: Optional[str],
+    round_value: int,
+    client: Client,
+    exclude_match_id: Optional[UUID] = None,
+) -> None:
+    """Reject if another match in the same stream already has this round value.
+
+    'Stream' is defined by (tournament_id, format). Enforces the no-duplicate
+    invariant per round-progression-and-formats.md §D.4. Linear-progression
+    (R64→R32→…) is enforced on the iOS side, not here.
+
+    Skipped entirely when match_format is None (stream undetermined — caller did
+    not supply format, so we cannot determine which stream to check).
+    """
+    if match_format is None:
+        return
+    query = (
+        client.table(_TABLE)
+        .select("id")
+        .eq("tournament_id", str(tournament_id))
+        .eq("format", match_format)
+        .eq("round", round_value)
+    )
+    if exclude_match_id is not None:
+        query = query.neq("id", str(exclude_match_id))
+    result = query.limit(1).execute()
+    if result.data:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=(
+                f"Round {round_value} already exists for {match_format} in this tournament. "
+                "Use a different round or edit the existing match."
+            ),
+        )
+
+
 def _validate_doubles_format(format_val: Optional[str], doubles_format: Optional[str]) -> None:
     """Validate that doubles_format is consistent with the match format field.
 
@@ -151,8 +245,50 @@ def create_match(
     """Create a match under a tournament. RLS verifies tournament ownership."""
     _validate_doubles_format(body.format, body.doubles_format)
     _validate_opponent_player_id(body.opponent_player_id, client)
+
+    # Cross-table round validation: round must not exceed the tournament's draw_size.
+    # Postgres CHECK on matches.round only validates the value is a power-of-2 bracket size;
+    # it cannot subquery across tables. Enforced here (draw-size-spec.md §4.2).
+    t_result = (
+        client.table("tournaments")
+        .select("draw_size,start_date,end_date")
+        .eq("id", str(tid))
+        .limit(1)
+        .execute()
+    )
+    if not t_result.data:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Tournament not found",
+        )
+    t_row = t_result.data[0]
+    draw_size: int = t_row["draw_size"]
+    if body.round > draw_size:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"round {body.round} exceeds tournament draw size {draw_size}",
+        )
+    # Date range validation — scheduled_start must fall within [start_date, end_date] inclusive.
+    # .get() guards against sparse mock dicts in unit tests (production rows always have start_date).
+    t_start_str: Optional[str] = t_row.get("start_date")
+    if t_start_str is not None:
+        _validate_scheduled_start_in_range(
+            body.scheduled_start,
+            t_start_str,
+            t_row.get("end_date"),
+        )
+    # Round progression: no duplicate round per (tournament, format) stream — §D.4
+    _validate_round_progression(
+        tournament_id=tid,
+        match_format=body.format,
+        round_value=body.round,
+        client=client,
+    )
+
     payload = body.model_dump(exclude_none=True)
     payload["tournament_id"] = str(tid)
+    # Server is source of truth for round_label — always overwrite from the numeric round.
+    payload["round_label"] = ROUND_LABELS[body.round]
     # UUID → string for PostgREST
     if payload.get("opponent_player_id") is not None:
         payload["opponent_player_id"] = str(payload["opponent_player_id"])
@@ -202,11 +338,45 @@ def update_match(
     if not payload:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="No fields to update")
+    # Date range validation when scheduled_start is being changed.
+    if body.scheduled_start is not None:
+        t_res = (
+            client.table("tournaments")
+            .select("start_date,end_date")
+            .eq("id", str(tid))
+            .limit(1)
+            .execute()
+        )
+        if t_res.data:
+            t_start_str: Optional[str] = t_res.data[0].get("start_date")
+            if t_start_str:
+                _validate_scheduled_start_in_range(
+                    body.scheduled_start,
+                    t_start_str,
+                    t_res.data[0].get("end_date"),
+                )
+    # Round progression: no duplicate round per (tournament, format) stream — §D.4
+    if body.round is not None:
+        _validate_round_progression(
+            tournament_id=tid,
+            match_format=body.format,
+            round_value=body.round,
+            client=client,
+            exclude_match_id=mid,
+        )
+    # match-done-state-cards spec §C: handle is_done / done_at flip logic
+    if body.is_done is True and body.done_at is None:
+        # false → true transition with no explicit done_at: server sets it now
+        payload["done_at"] = datetime.now(timezone.utc).isoformat()
+    elif body.is_done is False:
+        # undo: always clear done_at regardless of any client-provided value
+        payload["done_at"] = None
+    # When is_done is None (not in payload) or done_at is explicitly provided, pass through
     # UUID → string for PostgREST
     if payload.get("opponent_player_id") is not None:
         payload["opponent_player_id"] = str(payload["opponent_player_id"])
-    for k in ("scheduled_start", "actual_end_at"):
-        if k in payload:
+    for k in ("scheduled_start", "actual_end_at", "done_at"):
+        if k in payload and payload[k] is not None and isinstance(payload[k], datetime):
             payload[k] = payload[k].isoformat()
     result = (
         client.table(_TABLE)
@@ -230,6 +400,19 @@ def delete_match(
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> Response:
-    """Delete a match. RLS enforces ownership."""
-    client.table(_TABLE).delete().eq("id", str(mid)).eq("tournament_id", str(tid)).execute()
+    """Delete a match. RLS enforces ownership.
+
+    Filters on both id AND tournament_id so a match from a different tournament
+    (or one not owned by the caller, per RLS) returns 404 — not 204 — per spec §C.1.
+    """
+    result = (
+        client.table(_TABLE)
+        .delete()
+        .eq("id", str(mid))
+        .eq("tournament_id", str(tid))
+        .execute()
+    )
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Match not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

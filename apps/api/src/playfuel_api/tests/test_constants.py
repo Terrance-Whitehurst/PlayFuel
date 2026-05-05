@@ -4,7 +4,8 @@ Asserts that the frozen constants are byte-for-byte correct.
 Any value drift here signals an uncommitted version bump (§J.3).
 
 v1.1.0 changes:
-- RULES_CONSTANTS_VERSION bumped from "1.0.0" to "1.1.0"
+- RULES_CONSTANTS_VERSION bumped from "1.1.0" to "2.0.0" (Phase B metric recalibration)
+- RULES_CONSTANTS_VERSION bumped from "2.0.0" to "2.1.0" (Phase C-infrastructure)
 - SCENARIO_DURATIONS_MIN changed from flat dict[str,int] to nested dict
   keyed by (match_type, doubles_format | None).
 """
@@ -12,8 +13,8 @@ from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION, SCENARIO_DURAT
 
 
 def test_rules_constants_version():
-    """§J.1 — version must be exactly '1.1.0' (bumped for doubles-spec §B.1 shape change)."""
-    assert RULES_CONSTANTS_VERSION == "1.1.0"
+    """§J.1 — version must be exactly '2.1.0' (Phase C-infrastructure: preferred_language, _SYSTEM_PROMPTS, emergency_number_for)."""
+    assert RULES_CONSTANTS_VERSION == "2.1.0"
 
 
 def test_scenario_durations_min_singles():

@@ -34,6 +34,7 @@ struct TournamentDashboardView: View {
     @State private var showingCreateMatch = false
     @State private var showProfile = false
     @State private var showMatchDetail = false
+    @State private var showFeedbackSheet = false
 
     var body: some View {
         ScrollView {
@@ -98,9 +99,17 @@ struct TournamentDashboardView: View {
         .sheet(isPresented: $showingCreateMatch) {
             MatchCreateView(
                 tournamentId: tournament.id,
+                drawSize: tournament.drawSize ?? 32,
                 existingMatchCount: 0
             )
             .environmentObject(appState)
+        }
+        // Phase 7 — post-tournament feedback sheet
+        .sheet(isPresented: $showFeedbackSheet) {
+            TournamentFeedbackView(tournament: tournament)
+                .environmentObject(appState)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
         }
         .task(id: tournament.id) {
             // Phase 8.6: Auto-generate plan on tournament selection.
@@ -265,9 +274,13 @@ struct TournamentDashboardView: View {
         scenariosSection(plan: plan)
 
         // #7 — Full Timeline button
-        if !plan.timeline.isEmpty {
+        // Shows timeline events for ALL matches in the tournament (not just the
+        // currently-selected match). envelope.allTimeline merges and sorts the
+        // per-match timelines chronologically so new matches appear immediately
+        // after plan re-generation. fix/full-day-timeline-multi-match.
+        if !envelope.allTimeline.isEmpty {
             NavigationLink {
-                TimelineView(tournament: tournament, timeline: plan.timeline)
+                TimelineView(tournament: tournament, timeline: envelope.allTimeline)
             } label: {
                 Label("Full Day Timeline", systemImage: "calendar.badge.clock")
                     .frame(maxWidth: .infinity)
@@ -276,7 +289,20 @@ struct TournamentDashboardView: View {
             .padding(.horizontal, 16)
         }
 
-        // #8 — §A Footer disclaimer link
+        // #8 — Feedback CTA (only when all matches are in the past)
+        // phase7-feedback-spec.md §E.1
+        if envelope.allMatchesPast {
+            Button {
+                showFeedbackSheet = true
+            } label: {
+                Label("Rate This Tournament", systemImage: "star.bubble")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .padding(.horizontal, 16)
+        }
+
+        // #9 — §A Footer disclaimer link
         footerDisclaimer
     }
 

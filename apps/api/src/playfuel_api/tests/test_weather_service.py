@@ -86,7 +86,7 @@ async def test_fetch_current_returns_payload():
     call_args = mock_client.get.call_args
     assert "/v1/forecast" in call_args.args[0]
     params = call_args.kwargs.get("params", {})
-    assert params["temperature_unit"] == "fahrenheit"
+    assert params["temperature_unit"] == "celsius"
     assert "temperature_2m" in params["current"]
 
 

@@ -1,0 +1,294 @@
+{
+  "version": "1.0.0",
+  "registry_as_of": "2026-05-04",
+  "chains": [
+    {
+      "id": "chick-fil-a",
+      "display_name": "Chick-fil-A",
+      "match_aliases": ["chickfila"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "2026-05-04",
+      "suggestions": {
+        "main_options": [
+          "Grilled Chicken Sandwich (no pickles, no sauce)",
+          "Grilled Nuggets — 8 ct"
+        ],
+        "add_ons": [
+          "Fruit Cup",
+          "Side Salad (no dressing)"
+        ],
+        "drinks": [
+          "Bottled Water",
+          "Diet Lemonade if tolerated"
+        ],
+        "avoid": [
+          "Waffle Fries — high fat before match",
+          "Milkshakes — high sugar/dairy"
+        ],
+        "notes": [
+          "Eat 60–90 min before next match. Grilled only — avoid Classic fried."
+        ]
+      }
+    },
+    {
+      "id": "chipotle",
+      "display_name": "Chipotle Mexican Grill",
+      "match_aliases": ["chipotle", "chipotle mexican grill"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "2026-05-04",
+      "suggestions": {
+        "main_options": [
+          "Rice bowl: white or brown rice, black beans, grilled chicken",
+          "Burrito bowl (no tortilla): chicken, rice, mild salsa, lettuce"
+        ],
+        "add_ons": [],
+        "drinks": [
+          "Water — 16–20 oz with the meal"
+        ],
+        "avoid": [
+          "Sour cream",
+          "Cheese",
+          "Guacamole — high fat before competition"
+        ],
+        "notes": [
+          "Eat 60–90 min before next match. Mild salsa only."
+        ]
+      }
+    },
+    {
+      "id": "starbucks",
+      "display_name": "Starbucks",
+      "match_aliases": ["starbucks"],
+      "category_hint": "breakfast_cafe",
+      "as_of": "2026-05-04",
+      "suggestions": {
+        "main_options": [
+          "Classic Oatmeal (plain, no brown sugar packet)",
+          "Spinach, Feta & Cage Free Egg White Wrap"
+        ],
+        "add_ons": [
+          "Banana — easy carb bridge"
+        ],
+        "drinks": [
+          "Water (primary)",
+          "Small plain coffee or unsweetened tea if tolerated"
+        ],
+        "avoid": [
+          "Frappuccinos and blended drinks — high sugar",
+          "Pastries and muffins — spike and crash",
+          "Bagels with cream cheese — heavy pre-match"
+        ],
+        "notes": [
+          "Eat ≥45 min before play. Oatmeal is the safest pre-match choice."
+        ]
+      }
+    },
+    {
+      "id": "panera-bread",
+      "display_name": "Panera Bread",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["panera bread", "panera"],
+      "category_hint": "breakfast_cafe",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "subway",
+      "display_name": "Subway",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["subway"],
+      "category_hint": "sandwich_shop",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "jersey-mikes",
+      "display_name": "Jersey Mike's",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["jersey mikes", "jersey mikes subs"],
+      "category_hint": "sandwich_shop",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "jimmy-johns",
+      "display_name": "Jimmy John's",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["jimmy johns", "jimmy johns gourmet sandwiches"],
+      "category_hint": "sandwich_shop",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "firehouse-subs",
+      "display_name": "Firehouse Subs",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["firehouse subs", "firehouse"],
+      "category_hint": "sandwich_shop",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "sweetgreen",
+      "display_name": "Sweetgreen",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["sweetgreen"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "cava",
+      "display_name": "CAVA",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["cava"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "panda-express",
+      "display_name": "Panda Express",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["panda express"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "chopt",
+      "display_name": "Chopt",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["chopt", "chopt creative salad co"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "dunkin",
+      "display_name": "Dunkin'",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["dunkin", "dunkin donuts"],
+      "category_hint": "breakfast_cafe",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "einstein-bros-bagels",
+      "display_name": "Einstein Bros. Bagels",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["einstein bros bagels", "einstein bros", "einstein bagels"],
+      "category_hint": "breakfast_cafe",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "tropical-smoothie-cafe",
+      "display_name": "Tropical Smoothie Cafe",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["tropical smoothie cafe", "tropical smoothie"],
+      "category_hint": "breakfast_cafe",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "jamba",
+      "display_name": "Jamba",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["jamba", "jamba juice"],
+      "category_hint": "breakfast_cafe",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "five-guys",
+      "display_name": "Five Guys",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["five guys", "five guys burgers and fries"],
+      "category_hint": "fast_food_restaurant",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "shake-shack",
+      "display_name": "Shake Shack",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["shake shack"],
+      "category_hint": "fast_food_restaurant",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "whataburger",
+      "display_name": "Whataburger",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["whataburger"],
+      "category_hint": "fast_food_restaurant",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "in-n-out",
+      "display_name": "In-N-Out",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["in n out", "in n out burger"],
+      "category_hint": "fast_food_restaurant",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "dominos",
+      "display_name": "Domino's",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["dominos", "dominos pizza"],
+      "category_hint": "pizza_restaurant",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "pizza-hut",
+      "display_name": "Pizza Hut",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["pizza hut"],
+      "category_hint": "pizza_restaurant",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "whole-foods",
+      "display_name": "Whole Foods",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["whole foods", "whole foods market"],
+      "category_hint": "grocery_prepared",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "sprouts",
+      "display_name": "Sprouts",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["sprouts", "sprouts farmers market"],
+      "category_hint": "grocery_prepared",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "qdoba",
+      "display_name": "Qdoba",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["qdoba", "qdoba mexican eats"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "TBD",
+      "suggestions": {}
+    },
+    {
+      "id": "moes-southwest-grill",
+      "display_name": "Moe's Southwest Grill",
+      "_status": "[DRAFT — populate before TestFlight]",
+      "match_aliases": ["moes southwest grill", "moes"],
+      "category_hint": "fast_casual_bowl",
+      "as_of": "TBD",
+      "suggestions": {}
+    }
+  ]
+}

@@ -43,6 +43,7 @@ struct TournamentDTO: Decodable {
     let venueLng: Double?
     let startDate: String    // ISO date string kept as-is; matches iOS Tournament.startDate
     let endDate: String?
+    let drawSize: Int?       // draw_size → drawSize via .convertFromSnakeCase (migration 0016)
     let createdAt: Date?
     let updatedAt: Date?
 
@@ -57,7 +58,8 @@ struct TournamentDTO: Decodable {
             lat: venueLat ?? 0.0,
             lon: venueLng ?? 0.0,
             startDate: startDate,
-            endDate: endDate
+            endDate: endDate,
+            drawSize: drawSize
         )
     }
 }
@@ -90,6 +92,9 @@ struct MatchDTO: Decodable {
     let roundLabel: String?    // round_label → roundLabel
     let opponentLabel: String? // opponent_label → opponentLabel
     let courtLabel: String?    // court_label → courtLabel
+
+    // migration 0016 — numeric round. Decoded as-is (no camel conversion needed).
+    let round: Int?            // matches.round: 32=R32, 8=QF, 4=SF, 2=Final
 
     // Player Scouting — migration 0010. Decoded via .convertFromSnakeCase.
     let opponentPlayerId: UUID? // opponent_player_id → opponentPlayerId
@@ -235,10 +240,6 @@ private let _weatherUnavailable = WeatherSnapshot(
 // MARK: WeatherBlockDTO
 //
 // Decoded from the `weather` field of PlanCoreDTO. Maps to iOS `WeatherSnapshot`.
-// Note: the API WeatherBlock does not surface `windMph`, `precipProb`, or `uvIndex`
-// as scalar values — only boolean flags. iOS domain model defaults those to 0.0/nil.
-// NEW-OQ-W1: consider adding wind_mph / precip_prob / uv_index to the API WeatherBlock
-// so WeatherCardView can display accurate values from the real provider.
 struct WeatherBlockDTO: Decodable {
     let tempF: Double
     let humidityPct: Double
@@ -253,10 +254,12 @@ struct WeatherBlockDTO: Decodable {
     let isStale: Bool
     let fetchedAt: String      // ISO 8601 datetime string
     let provider: String
+    let windMph: Double?       // nil when provider did not return wind data (rare)
+    let precipProb: Double?    // precipitation probability 0–100; nil on older cached snapshots
 
     /// Map API WeatherBlock → iOS WeatherSnapshot.
     /// Boolean flags are reconstructed into the [WeatherFlag] array.
-    /// windMph / precipProb / uvIndex are not available from the API at this time.
+    /// windMph / precipProb default to 0.0 when the field is absent (older snapshots / cache hits).
     func toModel() -> WeatherSnapshot {
         var flags: [WeatherFlag] = []
         if flagVeryHot { flags.append(.very_hot) }
@@ -268,9 +271,9 @@ struct WeatherBlockDTO: Decodable {
         return WeatherSnapshot(
             tempF: tempF,
             humidity: humidityPct,
-            windMph: 0.0,      // NEW-OQ-W1: not yet surfaced by API WeatherBlock
-            precipProb: 0.0,   // NEW-OQ-W1: not yet surfaced by API WeatherBlock
-            uvIndex: nil,      // NEW-OQ-W1: not yet surfaced by API WeatherBlock
+            windMph: windMph ?? 0.0,
+            precipProb: precipProb ?? 0.0,
+            uvIndex: nil,      // uv_index deferred to migration 0013 (OQ-WX-4)
             flags: flags
         )
     }
@@ -385,15 +388,24 @@ struct TimelineEventDTO: Decodable {
 // so Swift camelCase property names map to the API's snake_case request fields.
 
 /// Request body for POST /v1/tournaments.
+/// Widened in feat/places-live to include MapKit-resolved venue address fields.
 /// NOTE: `time_zone` is collected by the iOS form but is NOT in the API's TournamentCreate
 /// Pydantic model (migration pending). Omitted here — the iOS form retains it for future use.
+/// postEncoder uses .convertToSnakeCase so camelCase → snake_case automatically:
+///   venueName → venue_name, venueAddress → venue_address, etc.
 struct TournamentCreateRequest: Encodable {
     let name: String
-    let venueName: String       // → venue_name
-    let venueLat: Double        // → venue_lat
-    let venueLng: Double        // → venue_lng
-    let startDate: String       // → start_date ("yyyy-MM-dd" string; API type is `date`)
-    let endDate: String         // → end_date
+    let venueName: String        // → venue_name
+    let venueAddress: String?    // → venue_address  (from MKPlacemark.thoroughfare)
+    let venueCity: String?       // → venue_city     (from MKPlacemark.locality)
+    let venueRegion: String?     // → venue_region   (from MKPlacemark.administrativeArea)
+    let venuePostal: String?     // → venue_postal   (from MKPlacemark.postalCode)
+    let venuePlaceId: String?    // → venue_place_id (nil for MapKit; reserved for Google Places)
+    let venueLat: Double?        // → venue_lat      (nil when no venue selected)
+    let venueLng: Double?        // → venue_lng      (nil when no venue selected)
+    let startDate: String        // → start_date ("yyyy-MM-dd" string; API type is `date`)
+    let endDate: String          // → end_date
+    let drawSize: Int            // → draw_size (migration 0016; required by API)
 }
 
 /// Request body for POST /v1/tournaments/{tid}/matches.
@@ -413,6 +425,8 @@ struct MatchCreateRequest: Encodable {
     let doublesFormat: String?          // → doubles_format ("best_of_3" | "pro_set_8" | null)
     // Player Scouting — optional FK to scouted opponent
     let opponentPlayerId: UUID?         // → opponent_player_id (migration 0010)
+    // migration 0016 — numeric round; server auto-derives round_label from this value
+    let round: Int                      // → round (e.g. 32, 8, 4, 2)
 }
 
 // MARK: - Player Scouting DTOs (migration 0010)
@@ -547,6 +561,52 @@ struct MatchEvaluationCreateRequest: Encodable {
     let keyMoments: String?         // → key_moments
 }
 
+// MARK: - Tournament Feedback DTOs (migration 0013 — phase7-feedback-spec.md §C)
+//
+// Endpoints: GET/POST /v1/tournaments/{tid}/feedback
+// Response decoded with camelDecoder (model_config = _CAMEL → camelCase JSON output).
+// Request body encoded with postEncoder (.convertToSnakeCase → snake_case;
+// accepted by Pydantic via populate_by_name=True on _CAMEL models).
+
+/// Wire format for `public.feedback` row returned by feedback endpoints.
+/// Decoded with camelDecoder (.iso8601 dates, no key conversion).
+/// Field names match the camelCase aliases Pydantic emits via alias_generator=to_camel.
+struct TournamentFeedbackDTO: Decodable {
+    let id: UUID
+    let tournamentId: UUID
+    let planId: UUID?
+    let overallRating: Int?
+    let whatWorked: [String]
+    let whatDidntWork: [String]
+    let freeText: String?
+    let createdAt: Date
+    let updatedAt: Date
+
+    func toModel() -> TournamentFeedback {
+        TournamentFeedback(
+            id: id,
+            tournamentId: tournamentId,
+            planId: planId,
+            overallRating: overallRating,
+            whatWorked: whatWorked,
+            whatDidntWork: whatDidntWork,
+            freeText: freeText,
+            createdAt: createdAt,
+            updatedAt: updatedAt
+        )
+    }
+}
+
+/// Request body for POST /v1/tournaments/{tid}/feedback.
+/// Encoded with postEncoder (.convertToSnakeCase).
+/// Pydantic's populate_by_name=True accepts snake_case input on _CAMEL models.
+struct TournamentFeedbackCreateRequest: Encodable {
+    let overallRating: Int?      // → overall_rating
+    let whatWorked: [String]     // → what_worked
+    let whatDidntWork: [String]  // → what_didnt_work
+    let freeText: String?        // → free_text
+}
+
 // MARK: - MatchDTO.toModel()
 
 extension MatchDTO {
@@ -572,10 +632,11 @@ extension MatchDTO {
             // roundLabel / opponentLabel / courtLabel use their `= nil` stored-property defaults
             // Phase 7: pass format + doublesFormat explicitly from the DB row
             format: format,
-            doublesFormat: doublesFormat
+            doublesFormat: doublesFormat,
             // opponentPlayerId uses its `= nil` stored-property default; populated via Codable
             // when Match is decoded directly. In MatchDTO.toModel() it defaults to nil because
             // MatchDTO carries it but Match.opponentPlayerId is set via Codable decode path.
+            roundNumeric: round  // migration 0016: numeric round from DB
         )
     }
 }

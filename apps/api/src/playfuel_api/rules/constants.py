@@ -8,7 +8,7 @@ No runtime code may mutate these constants; changes require a version bump (§J)
 
 # ─── Version (§J.1) ──────────────────────────────────────────────────────────
 
-RULES_CONSTANTS_VERSION = "1.1.0"  # bumped from 1.0.0 — SCENARIO_DURATIONS_MIN nested for doubles-spec
+RULES_CONSTANTS_VERSION = "2.1.0"  # bumped from 2.0.0 — Phase C-infrastructure: preferred_language field, _SYSTEM_PROMPTS dict, emergency_number_for() added
 
 # ─── Scenario durations (§A.1 + DOUBLES_SPEC_V1.md §B.1) ─────────────────────────────────────────
 #
@@ -59,11 +59,52 @@ REWARM_UP_DURATION_MIN: int = 20   # duration of dynamic re-warm-up
 # ─── Weather thresholds (§E.1) ───────────────────────────────────────────────
 
 WEATHER_THRESHOLDS: dict[str, float] = {
-    "hot":        85.0,   # temp_f >= 85
-    "very_hot":   90.0,   # temp_f >= 90 (independent; 92°F sets BOTH hot AND very_hot)
-    "humid":      65.0,   # humidity_pct >= 65
-    "cold":       50.0,   # temp_f <= 50
-    "windy":      15.0,   # wind_mph >= 15
-    "rain_risk":  40.0,   # precipitation_probability >= 40
+    "hot":        29.4,   # temp_c >= 29.4°C  (was 85°F)  §E.1
+    "very_hot":   32.2,   # temp_c >= 32.2°C  (was 90°F)  §E.1
+    "humid":      65.0,   # humidity_pct >= 65%            §E.1 — unchanged
+    "cold":       10.0,   # temp_c <= 10.0°C  (was 50°F)  §E.1
+    "windy":      24.0,   # wind_kmh >= 24.0 km/h (was 15 mph) §E.1
+    "rain_risk":  40.0,   # precipitation_probability >= 40%    §E.1 — unchanged
 }
 # Derived: extreme_heat_risk = very_hot OR (hot AND humid) — §E.2
+# DR_20 atomic-flip contract: WEATHER_THRESHOLDS and Open-Meteo unit params
+# MUST change in the same commit. Splitting breaks EmergencyBanner silently.
+
+# ─── Draw size + round vocab (draw-size-spec.md §3) ──────────────────────────
+#
+# draw_size: total bracket entries. The four values supported for junior draws.
+# round: number of players still alive at this bracket stage. 2 = Final.
+# round_label: short DB/wire abbreviation derived from round.
+#
+# Keep in sync with iOS RoundVocab.swift (Models/RoundVocab.swift).
+
+DRAW_SIZES: list[int] = [32, 64, 128, 256]
+
+ROUND_LABELS: dict[int, str] = {
+    256: "R256",
+    128: "R128",
+    64:  "R64",
+    32:  "R32",
+    16:  "R16",
+    8:   "QF",
+    4:   "SF",
+    2:   "F",
+}
+
+VALID_ROUNDS: set[int] = set(ROUND_LABELS.keys())
+
+
+def rounds_for_draw(draw_size: int) -> list[int]:
+    """Return valid round values for a draw size, largest first (earliest → latest bracket stage).
+
+    Examples:
+        rounds_for_draw(32)  → [32, 16, 8, 4, 2]
+        rounds_for_draw(64)  → [64, 32, 16, 8, 4, 2]
+        rounds_for_draw(256) → [256, 128, 64, 32, 16, 8, 4, 2]
+    """
+    rounds: list[int] = []
+    r = draw_size
+    while r >= 2:
+        rounds.append(r)
+        r //= 2
+    return rounds

@@ -137,16 +137,25 @@ private struct MatchChip: View {
     }
 
     // MARK: - Time String
+    //
+    // Uses the canonical asClockTimeFromISO extension (DateFormatting.swift) —
+    // same approach as ScenarioCardView after the fix/scenario-card-end-time hotfix.
+    // Backend emits ISO 8601 UTC (e.g. "2026-04-26T14:00:00Z"); the extension
+    // parses and reformats in the device's local timezone (e.g. "9:00 AM" in CDT).
+    // Non-ISO strings (FakeData human-readable) pass through unchanged.
+    // Nil scheduledStart → "—" (defensive for legacy plans pre-feat/match-card-time).
 
     private var timeString: String {
-        guard let iso = plan.scheduledStart else { return "—" }
-        let fmt = ISO8601DateFormatter()
-        if let date = fmt.date(from: iso) {
-            let display = DateFormatter()
-            display.dateFormat = "h:mm a"
-            display.amSymbol = "AM"
-            display.pmSymbol = "PM"
-            return display.string(from: date)
+        if let iso = plan.scheduledStart, !iso.isEmpty {
+            return iso.asClockTimeFromISO
+        }
+        // Defensive fallback: derive from the timeline's `.match` event.
+        // Safe-guards against backend versions that pre-date commit d17b308
+        // (feat/match-card-time) and don't emit `scheduledStart` on the Plan
+        // envelope. The `.match` TimelineEvent has been emitted since Phase 4
+        // with `time = match.scheduled_start.isoformat()`.
+        if let matchEvent = plan.timeline.first(where: { $0.kind == .match }) {
+            return matchEvent.time.asClockTimeFromISO
         }
         return "—"
     }
@@ -171,7 +180,7 @@ private struct MatchChip: View {
     private var statusView: some View {
         switch matchStatus {
         case .upcoming:
-            Label("Upcoming", systemImage: "clock")
+            Label(timeString, systemImage: "clock")
                 .font(.caption2)
                 .foregroundStyle(.secondary)
         case .inProgress:

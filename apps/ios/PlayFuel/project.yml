@@ -15,15 +15,14 @@ targets:
       - path: Sources/PlayFuel
         excludes:
           - Info.plist
-    resources:
       - path: Resources/Assets.xcassets
-        type: folder.assetcatalog
     info:
       path: Resources/Info.plist
       properties:
         CFBundleDisplayName: PlayFuel
         CFBundleShortVersionString: "0.1.0"
-        CFBundleVersion: "1"
+        CFBundleVersion: "10"
+        CFBundleIconName: AppIcon
         UILaunchScreen: {}
         UIRequiredDeviceCapabilities: [armv7]
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

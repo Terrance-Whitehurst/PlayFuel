@@ -161,13 +161,25 @@ def test_assemble_food_options_suggestions_non_empty_for_fast_casual_bowl() -> N
 
 
 def test_assemble_food_options_dallas_mock_provider_fixtures_have_coords() -> None:
-    """All 4 Dallas mock fixtures surface non-None lat/lng through assemble_food_options."""
+    """Food-primary Dallas mock fixtures surface non-None lat/lng through assemble_food_options.
+
+    FOOD_PLACES_FILTER_V1: Central Market (supermarket types) is now excluded by
+    _is_food_primary() Pass 1 filter, leaving 4 food-primary fixtures:
+    Chipotle, Jimmy John's, Starbucks, Domino's Pizza.
+    MockPlacesProvider still returns all 5 fixtures (provider layer unchanged);
+    the filter fires at assembly layer (FOOD_PLACES_FILTER_V1 §D.2, §H.2).
+    """
     from playfuel_api.services.places import MockPlacesProvider
 
     raw = list(MockPlacesProvider().search_nearby(32.78, -96.80, 4828, 10))
+    # MockPlacesProvider returns 5 fixtures (unchanged)
+    assert len(raw) == 5, f"MockPlacesProvider should still return 5 raw fixtures, got {len(raw)}"
     options, bag_only = assemble_food_options(raw, ["light_meal"])
     assert bag_only is False
-    assert len(options) == 4, f"Expected 4 Dallas fixtures, got {len(options)}"
+    # After food-primary filter: Central Market (supermarket) excluded → 4 food-primary options
+    assert len(options) == 4, f"Expected 4 food-primary fixtures (Central Market excluded), got {len(options)}"
+    names = [o.name for o in options]
+    assert "Central Market" not in names  # excluded: supermarket + grocery_store types
     for opt in options:
         assert opt.lat is not None, f"{opt.name}.lat must not be None"
         assert opt.lng is not None, f"{opt.name}.lng must not be None"

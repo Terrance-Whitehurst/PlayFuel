@@ -46,7 +46,8 @@ enum FakeData {
         lat: 32.7767,
         lon: -96.7970,
         startDate: "2026-04-26",
-        endDate: "2026-04-27"
+        endDate: "2026-04-27",
+        drawSize: 32
     )
 
     /// Stub tournament — lighter-weight, no full plan
@@ -57,7 +58,8 @@ enum FakeData {
         lat: 30.2672,
         lon: -97.7431,
         startDate: "2026-05-10",
-        endDate: "2026-05-11"
+        endDate: "2026-05-11",
+        drawSize: nil
     )
 
     /// Stub tournament — lighter-weight, no full plan
@@ -68,7 +70,8 @@ enum FakeData {
         lat: 29.7604,
         lon: -95.3698,
         startDate: "2026-06-07",
-        endDate: "2026-06-08"
+        endDate: "2026-06-08",
+        drawSize: nil
     )
 
     // MARK: - Match (Dallas)
@@ -82,7 +85,8 @@ enum FakeData {
         opponent: "T. Anderson",
         court: "Court 4",
         format: nil,
-        doublesFormat: nil
+        doublesFormat: nil,
+        roundNumeric: 16
     )
 
     // MARK: - Weather (Dallas)
@@ -757,6 +761,23 @@ enum FakeData {
             createdAt: Date(timeIntervalSinceNow: -86400 * 7)
         )
     ]
+
+    // MARK: - Tournament Feedback (phase7-feedback-spec.md §E.4)
+    //
+    // Dummy feedback for preview blocks. Hex-only UUID (FBFB-pattern).
+    // Safety check: no §C prohibited phrases in any field.
+
+    static let dallasFeedback = TournamentFeedback(
+        id: UUID(uuidString: "FBFBFBFB-0000-0000-0000-000000000001")!,
+        tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
+        planId: nil,
+        overallRating: 4,
+        whatWorked: ["food_timing", "hydration", "scenario_planning"],
+        whatDidntWork: ["schedule"],
+        freeText: nil,
+        createdAt: Date(timeIntervalSinceNow: -3600 * 2),
+        updatedAt: Date(timeIntervalSinceNow: -3600 * 2)
+    )
 
     // MARK: - Match Evaluations (POST_MATCH_EVAL_V1.md §G item 19)
     //

@@ -56,6 +56,41 @@ struct PlanEnvelope: Codable, Sendable {
         type == .singles ? singlesPlans.first : doublesPlans.first
     }
 
+    // MARK: - Tournament Completion
+
+    /// True when the tournament is over — all plans have a scheduledStart in the past.
+    /// Returns false when allPlans is empty (no matches added yet, or still loading).
+    ///
+    /// Used by TournamentDashboardView to show the "Rate this tournament" CTA.
+    /// phase7-feedback-spec.md §E.1
+    var allMatchesPast: Bool {
+        guard !allPlans.isEmpty else { return false }
+        let iso = ISO8601DateFormatter()
+        return allPlans.allSatisfy { plan in
+            guard let str = plan.scheduledStart,
+                  let date = iso.date(from: str) else { return false }
+            return date < .now
+        }
+    }
+
+    // MARK: - Tournament-wide Timeline
+
+    /// All timeline events across every plan in the envelope, sorted chronologically.
+    ///
+    /// The backend emits a per-match timeline for each Plan (one match per plan).
+    /// The Full Day Timeline view should show ALL matches for the day, so this
+    /// property merges and sorts the per-plan timelines by their ISO 8601 `time`
+    /// string (lexicographic sort is correct for same-timezone ISO strings).
+    ///
+    /// FakeData uses human-readable time strings ("6:00 AM") in #Preview blocks —
+    /// sort order in previews is approximate but acceptable since previews are
+    /// Xcode-only.
+    var allTimeline: [TimelineEvent] {
+        allPlans
+            .flatMap { $0.timeline }
+            .sorted { $0.time < $1.time }
+    }
+
     // MARK: - Default Selection
 
     /// Returns the plan whose match starts soonest after `now`.

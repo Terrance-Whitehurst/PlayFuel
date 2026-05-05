@@ -15,17 +15,18 @@ enum Configuration {
            let url = URL(string: raw) {
             return url
         }
-        return URL(string: "http://localhost:8000")!
+        return URL(string: "https://playfuel-api.fly.dev")!
     }()
 
     /// Supabase project URL, e.g. https://abcdefgh.supabase.co
     static let supabaseURL: URL = {
         let raw = ProcessInfo.processInfo.environment["SUPABASE_URL"]
-            ?? "https://YOUR_PROJECT.supabase.co"
+            ?? "https://vxiunrpjvamspeecbriu.supabase.co"
         return URL(string: raw)!
     }()
 
     /// Supabase anon (publishable) key. Required as `apikey` header on Auth calls.
     static let supabaseAnonKey: String =
-        ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"] ?? "YOUR_ANON_KEY"
+        ProcessInfo.processInfo.environment["SUPABASE_ANON_KEY"]
+            ?? "sb_publishable_W-mzbfauTGvnL09kePXGEw_Jajsuqut"
 }

@@ -243,3 +243,151 @@ def test_doubles_plans_have_doubles_match_type(client_with_auth, mock_db) -> Non
     body = _run_generate(client_with_auth, mock_db, matches)
 
     assert body["doublesPlans"][0]["matchType"] == "doubles"
+
+
+def test_empty_raw_places_produces_bag_fallback_only_for_last_match(
+    client_with_auth, mock_db
+) -> None:
+    """raw_places=[] on the only/last match → bag_fallback_only=True, foodOptions=[].
+
+    §G.5 no_next_match path: all scenarios have food_strategy=None → food_buckets=[].
+    The quick_pickup fallback (`if not food_buckets and raw_places`) requires raw_places
+    to be non-empty; with raw_places=[], it does not fire.  assemble_food_options([], [])
+    returns ([], True) → bag_fallback_only=True.
+
+    Locks in current behavior.  A regression (bag_fallback_only=False on empty raw_places)
+    would be caught immediately.  This is the exact path that fires in production when
+    GOOGLE_PLACES_API_KEY is invalid/expired or billing is disabled — every new match
+    the user adds shows no restaurant options and no bag-fallback banner.
+    """
+    matches = [
+        _base_match(MID_S1, "singles", None, "2026-05-15T09:00:00+00:00", 1),
+        # Only one match — no next_match; §G.5 path fires for all scenarios.
+    ]
+    db = _make_mock_db(matches)
+    mock_db.table.side_effect = db.table.side_effect
+
+    from playfuel_api.services.llm import TemplateProvider
+
+    with (
+        patch(
+            "playfuel_api.routes.plans.get_or_fetch_weather", new_callable=AsyncMock
+        ) as mock_wx,
+        patch("playfuel_api.routes.plans.find_nearby_food") as mock_places,
+        patch(
+            "playfuel_api.routes.plans.get_llm_provider",
+            return_value=TemplateProvider(),
+        ),
+    ):
+        mock_wx.return_value = None
+        mock_places.return_value = []  # Simulates API key failure / no venue coords
+        resp = client_with_auth.post(_PLAN_PATH)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    all_plans = body["singlesPlans"] + body["doublesPlans"]
+    assert len(all_plans) == 1, f"Expected 1 plan. Got {len(all_plans)}"
+    plan = all_plans[0]
+
+    assert plan["bagFallbackOnly"] is True, (
+        f"Expected bagFallbackOnly=True when raw_places=[] on last match. "
+        f"Got bagFallbackOnly={plan['bagFallbackOnly']}"
+    )
+    assert plan["foodOptions"] == [], (
+        f"Expected empty foodOptions when raw_places=[]. Got {plan['foodOptions']}"
+    )
+
+
+def test_nonempty_raw_places_produces_food_options_on_last_match(
+    client_with_auth, mock_db
+) -> None:
+    """raw_places=[3 mocks] on the only/last match → bag_fallback_only=False, foodOptions non-empty.
+
+    §G.5 no_next_match: food_buckets=[] after scenario derivation.
+    The quick_pickup fallback fires (food_buckets empty AND raw_places non-empty) →
+    food_buckets=["quick_pickup"] → assemble_food_options returns venues with
+    drive_time <= 8 min → bag_fallback_only=False.
+
+    Confirms: a newly added single match (or any last match) shows restaurant
+    options as long as the Places provider returns results.  The user-reported bug
+    ("no food locations on first tap") is caused by raw_places=[] at the Places
+    layer — not a food-bucket routing issue in the per-match loop.
+    """
+    from playfuel_api.services.llm import TemplateProvider
+    from playfuel_api.services.places import MockPlacesProvider
+
+    matches = [
+        _base_match(MID_S1, "singles", None, "2026-05-15T09:00:00+00:00", 1),
+        # Single match — no_next_match; quick_pickup fallback required for food to show.
+    ]
+    db = _make_mock_db(matches)
+    mock_db.table.side_effect = db.table.side_effect
+
+    with (
+        patch(
+            "playfuel_api.routes.plans.get_or_fetch_weather", new_callable=AsyncMock
+        ) as mock_wx,
+        patch("playfuel_api.routes.plans.find_nearby_food") as mock_places,
+        patch(
+            "playfuel_api.routes.plans.get_llm_provider",
+            return_value=TemplateProvider(),
+        ),
+    ):
+        mock_wx.return_value = None
+        # 3 Dallas mock places: Chipotle (4 min), Jimmy John's (3 min), Starbucks (2 min).
+        # All have drive_time <= 8 min (quick_pickup threshold) so all 3 are included.
+        # Central Market (9 min) is excluded by passing max_results=3 to search_nearby.
+        mock_places.return_value = list(
+            MockPlacesProvider().search_nearby(32.78, -96.80, 4828, 3)
+        )
+        resp = client_with_auth.post(_PLAN_PATH)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    all_plans = body["singlesPlans"] + body["doublesPlans"]
+    assert len(all_plans) == 1, f"Expected 1 plan. Got {len(all_plans)}"
+    plan = all_plans[0]
+
+    assert plan["bagFallbackOnly"] is False, (
+        f"Expected bagFallbackOnly=False when raw_places has mocks. "
+        f"Got bagFallbackOnly={plan['bagFallbackOnly']}"
+    )
+    assert len(plan["foodOptions"]) > 0, (
+        f"Expected non-empty foodOptions when raw_places=[3 mocks]. "
+        f"Got foodOptions={plan['foodOptions']}"
+    )
+
+
+def test_each_plan_has_scheduled_start_iso_utc(client_with_auth, mock_db) -> None:
+    """Each Plan carries scheduledStart as ISO 8601 UTC matching the match's scheduled_start.
+
+    feat/match-card-time: iOS MatchChip uses scheduledStart + asClockTimeFromISO to display
+    device-local clock time.  Previously this field was absent, causing the chip to show —.
+    """
+    matches = [
+        _base_match(MID_S1, "singles", None, "2026-05-15T09:00:00+00:00", 1),
+        _base_match(MID_S2, "singles", None, "2026-05-15T13:00:00+00:00", 2),
+    ]
+    body = _run_generate(client_with_auth, mock_db, matches)
+
+    plans = body["singlesPlans"]
+    assert len(plans) == 2
+
+    # Field must be present and non-null for every plan.
+    for plan in plans:
+        ss = plan.get("scheduledStart")
+        assert ss is not None, (
+            f"Plan {plan.get('matchId')} is missing scheduledStart. iOS MatchChip will show —."
+        )
+        # Must be parseable as ISO 8601 (contains 'T' separator and trailing 'Z').
+        assert "T" in ss and ss.endswith("Z"), (
+            f"scheduledStart must be ISO 8601 UTC (e.g. '2026-05-15T09:00:00Z'). Got: {ss!r}"
+        )
+
+    # Values match the two match inputs in order.
+    assert plans[0]["scheduledStart"] == "2026-05-15T09:00:00Z", (
+        f"Expected first plan scheduledStart='2026-05-15T09:00:00Z'. Got: {plans[0]['scheduledStart']!r}"
+    )
+    assert plans[1]["scheduledStart"] == "2026-05-15T13:00:00Z", (
+        f"Expected second plan scheduledStart='2026-05-15T13:00:00Z'. Got: {plans[1]['scheduledStart']!r}"
+    )

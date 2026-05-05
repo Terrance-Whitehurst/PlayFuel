@@ -14,12 +14,12 @@ These tests use conftest.py fixtures:
 
 
 def test_healthz_unauthed_returns_200(client_no_auth):
-    """GET /healthz returns {"status":"ok","rules_version":"1.1.0"} without auth (v1.1.0 doubles-spec)."""
+    """GET /healthz returns {"status":"ok","rules_version":"2.1.0"} without auth (v2.1.0 Phase C-infrastructure)."""
     resp = client_no_auth.get("/healthz")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
-    assert body["rules_version"] == "1.1.0"
+    assert body["rules_version"] == "2.1.0"
 
 
 def test_protected_route_without_token_returns_401(client_no_auth):

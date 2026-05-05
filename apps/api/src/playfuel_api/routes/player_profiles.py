@@ -65,11 +65,13 @@ def list_player_profiles(
 @router.post("", status_code=status.HTTP_201_CREATED, summary="Create player profile")
 def create_player_profile(
     body: PlayerProfileCreate,
-    _user_id: UUID = Depends(verify_supabase_jwt),
+    user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> dict[str, Any]:
-    """Create a new player profile. user_id is set by RLS / DB trigger."""
-    result = client.table(_TABLE).insert(body.model_dump(exclude_none=True)).execute()
+    """Create a new player profile owned by the authenticated caller."""
+    payload = body.model_dump(exclude_none=True)
+    payload["user_id"] = str(user_id)  # required: NOT NULL, no DEFAULT; RLS enforces owner
+    result = client.table(_TABLE).insert(payload).execute()
     if not result.data:
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="Insert returned no data")

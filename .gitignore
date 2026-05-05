@@ -1,9 +1,34 @@
-# Multi-Team Chat — agent session data
-.pi/multi-team/sessions/
+# Local agent team config + session data — not part of the app
+.pi/
 
-# Environment files (never commit secrets)
+# Claude Code agent state
+.claude/
+
+# Supabase CLI runtime cache
+supabase/.temp/
+
+# Xcode per-user UI state
+xcuserdata/
+*.xcuserstate
+
+# Environment files — NEVER commit these (contain secrets)
+# Real values go here locally; .env.example/.sample/.template templates are allowed.
 .env
 .env.*
+**/.env
+**/.env.*
 !.env.example
 !.env.sample
 !.env.template
+!**/.env.example
+!**/.env.sample
+!**/.env.template
+
+# Python bytecode / build cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Swift Package Manager build cache
+.build/
+**/.build/

@@ -23,7 +23,7 @@ GapStatus / FoodBucket etc. enums have matching raw values.
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import Literal, Optional
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
@@ -119,7 +119,8 @@ class ScenarioPlan(BaseModel):
 
     scenario: ScenarioKind
     duration_min: int
-    estimated_end: str        # e.g. "10:15 AM" — human-readable
+    estimated_end: str        # ISO 8601 UTC string, e.g. "2026-04-26T10:15:00Z"
+                               # iOS uses asClockTimeFromISO to convert to local time.
     gap_minutes: Optional[int] = None
     gap_status: GapStatus
     food_strategy: Optional[FoodStrategy] = None
@@ -138,10 +139,14 @@ class WeatherBlock(BaseModel):
     is_stale=True signals iOS that the cache fallback was used (provider error).
     All seven flag fields are passed through so iOS EmergencyBanner logic
     mirrors the backend classification exactly.
+
+    Phase B: metric fields added alongside legacy imperial for backward compat.
+    iOS should prefer tempC/windKph; old builds still read tempF/windMph.
     """
     model_config = _CAMEL
 
-    temp_f: float
+    temp_f: float                       # legacy imperial — keep for backward compat
+    temp_c: float                       # °C canonical (Phase B+)
     humidity_pct: float
     condition: WeatherCondition
     flag_hot: bool
@@ -151,9 +156,14 @@ class WeatherBlock(BaseModel):
     flag_windy: bool
     flag_rain_risk: bool
     flag_extreme_heat_risk: bool
-    is_stale: bool = False           # True when cache fallback was used (provider error)
+    is_stale: bool = False              # True when cache fallback was used (provider error)
     fetched_at: datetime
     provider: str
+    # WX-G2: wind + precip exposed so iOS WeatherCardView shows real values.
+    # None when the provider did not return the field (rare; iOS falls back to 0.0).
+    wind_mph: Optional[float] = None    # legacy imperial — keep for backward compat
+    wind_kmh: Optional[float] = None    # km/h canonical (Phase B+)
+    precip_prob: Optional[float] = None
 
 
 # ─── Phase 4 timeline block — OQ-API-2 / OQ-TRIAGE-1 ───────────────────────────
@@ -240,6 +250,10 @@ class Plan(BaseModel):
     # ─ Nutrition-first IA additions (NUTRITION_FIRST_IA_V1.md §E) ──────────────────────────
     match_id: Optional[UUID] = None                     # alias: matchId; FK to matches.id; null for legacy/eval plans
     next_action: Optional["NextAction"] = None          # alias: nextAction; deterministic, rules-derived
+    # ─ feat/match-card-time — match schedule chip (ScheduleStripView) ──────────────────────
+    scheduled_start: Optional[str] = None               # alias: scheduledStart; ISO 8601 UTC from match.scheduled_start
+    # ─ match-done-state-cards spec §C ─────────────────────────────────────────────
+    is_done: bool = False                               # alias: isDone; forwarded from match.is_done at plan-gen time
 
 
 # ─── Phase 5 food option model — Task #8 ─────────────────────────────────────
@@ -296,6 +310,9 @@ class FoodOption(BaseModel):
     suggestions: FoodSuggestions = Field(default_factory=FoodSuggestions)
     lat: Optional[float] = None   # venue-relative latitude; None for non-geo providers
     lng: Optional[float] = None   # venue-relative longitude; None for non-geo providers
+    # ─ chain-menu-items feature (chain-menu-items spec §J) ──────────────────────
+    chain_matched: bool = False           # True when a curated chain registry entry was matched
+    chain_as_of: Optional[str] = None     # ISO date of registry curation (e.g. '2026-05-04')
 
 
 
@@ -350,18 +367,29 @@ class PlanExplanationInput(BaseModel):
     match_start_iso: str
     match_round_label: Optional[str] = None
     next_match_estimated_iso: Optional[str] = None
-    weather_temp_f: Optional[float] = None
+    weather_temp_f: Optional[float] = None   # legacy imperial; used to compute temp_c when needed
+    weather_temp_c: Optional[float] = None   # °C canonical (Phase B+); preferred by _build_weather_note()
     weather_humidity_pct: Optional[int] = None
     weather_flags: list[str] = []
     extreme_heat_risk: bool = False
     scenarios: list[ScenarioSummary] = []
-    food_recommendations: list[FoodRecommendationSummary] = []
+    food_recommendations: list[FoodRecommendationSummary] = []  # legacy; prefer food_categories
+    # SEC-P6-1: category bucket names only (no restaurant names, addresses, or place_ids).
+    # build_explanation_input() populates this field; food_recommendations stays empty
+    # at runtime. Tests that construct PlanExplanationInput directly may still use
+    # food_recommendations for backward compat — TemplateProvider falls back to it.
+    food_categories: list[str] = []
     bag_fallback_only: bool = False
     heat_emergency_text: Optional[str] = None
     user_disclaimer: str
     match_type: str = "singles"  # 'singles' | 'doubles' — drives partner-aware LLM prose
     # Player scouting extension (PLAYER_SCOUTING_V1.md §D) — additive, decode-safe
+    # SEC-P6-2: not populated by routes/plans.py — opponent notes stay server-side only.
     opponent_notes: list[OpponentNoteForLLM] = []
+    # Phase C-infrastructure: language preference for LLM system-prompt selection.
+    # Literal enforces Tier-1 allowlist — INTL-SEC-5 compliance.
+    # _resolve_system_prompt() uses this as a dict key, never interpolated into prompts.
+    preferred_language: Optional[Literal["en", "es"]] = None
 
 
 class PlanExplanation(BaseModel):
@@ -539,6 +567,64 @@ class MatchEvaluation(BaseModel):
     to_improve: list[str] = Field(default_factory=list)
     opponent_observations: Optional[str] = None
     key_moments: Optional[str] = None
+    created_at: datetime
+    updated_at: datetime
+
+
+# ── Phase 7 Feedback models ──────────────────────────────────────────────────
+
+
+class FeedbackCreate(BaseModel):
+    """POST /v1/tournaments/{tid}/feedback request body.
+
+    Validation:
+      - ``overall_rating`` must be 1–5 if provided (optional — parent may submit
+        chips without a star rating).
+      - ``what_worked`` and ``what_didnt_work`` tokens must be from
+        ``FEEDBACK_CHIPS_WORKED`` vocab. Max 7 tokens per field.
+      - ``free_text`` capped at 500 characters.
+    """
+    model_config = _CAMEL
+
+    overall_rating: Optional[int] = Field(default=None, ge=1, le=5)
+    what_worked: list[str] = Field(default_factory=list)
+    what_didnt_work: list[str] = Field(default_factory=list)
+    free_text: Optional[str] = Field(default=None, max_length=500)
+
+    @field_validator("what_worked", mode="before")
+    @classmethod
+    def _check_what_worked(cls, v: list) -> list:
+        from playfuel_api.rules.feedback import (  # noqa: PLC0415
+            FEEDBACK_CHIPS_WORKED,
+            validate_chip_list,
+        )
+        return validate_chip_list(v or [], FEEDBACK_CHIPS_WORKED, "what_worked")
+
+    @field_validator("what_didnt_work", mode="before")
+    @classmethod
+    def _check_what_didnt_work(cls, v: list) -> list:
+        from playfuel_api.rules.feedback import (  # noqa: PLC0415
+            FEEDBACK_CHIPS_DIDNT_WORK,
+            validate_chip_list,
+        )
+        return validate_chip_list(v or [], FEEDBACK_CHIPS_DIDNT_WORK, "what_didnt_work")
+
+
+class FeedbackResponse(BaseModel):
+    """API response for GET / POST /v1/tournaments/{tid}/feedback.
+
+    Returned on both 201 (create) and 200 (update) to give iOS the full row.
+    ``plan_id`` is nullable — feedback row survives plan deletion (SET NULL).
+    """
+    model_config = _CAMEL
+
+    id: UUID
+    tournament_id: UUID
+    plan_id: Optional[UUID] = None
+    overall_rating: Optional[int] = None
+    what_worked: list[str] = []
+    what_didnt_work: list[str] = []
+    free_text: Optional[str] = None
     created_at: datetime
     updated_at: datetime
 

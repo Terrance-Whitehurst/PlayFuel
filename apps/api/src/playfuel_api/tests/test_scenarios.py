@@ -12,17 +12,52 @@ Key invariants:
     - gap_status='overrun' ONLY when gap < 0.
     - Overrun clamps: food=bag_only, pickup=bring_portable, rewarm_up=None.
     - gap=120 → food=quick_pickup (OQ-13 resolution; not light_meal).
+
+Full-pipeline classes (TestScenario*_FullPipeline):
+    Each calls classify_weather() + generate_match_scenarios() + build_plan_envelope()
+    — the same three-step pipeline the route uses minus the LLM step.
+    LLM is never reached here (build_plan_envelope is rules-engine only; llm_summary stays
+    None). The module-scoped `_force_template_provider` autouse fixture also sets
+    LLM_PROVIDER=template in os.environ so no LLM provider auto-selects if it somehow fires.
+
+Ref: .pi/multi-team/expertise/SCENARIO_ACCEPTANCE.md
 """
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 from uuid import uuid4
 
 import pytest
 
 from playfuel_api.models.db import MatchRow
-from playfuel_api.models.enums import FoodBucket, GapStatus, PickupBucket, ScenarioKind
+from playfuel_api.models.enums import FoodBucket, GapStatus, PickupBucket, ScenarioKind, ScheduleConfidence
+from playfuel_api.rules.hard_coded_strings import HEAT_EMERGENCY_TEXT
+from playfuel_api.rules.plan import build_plan_envelope, derive_schedule_confidence
 from playfuel_api.rules.scenarios import generate_match_scenarios
+from playfuel_api.rules.weather import classify_weather
+
+# ── LLM isolation fixture ────────────────────────────────────────────────────
+# Force LLM_PROVIDER=template in os.environ for the entire test module.
+# build_plan_envelope() never calls the LLM directly, so this is belt-and-suspenders,
+# but it satisfies the eval-harness AC: no Anthropic calls during pytest -k scenario.
+
+
+@pytest.fixture(autouse=True, scope="module")
+def _force_template_provider():
+    """Set LLM_PROVIDER=template for the duration of this module's tests.
+
+    Ensures Anthropic provider never auto-selects if a future refactor causes the
+    rules layer to reach the LLM factory. Unset after the module completes.
+    """
+    original = os.environ.get("LLM_PROVIDER")
+    os.environ["LLM_PROVIDER"] = "template"
+    yield
+    if original is None:
+        os.environ.pop("LLM_PROVIDER", None)
+    else:
+        os.environ["LLM_PROVIDER"] = original
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -201,19 +236,335 @@ class TestScenario4_BackToBack_9am11am:
         assert "MATCH_OVERRUN" in self.long_.warnings
 
 
-# ── Scenario 5 — Rain delay (OQ-F, deferred to Phase 4) ─────────────────────
+# ── Scenario 5 — Rain delay (OQ-F) ──────────────────────────────────────────
+# The weather flag (`flag_rain_risk`) IS implemented (Phase 4 classify_weather).
+# The plan-body rain-delay guidance (RAIN_DELAY_RISK warning, flexible pickup prose)
+# is NOT yet implemented — schedule_confidence is driven by gap_status, not weather flags.
+# So the full Scenario 5 contract remains xfail.
 
-@pytest.mark.xfail(reason="OQ-F deferred to Phase 4")
-def test_scenario_5_rain_delay_engine_path():
-    """Contract for rain-delay scenario — not implemented in v1.0.0.
 
-    When precipitation_probability >= 40% and next match schedule is uncertain,
-    the engine should:
-        - Return schedule_confidence='low' in the Plan envelope.
-        - Include rain-delay guidance in warnings (e.g. 'RAIN_DELAY_RISK').
-        - Treat parent pickup advice as uncertain / flexible.
+def test_scenario_5_rain_risk_flag_is_classified():
+    """SCENARIO_ACCEPTANCE.md Scenario 5: flag_rain_risk IS implemented in classify_weather.
 
-    Implementation deferred to Phase 4 per OQ-F.
-    This test documents the expected behaviour contract only.
+    precipitation_probability=55% ≥ 40% threshold → flag_rain_risk=True.
+    This specific invariant is verifiable even though the full rain-delay guidance
+    in the plan body is not yet implemented (see xfail test below).
+
+    Ref: SCENARIO_ACCEPTANCE.md §Scenario 5 — Must Include (first bullet).
     """
-    raise NotImplementedError("Rain delay handling (OQ-F) deferred to Phase 4")
+    flags = classify_weather(
+        temp_c=21.1,   # 70°F ≈ 21.1°C (Phase B metric)
+        humidity_pct=60.0,
+        wind_kmh=8.0,  # 5 mph ≈ 8.0 km/h
+        precipitation_probability=55.0,
+    )
+    assert flags["flag_rain_risk"] is True, (
+        "precipitation_probability=55% must set flag_rain_risk=True (threshold >= 40%)"
+    )
+    # Sanity: 21.1°C is below hot threshold (29.4°C) → not hot, not cold, not extreme
+    assert flags["flag_hot"] is False
+    assert flags["flag_extreme_heat_risk"] is False
+
+
+@pytest.mark.xfail(
+    reason=(
+        "OQ-F: rain-delay guidance in plan body not implemented. "
+        "classify_weather sets flag_rain_risk=True (tested separately), but "
+        "build_plan_envelope does not yet emit RAIN_DELAY_RISK warnings or "
+        "set schedule_confidence=low from rain risk alone (requires gap overrun/no_next_match)."
+    )
+)
+def test_scenario_5_rain_delay_engine_path():
+    """Contract for rain-delay scenario plan body — not implemented in v1.0.0.
+
+    SCENARIO_ACCEPTANCE.md Scenario 5 — Must Include (full contract):
+        - schedule_confidence='low' when rain_delay_risk is active.
+        - RAIN_DELAY_RISK warning in plan.warnings.
+        - Flexible pickup prose: 'keep food flexible and have extra snacks available.'
+
+    Ref: SCENARIO_ACCEPTANCE.md §Scenario 5 — Must Include.
+    """
+    raise NotImplementedError(
+        "Rain delay guidance in plan body (OQ-F) not yet implemented. "
+        "schedule_confidence=low requires overrun/no_next_match gap_status, not flag_rain_risk."
+    )
+
+
+# ── Scenario 1 — Full Pipeline ────────────────────────────────────────────────
+
+
+class TestScenario1_FullPipeline:
+    """SCENARIO_ACCEPTANCE.md Scenario 1: full plan pipeline — cool weather 9 AM / 1 PM.
+
+    Calls classify_weather() + generate_match_scenarios() + build_plan_envelope().
+    LLM is NOT called (rules-engine path only; _force_template_provider fixture also guards).
+    Ref: SCENARIO_ACCEPTANCE.md §Scenario 1 — Must Include / Must Not Include.
+    """
+
+    def setup_method(self):
+        m1 = _match(9, 0)
+        m2 = _match(13, 0, tid=m1.tournament_id)
+        scenarios = generate_match_scenarios(m1, m2)
+        self.weather = classify_weather(
+            temp_c=18.3, humidity_pct=40.0, wind_kmh=8.0, precipitation_probability=10.0
+        )  # 65°F ≈ 18.3°C, 5 mph ≈ 8.0 km/h (Phase B metric)
+        self.plan = build_plan_envelope(m1.tournament_id, scenarios, weather_flags=self.weather)
+
+    def test_cool_weather_flags_not_set(self):
+        """§Scenario 1 Must Not Include: no hot, humid, or extreme_heat_risk flags.
+
+        65°F is below hot threshold (85°F); 40% humidity below humid threshold (65%).
+        """
+        assert self.weather["flag_hot"] is False
+        assert self.weather["flag_humid"] is False
+        assert self.weather["flag_extreme_heat_risk"] is False
+        assert self.weather["flag_rain_risk"] is False  # 10% < 40%
+
+    def test_plan_has_no_heat_emergency_text(self):
+        """§Scenario 1 Must Not Include: heat_emergency_text is None (no extreme heat)."""
+        assert self.plan.heat_emergency_text is None
+
+    def test_plan_schedule_confidence_is_high(self):
+        """§Scenario 1 Must Include: schedule_confidence == high.
+
+        All gaps are ok status (165, 120, 60) — no overrun, no tight, no no_next_match.
+        """
+        assert self.plan.schedule_confidence == ScheduleConfidence.high
+
+    def test_plan_has_no_overrun_warnings(self):
+        """§Scenario 1 Must Not Include: no MATCH_OVERRUN warning in plan."""
+        assert "MATCH_OVERRUN" not in self.plan.warnings
+
+    def test_llm_summary_is_none(self):
+        """Eval harness: LLM is never called from the rules engine path.
+
+        build_plan_envelope() does not invoke the LLM provider. llm_summary
+        must be None to confirm no Anthropic calls occurred.
+        """
+        assert self.plan.llm_summary is None
+
+
+# ── Scenario 2 — Full Pipeline ────────────────────────────────────────────────
+
+
+class TestScenario2_FullPipeline:
+    """SCENARIO_ACCEPTANCE.md Scenario 2: full plan pipeline — hot/humid Dallas 88°F.
+
+    Calls classify_weather() + generate_match_scenarios() + build_plan_envelope().
+    LLM is NOT called (rules-engine path only).
+    Ref: SCENARIO_ACCEPTANCE.md §Scenario 2 — Must Include / Must Not Include.
+    """
+
+    def setup_method(self):
+        m1 = _match(9, 0)
+        m2 = _match(12, 0, tid=m1.tournament_id)
+        scenarios = generate_match_scenarios(m1, m2)
+        self.weather = classify_weather(
+            temp_c=31.1, humidity_pct=72.0, wind_kmh=12.9, precipitation_probability=0.0
+        )  # 88°F ≈ 31.1°C, 8 mph ≈ 12.9 km/h (Phase B metric)
+        self.plan = build_plan_envelope(m1.tournament_id, scenarios, weather_flags=self.weather)
+
+    def test_hot_and_humid_flags_set(self):
+        """§Scenario 2 Must Include: flag_hot and flag_humid both True at 88°F / 72%.
+
+        88°F ≥ 85°F hot threshold; 72% ≥ 65% humid threshold.
+        extreme_heat_risk = flag_hot AND flag_humid → True.
+        """
+        assert self.weather["flag_hot"] is True
+        assert self.weather["flag_humid"] is True
+        assert self.weather["flag_extreme_heat_risk"] is True
+
+    def test_not_very_hot(self):
+        """§Scenario 2 Must Not Include: very_hot flag NOT set (88°F < 90°F threshold)."""
+        assert self.weather["flag_very_hot"] is False
+
+    def test_plan_has_heat_emergency_text(self):
+        """§Scenario 2 Must Include: heat_emergency_text is set when extreme_heat_risk=True.
+
+        HEAT_EMERGENCY_TEXT verbatim constant — no paraphrase, no truncation.
+        """
+        assert self.plan.heat_emergency_text is not None
+        assert self.plan.heat_emergency_text == HEAT_EMERGENCY_TEXT
+
+    def test_plan_schedule_confidence_is_medium(self):
+        """§Scenario 2: schedule_confidence == medium.
+
+        Long scenario gap=0 → gap_status=tight (NOT overrun). No overrun exists,
+        so confidence = medium (not low). derive_schedule_confidence: tight → medium.
+        """
+        assert self.plan.schedule_confidence == ScheduleConfidence.medium
+
+    def test_llm_summary_is_none(self):
+        """Eval harness: LLM is never called from the rules engine path."""
+        assert self.plan.llm_summary is None
+
+
+# ── Scenario 3 — Full Pipeline ────────────────────────────────────────────────
+
+
+class TestScenario3_FullPipeline:
+    """SCENARIO_ACCEPTANCE.md Scenario 3: full plan pipeline — long gap 10 AM / 4 PM.
+
+    Calls classify_weather() + generate_match_scenarios() + build_plan_envelope().
+    LLM is NOT called (rules-engine path only).
+    Ref: SCENARIO_ACCEPTANCE.md §Scenario 3 — Must Include / Must Not Include.
+    """
+
+    def setup_method(self):
+        m1 = _match(10, 0)
+        m2 = _match(16, 0, tid=m1.tournament_id)
+        self.scenarios = generate_match_scenarios(m1, m2)
+        self.weather = classify_weather(
+            temp_c=22.2, humidity_pct=50.0, wind_kmh=8.0, precipitation_probability=0.0
+        )  # 72°F ≈ 22.2°C, 5 mph ≈ 8.0 km/h (Phase B metric)
+        self.plan = build_plan_envelope(m1.tournament_id, self.scenarios, weather_flags=self.weather)
+
+    def test_plan_schedule_confidence_is_high(self):
+        """§Scenario 3: schedule_confidence == high.
+
+        All gaps ≥ 180 → gap_status=ok for all scenarios. No tight or overrun.
+        """
+        assert self.plan.schedule_confidence == ScheduleConfidence.high
+
+    def test_neutral_weather_no_heat_flags(self):
+        """§Scenario 3 Must Not Include: neutral weather → no heat or rain flags.
+
+        72°F is below hot threshold (85°F); 50% humidity below humid (65%);
+        0% precipitation below rain_risk (40%).
+        """
+        assert self.weather["flag_hot"] is False
+        assert self.weather["flag_rain_risk"] is False
+        assert self.weather["flag_extreme_heat_risk"] is False
+
+    def test_plan_no_heat_emergency_text(self):
+        """§Scenario 3 Must Not Include: neutral weather → heat_emergency_text is None."""
+        assert self.plan.heat_emergency_text is None
+
+    def test_plan_no_overrun_warnings(self):
+        """§Scenario 3 Must Not Include: no urgent warnings (all gaps ≥ 150 min)."""
+        assert self.plan.warnings == []
+        assert "MATCH_OVERRUN" not in self.plan.warnings
+
+    def test_all_scenarios_have_rewarm_up(self):
+        """§Scenario 3 Must Include: re-warm-up timing specified (all gaps ≥ 60 min).
+
+        Long scenario gap=180 (≥ REWARM_UP_MIN_GAP=60) → rewarm_up set for all three.
+        """
+        for s in self.scenarios:
+            assert s.rewarm_up is not None, (
+                f"Expected rewarm_up set for scenario {s.scenario} (gap={s.gap_minutes})"
+            )
+
+
+# ── Scenario 4 — Full Pipeline ────────────────────────────────────────────────
+
+
+class TestScenario4_FullPipeline:
+    """SCENARIO_ACCEPTANCE.md Scenario 4: full plan pipeline — back-to-back 9 AM / 11 AM.
+
+    Calls classify_weather() + generate_match_scenarios() + build_plan_envelope().
+    LLM is NOT called (rules-engine path only).
+    Ref: SCENARIO_ACCEPTANCE.md §Scenario 4 — Must Include / Must Not Include.
+    """
+
+    def setup_method(self):
+        m1 = _match(9, 0)
+        m2 = _match(11, 0, tid=m1.tournament_id)
+        scenarios = generate_match_scenarios(m1, m2)
+        self.weather = classify_weather(
+            temp_c=22.2, humidity_pct=50.0, wind_kmh=8.0, precipitation_probability=0.0
+        )  # 72°F ≈ 22.2°C, 5 mph ≈ 8.0 km/h (Phase B metric)
+        self.plan = build_plan_envelope(m1.tournament_id, scenarios, weather_flags=self.weather)
+
+    def test_plan_schedule_confidence_is_low(self):
+        """§Scenario 4: schedule_confidence == low.
+
+        Long scenario gap=-60 → gap_status=overrun. derive_schedule_confidence:
+        overrun in status set → low.
+        """
+        assert self.plan.schedule_confidence == ScheduleConfidence.low
+
+    def test_overrun_warning_in_plan_warnings(self):
+        """§Scenario 4 Must Include: MATCH_OVERRUN warning bubbles to plan-level warnings.
+
+        build_plan_envelope de-duplicates and aggregates scenario.warnings.
+        The long scenario's overrun_warning should surface here.
+        """
+        assert "MATCH_OVERRUN" in self.plan.warnings
+
+    def test_no_heat_emergency_text(self):
+        """§Scenario 4: neutral weather → no heat_emergency_text."""
+        assert self.plan.heat_emergency_text is None
+
+    def test_llm_summary_is_none(self):
+        """Eval harness: LLM is never called from the rules engine path."""
+        assert self.plan.llm_summary is None
+
+
+# ── Timezone regression — fix/scenario-card-end-time ─────────────────────────
+#
+# Bug: _fmt_time() formatted estimated_end as "H:MM AM/PM" using dt.hour on a UTC
+# datetime. A user in UTC-5 entering 9 AM local time caused the iOS app to display
+# "3:15 PM" (UTC) instead of "10:15 AM" (local) on the Short scenario card.
+#
+# Root cause: iOS encodes Date as UTC ISO 8601 (e.g. "2026-05-03T14:00:00Z" for
+# 9 AM CDT/EST). Backend computed 14:00 + 75 min = 15:15 UTC, formatted as "3:15 PM".
+# The gap_minutes (225) was correct because it's a duration (timezone-invariant),
+# which is why the gap pill was right but the estimated end was wrong.
+#
+# Fix: _fmt_time() now returns an ISO 8601 UTC string (e.g. "2026-05-03T15:15:00Z").
+# iOS DateFormatting.asClockTimeFromISO converts to device-local time correctly.
+#
+# Regression test: asserts ISO 8601 format AND correct UTC value for Scenario 1.
+
+import re as _re
+
+_ISO_8601_Z_RE = _re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
+
+
+class TestEstimatedEndISO:
+    """fix/scenario-card-end-time — estimated_end must be ISO 8601 UTC, not 'H:MM AM/PM'.
+
+    Ref: fix/scenario-card-end-time — timezone bug where UTC-formatted time was
+    displayed directly on iOS instead of being converted to device-local time.
+    """
+
+    def setup_method(self):
+        # Match 1 at 09:00 UTC (simulates "9 AM local" sent as UTC from iOS).
+        # Match 2 at 14:00 UTC (simulates "2 PM local" = 5 hours later).
+        m1 = _match(9, 0)
+        m2 = _match(14, 0, tid=m1.tournament_id)
+        scenarios = generate_match_scenarios(m1, m2)
+        self.short, self.normal, self.long_ = scenarios
+
+    def test_estimated_end_is_iso_8601(self):
+        """All three scenarios must return ISO 8601 UTC strings, not 'H:MM AM/PM'."""
+        for s in (self.short, self.normal, self.long_):
+            assert _ISO_8601_Z_RE.match(s.estimated_end), (
+                f"estimated_end must be ISO 8601 UTC (got {s.estimated_end!r}). "
+                "Fix: _fmt_time() must use strftime('%Y-%m-%dT%H:%M:%SZ')."
+            )
+
+    def test_short_estimated_end_correct_utc_value(self):
+        """Short: 09:00 UTC + 75 min = 10:15 UTC → '2026-04-26T10:15:00Z'."""
+        assert self.short.estimated_end == "2026-04-26T10:15:00Z", (
+            f"Short estimated_end wrong: {self.short.estimated_end!r}. "
+            "User in UTC-5 entering 9 AM local would see this as 10:15 AM — correct."
+        )
+
+    def test_normal_estimated_end_correct_utc_value(self):
+        """Normal: 09:00 UTC + 120 min = 11:00 UTC → '2026-04-26T11:00:00Z'."""
+        assert self.normal.estimated_end == "2026-04-26T11:00:00Z"
+
+    def test_long_estimated_end_correct_utc_value(self):
+        """Long: 09:00 UTC + 180 min = 12:00 UTC → '2026-04-26T12:00:00Z'."""
+        assert self.long_.estimated_end == "2026-04-26T12:00:00Z"
+
+    def test_gap_still_correct_after_iso_fix(self):
+        """Gap minutes are timezone-invariant (duration arithmetic) — must still be correct.
+
+        Short: 09:00 + 75 min = 10:15; next_match at 14:00; gap = 225 min.
+        This was CORRECT before the fix too — the bug only affected the display string.
+        """
+        assert self.short.gap_minutes == 225
+        assert self.short.gap_status == GapStatus.ok

@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     supabase_url: str = ""
     supabase_anon_key: str = ""
-    supabase_jwt_secret: str = ""
+    supabase_jwt_secret: str = ""  # Legacy HS256 path only — optional. Removal: 2026-05-12.
     # Loaded but NOT used for RLS-protected routes in MVP.
     # Kept for Phase 6 / server-side admin use only.
     supabase_service_role_key: str = ""
@@ -38,7 +38,7 @@ class Settings(BaseSettings):
     #   openai    → OpenAIProvider    (requires 'openai'    SDK + key).
     llm_provider: str = "auto"
     anthropic_api_key: str = ""
-    anthropic_model: str = "claude-haiku-v3"
+    anthropic_model: str = "claude-3-5-haiku-latest"
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
     llm_max_tokens: int = 600

@@ -58,6 +58,18 @@ final class AppState: ObservableObject {
 
     private var cancellables: Set<AnyCancellable> = []
 
+    // MARK: - Plan Cache
+    //
+    // Stores generated PlanEnvelopes keyed by tournament ID.
+    // Cache hit → show plan instantly + trigger silent background refresh.
+    // Cache miss → normal loading path (spinner).
+    // Invalidated when: (a) a match is added to a tournament (plan is stale),
+    //                   (b) user signs out (signOut() calls clearPlanCache()).
+    //
+    // Thread safety: AppState is @MainActor — all access is on the main actor.
+    // TTL: session-scoped (no expiry). Invalidate explicitly on data changes.
+    private var planCache: [UUID: PlanEnvelope] = [:]
+
     // MARK: - Init
 
     init(repository: Repository, authService: AuthService) {
@@ -90,22 +102,68 @@ final class AppState: ObservableObject {
     }
 
     /// Run the rules engine for a tournament and populate `currentPlanEnvelope`.
+    ///
     /// Phase 8 (Nutrition-First IA): generatePlan returns a PlanEnvelope with
     /// per-match plan arrays (one Plan per match). After the envelope arrives,
-    /// `selectedMatchId` is anchored to the most actionable match (next upcoming
-    /// by scheduledStart, or most-recently-completed, or first available).
+    /// `selectedMatchId` is anchored to the most actionable match.
+    ///
+    /// Perf (perf/measure-and-optimize): cache-first path.
+    ///   - Cache HIT  → publish the stored envelope immediately (0 ms to first render),
+    ///                  then silently refresh in the background and update when done.
+    ///   - Cache MISS → normal loading path (spinner until network responds).
+    ///
+    /// Rollback / error on background refresh: silent. The user already sees a valid
+    /// cached plan. We do NOT replace a good loaded state with a failed state from a
+    /// background refresh. Log to debug console only.
     func generatePlan(for tournamentId: UUID) async {
-        currentPlanEnvelope = .loading
-        do {
-            let envelope = try await repository.generatePlan(tournamentId: tournamentId)
-            currentPlanEnvelope = .loaded(envelope)
-            // Anchor strip selection to the most actionable match.
-            selectedMatchId = defaultMatchId(from: envelope)
-        } catch {
-            currentPlanEnvelope = .failed(
-                (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
-            )
+        if let cached = planCache[tournamentId] {
+            // Cache HIT — show immediately, no spinner.
+            currentPlanEnvelope = .loaded(cached)
+            selectedMatchId = defaultMatchId(from: cached)
+            // Background refresh — update the cache + UI if the refresh succeeds.
+            Task {
+                do {
+                    let fresh = try await repository.generatePlan(tournamentId: tournamentId)
+                    planCache[tournamentId] = fresh
+                    // Only update the UI if the user is still viewing this tournament.
+                    if case .loaded = currentPlanEnvelope {
+                        currentPlanEnvelope = .loaded(fresh)
+                        selectedMatchId = defaultMatchId(from: fresh)
+                    }
+                } catch {
+                    // Silent failure — keep the cached plan displayed.
+                    #if DEBUG
+                    print("[PlayFuel Perf] generatePlan background refresh failed for \(tournamentId): \(error)")
+                    #endif
+                }
+            }
+        } else {
+            // Cache MISS — standard spinner path.
+            currentPlanEnvelope = .loading
+            do {
+                let envelope = try await repository.generatePlan(tournamentId: tournamentId)
+                planCache[tournamentId] = envelope
+                currentPlanEnvelope = .loaded(envelope)
+                // Anchor strip selection to the most actionable match.
+                selectedMatchId = defaultMatchId(from: envelope)
+            } catch {
+                currentPlanEnvelope = .failed(
+                    (error as? LocalizedError)?.errorDescription ?? error.localizedDescription
+                )
+            }
         }
+    }
+
+    /// Invalidate the cached plan for a specific tournament.
+    /// Call this after adding a match to a tournament so the next `generatePlan(for:)`
+    /// skips the cache and fetches a fresh plan that includes the new match.
+    func invalidatePlanCache(for tournamentId: UUID) {
+        planCache.removeValue(forKey: tournamentId)
+    }
+
+    /// Clear all cached plans. Called on sign-out so the next user starts clean.
+    private func clearPlanCache() {
+        planCache.removeAll()
     }
 
     // MARK: - Sign Out
@@ -128,5 +186,6 @@ final class AppState: ObservableObject {
         currentPlanEnvelope = .idle
         selectedMatchType = .singles
         selectedMatchId = nil
+        clearPlanCache()
     }
 }

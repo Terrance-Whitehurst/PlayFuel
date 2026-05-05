@@ -13,26 +13,55 @@ Endpoints:
 from __future__ import annotations
 
 from datetime import date
-from typing import Any, Optional
+from typing import Any, Literal, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic.alias_generators import to_camel
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from supabase import Client
 
 from playfuel_api.auth import verify_supabase_jwt
 from playfuel_api.db import authed_client
+from playfuel_api.rules.constants import DRAW_SIZES
 
 router = APIRouter(prefix="/v1", tags=["tournaments"])
 
 _TABLE = "tournaments"
 
 
+# ── Shared validators ─────────────────────────────────────────────────────────
+
+def _validate_iana_tz(v: Optional[str]) -> Optional[str]:
+    """Open-set IANA timezone validation via stdlib zoneinfo.
+
+    Accepts any identifier in the system/tzdata timezone database.
+    Rejects unknown identifiers (e.g. 'America/Mexico' — no city, typo)
+    with a descriptive ValueError so Pydantic returns 422.
+
+    Open-set (not an allowlist) so it stays valid as the iOS picker grows
+    and non-iOS API clients supply arbitrary valid IANA zone names.
+    """
+    if v is None:
+        return v
+    try:
+        ZoneInfo(v)
+    except ZoneInfoNotFoundError as e:
+        raise ValueError(f"Unknown IANA time zone: {v!r}") from e
+    return v
+
+
 # ── Request bodies ────────────────────────────────────────────────────────────
 
 class TournamentCreate(BaseModel):
+    # camelCase aliases: iOS sends venueLat, venueLng, startDate, endDate etc.
+    # populate_by_name=True allows both snake_case (tests) and camelCase (iOS).
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     name: str
+    draw_size: int                         # required — 32 | 64 | 128 | 256
     start_date: date
     end_date: Optional[date] = None
     venue_name: Optional[str] = None
@@ -42,10 +71,51 @@ class TournamentCreate(BaseModel):
     venue_postal: Optional[str] = None
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
+    # venue_place_id: stable place ID from a Places provider (e.g. Google Places).
+    # Nullable: MapKit results do not carry a stable place ID.
+    # Added migration 0012 (TOURNAMENT_LOCATION_V1.md §C.2).
+    venue_place_id: Optional[str] = None
+    # Phase A international rollout — migration 0018.
+    # time_zone: IANA tz identifier (e.g. "America/Mexico_City"). Client-supplied.
+    # venue_country: ISO 3166-1 alpha-2 (e.g. "US", "MX", "CA"). Auto-populated
+    #   from MKPlacemark.isoCountryCode on iOS when venue search resolves a placemark.
+    # Phase A.1 hardening: both fields validated before reaching the DB.
+    time_zone: Optional[str] = Field(
+        None, max_length=50,
+        description="IANA time zone identifier (e.g. 'America/Mexico_City').",
+    )
+    venue_country: Optional[str] = Field(
+        None, max_length=2, pattern=r'^[A-Z]{2}$',
+        description="ISO 3166-1 alpha-2 country code (e.g. 'US', 'MX', 'CA').",
+    )
+    # Phase C-infrastructure: per-tournament language preference for LLM explanation.
+    # Literal enforces the Tier-1 allowlist — prevents prompt injection (INTL-SEC-5).
+    # None → English default at runtime; client-supplied 'es' → Spanish once
+    # Phase C-translations delivers the Spanish system prompt.
+    preferred_language: Optional[Literal["en", "es"]] = Field(
+        None,
+        description="Language for plan explanations ('en' | 'es'). Defaults to 'en' when None.",
+    )
+
+    @field_validator("time_zone")
+    @classmethod
+    def _check_iana_tz(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_iana_tz(v)
+
+    @field_validator("draw_size")
+    @classmethod
+    def validate_draw_size(cls, v: int) -> int:
+        if v not in DRAW_SIZES:
+            raise ValueError(f"draw_size must be one of {DRAW_SIZES}")
+        return v
 
 
 class TournamentUpdate(BaseModel):
+    # camelCase aliases: iOS sends venueLat, venueLng, startDate, endDate etc.
+    model_config = ConfigDict(alias_generator=to_camel, populate_by_name=True)
+
     name: Optional[str] = None
+    draw_size: Optional[int] = None        # optional for partial update
     start_date: Optional[date] = None
     end_date: Optional[date] = None
     venue_name: Optional[str] = None
@@ -55,6 +125,35 @@ class TournamentUpdate(BaseModel):
     venue_postal: Optional[str] = None
     venue_lat: Optional[float] = None
     venue_lng: Optional[float] = None
+    venue_place_id: Optional[str] = None
+    # Phase A international rollout — migration 0018.
+    # Phase A.1 hardening: both fields validated before reaching the DB.
+    time_zone: Optional[str] = Field(
+        None, max_length=50,
+        description="IANA time zone identifier (e.g. 'America/Mexico_City').",
+    )
+    venue_country: Optional[str] = Field(
+        None, max_length=2, pattern=r'^[A-Z]{2}$',
+        description="ISO 3166-1 alpha-2 country code (e.g. 'US', 'MX', 'CA').",
+    )
+    # Phase C-infrastructure: per-tournament language preference.
+    # Literal enforces Tier-1 allowlist (INTL-SEC-5 compliance).
+    preferred_language: Optional[Literal["en", "es"]] = Field(
+        None,
+        description="Language for plan explanations ('en' | 'es'). Defaults to 'en' when None.",
+    )
+
+    @field_validator("time_zone")
+    @classmethod
+    def _check_iana_tz(cls, v: Optional[str]) -> Optional[str]:
+        return _validate_iana_tz(v)
+
+    @field_validator("draw_size")
+    @classmethod
+    def validate_draw_size(cls, v: Optional[int]) -> Optional[int]:
+        if v is not None and v not in DRAW_SIZES:
+            raise ValueError(f"draw_size must be one of {DRAW_SIZES}")
+        return v
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -86,11 +185,12 @@ def list_tournaments(
              summary="Create tournament")
 def create_tournament(
     body: TournamentCreate,
-    _user_id: UUID = Depends(verify_supabase_jwt),
+    user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> dict[str, Any]:
-    """Create a new tournament. user_id set by DB trigger / RLS."""
+    """Create a new tournament owned by the authenticated caller."""
     payload = body.model_dump(exclude_none=True)
+    payload["user_id"] = str(user_id)  # required: NOT NULL, no DEFAULT; RLS enforces owner
     # date → ISO string for PostgREST
     for k in ("start_date", "end_date"):
         if k in payload:
@@ -146,6 +246,13 @@ def delete_tournament(
     _user_id: UUID = Depends(verify_supabase_jwt),
     client: Client = Depends(authed_client),
 ) -> Response:
-    """Delete a tournament. RLS enforces ownership. Cascades to matches/plans."""
-    client.table(_TABLE).delete().eq("id", str(tid)).execute()
+    """Delete a tournament. RLS enforces ownership. Cascades to matches/plans.
+
+    Returns 404 when the row doesn't exist or RLS filtered it out (caller doesn't
+    own it). RLS makes 404 == 403 from the caller's POV — intentional per spec §C.1.
+    """
+    result = client.table(_TABLE).delete().eq("id", str(tid)).execute()
+    if not result.data:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail="Tournament not found")
     return Response(status_code=status.HTTP_204_NO_CONTENT)

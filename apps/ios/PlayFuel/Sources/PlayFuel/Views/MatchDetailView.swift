@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// Per-match detail view presenting header metadata + post-match write-up.
 ///
@@ -28,6 +29,28 @@ struct MatchDetailView: View {
     @State private var loadError: String? = nil
     @State private var showEvalForm: Bool = false
     @State private var editingEval: MatchEvaluation? = nil    // pre-fill when editing
+    // Delete state
+    @State private var showDeleteMatchConfirm = false
+    @State private var showDeleteErrorToast = false
+    @State private var isDeletingMatch = false
+
+    private static let deleteLogger = Logger(subsystem: "com.playfuel.ios", category: "delete")
+
+    // MARK: - Resolved scheduled time
+    //
+    // Defensive: prefer plan.scheduledStart, fall back to the timeline's `.match`
+    // event time. Mirrors the same fallback in ScheduleStripView.MatchChip so the
+    // detail view stays in sync with the strip even when backend pre-dates
+    // commit d17b308 (feat/match-card-time).
+    private var resolvedTimeString: String? {
+        if let iso = plan.scheduledStart, !iso.isEmpty {
+            return iso.asClockTimeFromISO
+        }
+        if let matchEvent = plan.timeline.first(where: { $0.kind == .match }) {
+            return matchEvent.time.asClockTimeFromISO
+        }
+        return nil
+    }
 
     var body: some View {
         NavigationStack {
@@ -53,6 +76,46 @@ struct MatchDetailView: View {
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("Done") { dismiss() }
+                }
+                // ••• overflow menu — Delete match (spec §D.1, I-18)
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Button(role: .destructive) {
+                            showDeleteMatchConfirm = true
+                        } label: {
+                            Label("Delete match", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                    }
+                    .accessibilityLabel("More options")
+                }
+            }
+            // Delete match confirmation dialog (spec §D.2)
+            .confirmationDialog(
+                "Delete match?",
+                isPresented: $showDeleteMatchConfirm,
+                titleVisibility: .visible
+            ) {
+                Button("Delete", role: .destructive) {
+                    Task { await performDeleteMatch() }
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("This will also delete the plan and any feedback for this match. This can't be undone.")
+            }
+            // Error toast overlay (spec §D.4)
+            .overlay(alignment: .bottom) {
+                if showDeleteErrorToast {
+                    Text("Couldn’t delete — please try again.")
+                        .font(.subheadline)
+                        .foregroundStyle(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 10)
+                        .background(.red.opacity(0.9), in: RoundedRectangle(cornerRadius: 10))
+                        .padding(.bottom, 32)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                        .animation(.easeInOut(duration: 0.25), value: showDeleteErrorToast)
                 }
             }
             .task {
@@ -81,9 +144,8 @@ struct MatchDetailView: View {
             Text("Match #\(matchIndex)")
                 .font(.title2.bold())
 
-            // Scheduled time
-            if let startISO = plan.scheduledStart {
-                let display = startISO.asClockTimeFromISO
+            // Scheduled time — uses resolved fallback (envelope → timeline → omit)
+            if let display = resolvedTimeString {
                 HStack(spacing: 4) {
                     Image(systemName: "clock")
                         .font(.caption)
@@ -215,6 +277,42 @@ struct MatchDetailView: View {
             loadError = "Couldn't load write-up. \(error.localizedDescription)"
         }
         isLoadingEval = false
+    }
+
+    // MARK: - Delete Match (spec §D.1, §D.3, §D.4)
+
+    /// Deletes the match via the API, then dismisses the sheet.
+    /// On success: invalidates plan cache for the parent tournament → dismiss
+    ///   (TournamentDashboardView’s onDismiss handler re-generates the plan).
+    /// On failure: shows inline error toast for 3 seconds; sheet stays open.
+    private func performDeleteMatch() async {
+        guard !isDeletingMatch else { return }
+        isDeletingMatch = true
+        defer { isDeletingMatch = false }
+
+        let hadPlan = true   // every match has a plan (enforced by schema)
+        let hadEval = evaluation != nil
+
+        let success = await appState.deleteMatchViaAPI(
+            matchId: plan.matchId,
+            tournamentId: plan.tournamentId
+        )
+
+        if success {
+            // Telemetry — fire-and-forget (spec §E)
+            Self.deleteLogger.info("match_deleted match_id=\(plan.matchId.uuidString) tournament_id=\(plan.tournamentId.uuidString) had_plan=\(hadPlan) had_evaluation=\(hadEval)")
+            // Invalidate plan cache so TournamentDashboardView’s onDismiss fetches fresh.
+            // (Already done inside deleteMatchViaAPI, but explicit here for clarity.)
+            // Dismiss — triggers TournamentDashboardView’s onDismiss → generatePlan (AC#5).
+            dismiss()
+        } else {
+            // Show inline error toast for 3 seconds (spec §D.4). Sheet stays open.
+            withAnimation { showDeleteErrorToast = true }
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                withAnimation { showDeleteErrorToast = false }
+            }
+        }
     }
 }
 
