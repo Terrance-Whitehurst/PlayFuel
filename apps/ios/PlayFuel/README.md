@@ -360,3 +360,83 @@ not active, nothing appears at the top — zero screen tax on normal days.
 | Emergency strip not suppressible by WeatherCard state | ✅ `EmergencyStrip` trigger is `plan.weather.extremeHeatRisk` (model-driven), zero coupling to `isExpanded` in `WeatherCardView` |
 | `EmergencyBanner.swift` preserved | ✅ Untouched; `#Preview` and other consumers unaffected |
 | OQ-11 caveat present | ✅ In `HeatGuidanceSheet.swift` source comment |
+
+---
+
+## Snapshot Tests (Phase B — WeatherCardView °F→°C Regression Net)
+
+**Phase B (2026-05-04):** SwiftUI snapshot tests added as a regression net for the
+locale-aware temperature/wind unit display introduced by the °F→°C metric flip.
+
+### Running snapshot tests
+
+```bash
+cd apps/ios/PlayFuel
+
+# Boot the simulator first (required if it's not already booted)
+xcrun simctl boot 92E2D959-19E2-4AFB-84FB-E3A3153BCBC1
+
+# Run ONLY the snapshot tests (fastest)
+xcodebuild test \
+  -scheme PlayFuel \
+  -destination "platform=iOS Simulator,id=92E2D959-19E2-4AFB-84FB-E3A3153BCBC1" \
+  -only-testing:PlayFuelTests/WeatherCardViewSnapshotTests
+
+# Run ALL tests (snapshot + unit tests)
+xcodebuild test \
+  -scheme PlayFuel \
+  -destination "platform=iOS Simulator,id=92E2D959-19E2-4AFB-84FB-E3A3153BCBC1"
+```
+
+> **Note:** `swift test` (macOS host) fails on this project because SwiftUI views use
+> iOS-only APIs (`topBarTrailing`, `Color(.secondarySystemBackground)`, etc.).
+> Always use `xcodebuild test` with an iOS simulator destination.
+
+### Snapshot files
+
+Baseline PNGs live at:
+```
+PlayFuelTests/__Snapshots__/WeatherCardViewSnapshotTests/
+  testWeatherCard_hotDay_enUS.hotDay_enUS.png   — 90 °F display (US locale)
+  testWeatherCard_mildDay_enUS.mildDay_enUS.png — 68 °F display (US locale)
+  testWeatherCard_hotDay_esMX.hotDay_esMX.png   — 32 °C display (es-MX locale)
+  testWeatherCard_hotDay_enGB.hotDay_enGB.png   — 32 °C display (en-GB locale)
+```
+
+### Re-recording baselines
+
+After intentional UI changes (e.g. Phase C adds Spanish labels to `WeatherCardView`):
+
+1. Delete the specific PNG files you want to re-record, **or** temporarily add
+   `record: true` to the individual `assertSnapshot` call.
+2. Run the tests once — SnapshotTesting auto-records when no baseline is found.
+3. Verify the new renders look correct visually.
+4. Commit the new PNG baselines alongside the code change.
+
+Alternatively, set the `SNAPSHOT_TESTING_RECORD=true` environment variable to
+re-record all snapshots in one pass.
+
+### Why 4 snapshots?
+
+| Test | Locale | Key assertion |
+|---|---|---|
+| `hotDay_enUS` | en-US | US locale shows "90 °F" + "8 mph" — verifies no metric regression |
+| `mildDay_enUS` | en-US | Mild day, no flag pills — tests default/quiet rendering path |
+| `hotDay_esMX` | es-MX | Mexican locale shows "32 °C" + "13 km/h" — Phase B correctness |
+| `hotDay_enGB` | en-GB | UK locale shows "32 °C" — Phase B treats UK as metric for now |
+
+The `hotDay_esMX` and `hotDay_enGB` snapshots **will change** in Phase C when
+Spanish translation strings replace English labels. That diff is expected and
+confirms i18n is working end-to-end.
+
+### Test infrastructure
+
+- **SPM package:** `SnapshotTesting` (Point-Free, v1.19.2) declared in both
+  `Package.swift` (SPM) and `project.yml` (xcodegen xcodeproj).
+- **xcodeproj target:** `PlayFuelTests` is now a registered xcodegen target with
+  `BUNDLE_LOADER` pointing to the app binary (standard iOS test-host pattern).
+  Run `xcodegen generate` after any `project.yml` change.
+- **Phase B gate:** The `hotDay_enUS` snapshot is the safety-critical baseline.
+  If a future change accidentally reverts WeatherCardView to hardcoded "°F"
+  strings, the `hotDay_esMX` and `hotDay_enGB` tests will fail immediately
+  (they would show °F instead of °C). This is the DR_20 unit-flip regression net.

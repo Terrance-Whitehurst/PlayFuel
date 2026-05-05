@@ -14,11 +14,21 @@ struct ScheduleStripView: View {
     /// All plans from the envelope (singlesPlans + doublesPlans, pre-sorted by API).
     let allPlans: [Plan]
 
+    /// Tournament draw size — used to derive the per-plan round number for the chip badge.
+    /// singlesPlans[0] → drawSize, [1] → drawSize/2, etc.
+    /// Defaults to 32 for backward-compat call sites (preview blocks, etc.).
+    /// round-progression-and-formats spec §J.
+    var drawSize: Int = 32
+
     /// Drives AppState.selectedMatchId — tapping a chip writes here.
     @Binding var selectedMatchId: UUID?
 
     /// Called when the empty-state CTA button is tapped.
     let onAddMatch: () -> Void
+
+    /// Called when the Done toggle is tapped on a chip. Receives the tapped plan's matchId.
+    /// match-done-state-cards spec §E.6 — routes to AppState.toggleMatchDone.
+    let onToggleDone: (UUID) -> Void
 
     var body: some View {
         if allPlans.isEmpty {
@@ -48,7 +58,9 @@ struct ScheduleStripView: View {
                         MatchChip(
                             plan: plan,
                             displayIndex: index + 1,
-                            isSelected: plan.matchId == selectedMatchId
+                            roundNumeric: roundNumericFor(plan),
+                            isSelected: plan.matchId == selectedMatchId,
+                            onToggleDone: { onToggleDone(plan.matchId) }
                         )
                         .onTapGesture {
                             withAnimation(.easeInOut(duration: 0.15)) {
@@ -61,6 +73,26 @@ struct ScheduleStripView: View {
                 .padding(.vertical, 4)
             }
         }
+    }
+
+    // MARK: - Round Badge Helper
+
+    /// Derives the numeric round for a plan from its stream position.
+    ///
+    /// stream[0] → drawSize (R64, R32, etc.)
+    /// stream[1] → drawSize/2
+    /// stream[2] → drawSize/4 … clamped to ≥2 (Final).
+    ///
+    /// Plans are ordered by scheduledStart ASC so earlier matches come first,
+    /// matching the typical R64→R32→QF→SF→F progression.
+    ///
+    /// round-progression-and-formats spec §J
+    private func roundNumericFor(_ plan: Plan) -> Int {
+        let streamPlans = allPlans.filter { $0.matchType == plan.matchType }
+        let streamIdx   = streamPlans.firstIndex(where: { $0.matchId == plan.matchId }) ?? 0
+        var divisor = 1
+        for _ in 0..<streamIdx { divisor *= 2 }
+        return max(drawSize / divisor, 2)
     }
 
     // MARK: - Empty State
@@ -96,7 +128,14 @@ private struct MatchChip: View {
 
     let plan: Plan
     let displayIndex: Int
+    /// Numeric round for the compact badge (e.g. 32 → "R32", 8 → "QF").
+    /// Derived by ScheduleStripView.roundNumericFor(_:) from stream position.
+    /// round-progression-and-formats spec §J
+    let roundNumeric: Int
     let isSelected: Bool
+    /// Routed to AppState.toggleMatchDone via ScheduleStripView.onToggleDone.
+    /// match-done-state-cards spec §E.6
+    let onToggleDone: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
@@ -111,8 +150,14 @@ private struct MatchChip: View {
                     .foregroundStyle(.secondary)
             }
 
-            // Row 2: Status
-            statusView
+            // Row 2: Status + Done toggle (spec §E.6)
+            // DoneToggleButton is declared in MatchStateDeckView.swift (internal, same module).
+            // SwiftUI routes Button taps to the Button action, NOT to chip's .onTapGesture.
+            HStack {
+                statusView
+                Spacer()
+                DoneToggleButton(isDone: plan.isDone, onToggle: onToggleDone)
+            }
 
             // Row 3: Type pill
             typePill
@@ -130,10 +175,11 @@ private struct MatchChip: View {
     // MARK: - Round Label
 
     private var roundLabel: String {
-        // Prefer API roundLabel (e.g. "R16", "QF") then fall back to "Match N"
-        // Plan doesn't directly carry roundLabel — it's on Match, not Plan.
-        // Use "Match N" as the reliable fallback for the strip.
-        "Match \(displayIndex)"
+        // round-progression-and-formats spec §J: compact badge "R32 · S" / "QF · D".
+        // roundNumeric is derived from stream position by ScheduleStripView.roundNumericFor(_:).
+        let abbr   = RoundVocab.abbreviation(for: roundNumeric)
+        let letter = plan.matchType == .singles ? "S" : "D"
+        return "\(abbr) · \(letter)"
     }
 
     // MARK: - Time String
@@ -163,6 +209,9 @@ private struct MatchChip: View {
     // MARK: - Status
 
     private var matchStatus: ChipStatus {
+        // spec V-3 + match-done-state-cards spec §C: check isDone FIRST, before time arithmetic.
+        // Manual done overrides auto-derived .inProgress.
+        if plan.isDone { return .done }
         guard let iso = plan.scheduledStart,
               let start = ISO8601DateFormatter().date(from: iso) else { return .upcoming }
         let now = Date()
@@ -254,13 +303,15 @@ private struct MatchChip: View {
             ScheduleStripView(
                 allPlans: FakeData.dallasPlanEnvelope.allPlans,
                 selectedMatchId: .constant(FakeData.dallasPlanEnvelope.allPlans.first?.matchId),
-                onAddMatch: {}
+                onAddMatch: {},
+                onToggleDone: { _ in }
             )
             Divider()
             ScheduleStripView(
                 allPlans: [],
                 selectedMatchId: .constant(nil),
-                onAddMatch: {}
+                onAddMatch: {},
+                onToggleDone: { _ in }
             )
         }
         .padding(.vertical, 16)
@@ -278,7 +329,8 @@ private struct MatchChip: View {
             ScheduleStripView(
                 allPlans: FakeData.dallasPlanEnvelope.allPlans,
                 selectedMatchId: .constant(FakeData.dallasPlanEnvelope.allPlans.first?.matchId),
-                onAddMatch: {}
+                onAddMatch: {},
+                onToggleDone: { _ in }
             )
         }
         .padding(.vertical, 16)

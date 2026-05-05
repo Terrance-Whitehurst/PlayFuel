@@ -14,12 +14,12 @@ These tests use conftest.py fixtures:
 
 
 def test_healthz_unauthed_returns_200(client_no_auth):
-    """GET /healthz returns {"status":"ok","rules_version":"2.1.0"} without auth (v2.1.0 Phase C-infrastructure)."""
+    """GET /healthz returns {"status":"ok","rules_version":"2.2.2"} without auth (v2.2.2 DR-PLACES-1)."""
     resp = client_no_auth.get("/healthz")
     assert resp.status_code == 200
     body = resp.json()
     assert body["status"] == "ok"
-    assert body["rules_version"] == "2.1.0"
+    assert body["rules_version"] == "2.2.2"
 
 
 def test_protected_route_without_token_returns_401(client_no_auth):
@@ -69,7 +69,6 @@ def test_generate_plan_food_options_not_null(client_with_auth, mock_db):
         "id": MID1,
         "tournament_id": TID,
         "scheduled_start": "2026-05-15T14:00:00+00:00",
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

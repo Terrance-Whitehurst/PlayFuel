@@ -29,7 +29,6 @@ def _one_singles_match(mid: str = MID_1) -> dict:
         "id": mid,
         "tournament_id": TID,
         "scheduled_start": "2026-05-15T09:00:00+00:00",
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

@@ -243,6 +243,9 @@ class Plan(BaseModel):
     # ─ Phase 5 additions (Task #8 / Places integration) ──────────────────────
     food_options: Optional[list["FoodOption"]] = None  # alias: foodOptions
     bag_fallback_only: bool = False                     # alias: bagFallbackOnly
+    places_unavailable: bool = False                    # alias: placesUnavailable; True when Google Places API
+                                                        # key is set but provider returned 4xx/5xx/timeout with
+                                                        # no stale cache. iOS renders explicit unavailable state.
     # ─ Phase 6 additions (Task #9) ─────────────────────────────────────────────
     llm_summary: Optional["PlanExplanation"] = None    # alias: llmSummary; None for pre-Phase-6 plans
     # ─ Doubles-spec extension (DOUBLES_SPEC_V1.md §D) ─────────────────────────────────────

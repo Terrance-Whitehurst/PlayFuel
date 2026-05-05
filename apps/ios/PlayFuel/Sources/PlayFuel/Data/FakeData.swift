@@ -47,7 +47,13 @@ enum FakeData {
         lon: -96.7970,
         startDate: "2026-04-26",
         endDate: "2026-04-27",
-        drawSize: 32
+        drawSize: 32,
+        timeZone: "America/Chicago",
+        venueCountry: "US",
+        accommodationLat: nil,
+        accommodationLng: nil,
+        accommodationAddress: nil,
+        accommodationKind: nil
     )
 
     /// Stub tournament — lighter-weight, no full plan
@@ -59,7 +65,13 @@ enum FakeData {
         lon: -97.7431,
         startDate: "2026-05-10",
         endDate: "2026-05-11",
-        drawSize: nil
+        drawSize: nil,
+        timeZone: "America/Chicago",
+        venueCountry: "US",
+        accommodationLat: nil,
+        accommodationLng: nil,
+        accommodationAddress: nil,
+        accommodationKind: nil
     )
 
     /// Stub tournament — lighter-weight, no full plan
@@ -71,7 +83,13 @@ enum FakeData {
         lon: -95.3698,
         startDate: "2026-06-07",
         endDate: "2026-06-08",
-        drawSize: nil
+        drawSize: nil,
+        timeZone: "America/Chicago",
+        venueCountry: "US",
+        accommodationLat: nil,
+        accommodationLng: nil,
+        accommodationAddress: nil,
+        accommodationKind: nil
     )
 
     // MARK: - Match (Dallas)
@@ -92,13 +110,17 @@ enum FakeData {
     // MARK: - Weather (Dallas)
     //
     // tempF = 88 → flag: .hot (≥85, <90 → NOT .very_hot)
+    // tempC = 31.1 → (88−32)×5/9 = 31.1°C
     // humidity = 72 → flag: .humid (≥65)
     // extremeHeatRisk = hot AND humid = true (§E.2)
+    // windKph = 12.9 → 8 mph × 1.60934 = 12.87 km/h
 
     static let dallasWeather = WeatherSnapshot(
         tempF: 88,
+        tempC: 31.1,
         humidity: 72,
         windMph: 8,
+        windKph: 12.9,
         precipProb: 10,
         uvIndex: 8,
         flags: [.hot, .humid]
@@ -186,6 +208,96 @@ enum FakeData {
         warnings: []
     )
 
+    // MARK: - Scenario Preview Helpers (SCENARIO_CARD_POPOUT_V1.md §G.2)
+    //
+    // makeOverrunScenario(kind:) — Preview 2: overrun degraded state.
+    // dallasLongNoNextMatch   — Preview 3: last-match recovery framing.
+    //
+    // OQ-POP-3 resolution: dallasLongScenario.gapStatus == .ok (verified above).
+    // These two helpers provide the .overrun and .no_next_match states for previews.
+
+    /// Returns a ScenarioPlan with gapStatus == .overrun for preview/testing.
+    ///
+    /// Rules-engine invariants on overrun (scenarios.py §G.3):
+    ///   - foodStrategy.bucket == .bag_only
+    ///   - pickupStrategy.bucket == .bring_portable
+    ///   - rewarmUp == nil (no warm-up window on overrun)
+    ///   - overrunWarning non-nil
+    static func makeOverrunScenario(kind: String) -> ScenarioPlan {
+        ScenarioPlan(
+            id: UUID(),
+            scenario: kind,
+            durationMin: kind == "short" ? 75 : (kind == "normal" ? 120 : 180),
+            estimatedEnd: kind == "short" ? "10:15 AM" : (kind == "normal" ? "11:00 AM" : "12:00 PM"),
+            gapMinutes: -15,   // 15-min overrun
+            gapStatus: .overrun,
+            foodStrategy: FoodStrategy(
+                bucket: .bag_only,
+                text: "No time for a restaurant run. Use bag food only."
+            ),
+            pickupStrategy: PickupStrategy(
+                bucket: .bring_portable,
+                text: "Parent should bring portable bag food and have it ready before the match ends."
+            ),
+            rewarmUp: nil,   // no warm-up window on overrun
+            overrunWarning: OverrunWarning(
+                code: "MATCH_OVERRUN",
+                severity: "high",
+                minutesOver: 15,
+                message: "Schedule overrun: this match may run 15 min past the next match start."
+            ),
+            warnings: ["MATCH_OVERRUN"]
+        )
+    }
+
+    /// Long scenario with no next match — recovery framing (Preview 3).
+    ///
+    /// Rules-engine invariants on no_next_match (scenarios.py §G.5):
+    ///   - gapMinutes == nil
+    ///   - foodStrategy == nil
+    ///   - pickupStrategy.bucket == nil
+    ///   - rewarmUp == nil
+    static let dallasLongNoNextMatch = ScenarioPlan(
+        id: UUID(uuidString: "BBBB0004-0000-0000-0000-000000000004")!,
+        scenario: "long",
+        durationMin: 180,
+        estimatedEnd: "12:00 PM",
+        gapMinutes: nil,
+        gapStatus: .no_next_match,
+        foodStrategy: nil,
+        pickupStrategy: PickupStrategy(
+            bucket: nil,
+            text: "This is your player's last match of the day. Focus on recovery."
+        ),
+        rewarmUp: nil,
+        overrunWarning: nil,
+        warnings: []
+    )
+
+    // MARK: - Short no_next_match (SCENARIO_COOLDOWN_V1 §G.5 / OQ-CD-4)
+    //
+    // Adds the missing short+no_next_match fixture needed for:
+    //   - testCooldown_short_noNextMatch_* (unit tests)
+    //   - testCooldown_fitsInGap_noNextMatch_short (gap-fit math test)
+    // Rules-engine invariants on no_next_match: gapMinutes=nil, foodStrategy=nil,
+    // pickupStrategy.bucket=nil, rewarmUp=nil.
+    static let dallasShortNoNextMatch = ScenarioPlan(
+        id: UUID(uuidString: "BBBB0005-0000-0000-0000-000000000005")!,
+        scenario: "short",
+        durationMin: 75,
+        estimatedEnd: "10:15 AM",
+        gapMinutes: nil,
+        gapStatus: .no_next_match,
+        foodStrategy: nil,
+        pickupStrategy: PickupStrategy(
+            bucket: nil,
+            text: "No next match provided."
+        ),
+        rewarmUp: nil,
+        overrunWarning: nil,
+        warnings: []
+    )
+
     // MARK: - Food Options (Dallas)
     //
     // §F.3: fast_casual_bowl text is CONFIRMED per USER_STORIES.md US-08.
@@ -224,7 +336,9 @@ enum FakeData {
                 notes: ["Eat 60–90 min before next match"]
             ),
             lat: 32.7825,
-            lng: -96.7975
+            lng: -96.7975,
+            chainMatched: true,
+            chainAsOf: "2026-05-04"
         ),
         FoodOption(
             id: UUID(uuidString: "CC000002-0000-0000-0000-000000000002")!,
@@ -250,7 +364,9 @@ enum FakeData {
                 notes: ["Eat within 30 min of ordering. DRAFT — confirm with your athlete."]
             ),
             lat: 32.7820,
-            lng: -96.8025
+            lng: -96.8025,
+            chainMatched: false,
+            chainAsOf: nil
         ),
         FoodOption(
             id: UUID(uuidString: "CC000003-0000-0000-0000-000000000003")!,
@@ -273,7 +389,9 @@ enum FakeData {
                 notes: ["Eat 60–90 min before play. DRAFT — confirm with your athlete."]
             ),
             lat: 32.7755,
-            lng: -96.7920
+            lng: -96.7920,
+            chainMatched: false,
+            chainAsOf: nil
         ),
         // PM Verification Finding I-4: Starbucks missing from FakeData despite being a
         // MockPlacesProvider fixture. User's literal example ("click into Starbucks and see oats").
@@ -305,7 +423,9 @@ enum FakeData {
                 notes: ["Eat ≥45 min before play. DRAFT — confirm with your athlete."]
             ),
             lat: 32.7805,
-            lng: -96.7990
+            lng: -96.7990,
+            chainMatched: true,
+            chainAsOf: "2026-05-04"
         )
     ]
 
@@ -482,7 +602,9 @@ enum FakeData {
         matchType: .singles,
         matchId: matchIdSingles1,
         nextAction: dallasNextAction1,
-        scheduledStart: "2026-04-26T09:00:00Z"
+        scheduledStart: "2026-04-26T09:00:00Z",
+        isDone: false,  // match-done-state-cards spec §C
+        placesUnavailable: false  // OQ-FOOD-EMPTY-1: GPS places fix
     )
 
     // MARK: - Dallas Singles Plan 2 (QF, 1:00 PM)
@@ -509,7 +631,9 @@ enum FakeData {
         matchType: .singles,
         matchId: matchIdSingles2,
         nextAction: dallasNextAction2,
-        scheduledStart: "2026-04-26T13:00:00Z"
+        scheduledStart: "2026-04-26T13:00:00Z",
+        isDone: false,  // match-done-state-cards spec §C
+        placesUnavailable: false  // OQ-FOOD-EMPTY-1
     )
 
     /// Alias for ScheduleStripView preview (Plan 1 = first singles match).
@@ -619,7 +743,9 @@ enum FakeData {
         matchType: .doubles,
         matchId: matchIdDoubles1,
         nextAction: dallasNextActionDoubles,
-        scheduledStart: "2026-04-26T15:00:00Z"
+        scheduledStart: "2026-04-26T15:00:00Z",
+        isDone: false,  // match-done-state-cards spec §C
+        placesUnavailable: false  // OQ-FOOD-EMPTY-1
     )
 
     /// Alias for multi-match envelope (Doubles Match 1 = first doubles plan).
@@ -636,6 +762,61 @@ enum FakeData {
         singlesPlans: [dallasSinglesPlan1, dallasSinglesPlan2],
         doublesPlans: [dallasDoublesPlan1]
     )
+
+    // MARK: - OQ-FOOD-EMPTY-1 Preview Plans
+    //
+    // Two factory plans for previewing FoodOptionDeck empty states without hitting the API.
+    // Used by FoodOptionDeck #Preview blocks for both "API failed" and "no restaurants found" paths.
+
+    /// Preview plan simulating a Google Places API failure.
+    /// `placesUnavailable: true, foodOptions: []` — FoodOptionDeck should render the
+    /// "Nearby restaurants unavailable" warning card + bag-fallback card.
+    static var previewPlacesUnavailable: Plan {
+        Plan(
+            id: UUID(uuidString: "EEEE00F1-0000-0000-0000-00000000F001")!,
+            planId: "preview-places-unavailable",
+            tournamentId: dallasTournament.id,
+            generatedAt: "2026-05-05T12:00:00Z",
+            warnings: [],
+            scenarioPlans: [dallasShortScenario, dallasNormalScenario, dallasLongScenario],
+            weather: dallasWeather,
+            foodOptions: [],
+            timeline: dallasTimeline,
+            bagFallbackOnly: false,
+            llmSummary: nil,
+            matchType: .singles,
+            matchId: UUID(uuidString: "EEEE00F1-0000-0000-0000-00000000F002")!,
+            nextAction: nil,
+            scheduledStart: "2026-05-05T14:00:00Z",
+            isDone: false,
+            placesUnavailable: true
+        )
+    }
+
+    /// Preview plan simulating a genuine empty Places result (API succeeded, no nearby restaurants).
+    /// `placesUnavailable: false, foodOptions: []` — FoodOptionDeck should render the
+    /// "No nearby restaurants found" message + bag-fallback card.
+    static var previewFoodEmpty: Plan {
+        Plan(
+            id: UUID(uuidString: "EEEE00F3-0000-0000-0000-00000000F003")!,
+            planId: "preview-food-empty",
+            tournamentId: dallasTournament.id,
+            generatedAt: "2026-05-05T12:00:00Z",
+            warnings: [],
+            scenarioPlans: [dallasShortScenario, dallasNormalScenario, dallasLongScenario],
+            weather: dallasWeather,
+            foodOptions: [],
+            timeline: dallasTimeline,
+            bagFallbackOnly: false,
+            llmSummary: nil,
+            matchType: .singles,
+            matchId: UUID(uuidString: "EEEE00F3-0000-0000-0000-00000000F004")!,
+            nextAction: nil,
+            scheduledStart: "2026-05-05T16:00:00Z",
+            isDone: false,
+            placesUnavailable: false
+        )
+    }
 
     // MARK: - Plan Lookup
 

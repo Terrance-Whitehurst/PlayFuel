@@ -91,6 +91,35 @@ struct PlanEnvelope: Codable, Sendable {
             .sorted { $0.time < $1.time }
     }
 
+    // MARK: - Done-State Selection (match-done-state-cards spec §E.8)
+
+    /// The most contextually relevant plan for the card deck.
+    ///
+    /// Priority:
+    ///   1. First plan with `isDone == false`, ordered by `scheduledStart` ASC
+    ///      (forward-looking: this is the next match to play).
+    ///   2. Most-recently-done plan (latest `scheduledStart`) when all are done
+    ///      (end-of-day deck still needs a plan for heat-flag interpolation).
+    ///   3. `anyPlan` as last resort (envelope non-empty but all scheduledStart nil).
+    var nextActionablePlan: Plan? {
+        let iso = ISO8601DateFormatter()
+
+        // 1. First undone plan
+        if let first = allPlans.first(where: { !$0.isDone }) { return first }
+
+        // 2. Most recently done (latest scheduledStart)
+        let done = allPlans.compactMap { plan -> (Plan, Date)? in
+            guard plan.isDone,
+                  let str = plan.scheduledStart,
+                  let date = iso.date(from: str) else { return nil }
+            return (plan, date)
+        }
+        if let latest = done.max(by: { $0.1 < $1.1 })?.0 { return latest }
+
+        // 3. Fallback
+        return anyPlan
+    }
+
     // MARK: - Default Selection
 
     /// Returns the plan whose match starts soonest after `now`.

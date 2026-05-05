@@ -93,11 +93,7 @@ struct NextActionCard: View {
     // MARK: - Helpers
 
     private func formattedTime(_ date: Date) -> String {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "h:mm a"
-        fmt.amSymbol = "AM"
-        fmt.pmSymbol = "PM"
-        return fmt.string(from: date)
+        DateFormatting.clockTime(date)
     }
 
     private var cardBackground: some View {

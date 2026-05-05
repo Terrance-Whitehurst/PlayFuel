@@ -6,7 +6,29 @@ options:
   createIntermediateGroups: true
   developmentLanguage: en
 
+packages:
+  swift-snapshot-testing:
+    url: https://github.com/pointfreeco/swift-snapshot-testing.git
+    from: 1.17.4
+
 targets:
+  PlayFuelTests:
+    type: bundle.unit-test
+    platform: iOS
+    deploymentTarget: "17.0"
+    sources:
+      - path: PlayFuelTests
+    dependencies:
+      - target: PlayFuel
+      - package: swift-snapshot-testing
+        product: SnapshotTesting
+    settings:
+      base:
+        SWIFT_VERSION: "5.9"
+        GENERATE_INFOPLIST_FILE: "YES"
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/PlayFuel.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/PlayFuel"
+        BUNDLE_LOADER: "$(TEST_HOST)"
+
   PlayFuel:
     type: application
     platform: iOS
@@ -49,6 +71,11 @@ schemes:
     build:
       targets:
         PlayFuel: all
+        PlayFuelTests: [testing]
+    test:
+      targets:
+        - PlayFuelTests
+      gatherCoverageData: false
     run:
       config: Debug
       environmentVariables:

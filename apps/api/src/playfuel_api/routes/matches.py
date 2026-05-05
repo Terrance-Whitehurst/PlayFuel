@@ -44,7 +44,6 @@ class MatchCreate(BaseModel):
 
     scheduled_start: datetime
     round: int                              # required — players still alive (32=R32, 8=QF, 2=Final)
-    estimated_duration_minutes: Optional[int] = None
     surface: Optional[str] = None
     format: Optional[str] = None            # 'singles' | 'doubles'
     age_bracket: Optional[str] = None
@@ -71,7 +70,6 @@ class MatchUpdate(BaseModel):
 
     scheduled_start: Optional[datetime] = None
     round: Optional[int] = None             # optional for partial update
-    estimated_duration_minutes: Optional[int] = None
     actual_end_at: Optional[datetime] = None
     surface: Optional[str] = None
     format: Optional[str] = None            # 'singles' | 'doubles'

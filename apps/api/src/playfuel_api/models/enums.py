@@ -115,3 +115,6 @@ class TimelineEventKind(StrEnum):
     matchEnd = "matchEnd"
     # Doubles-spec extension — DOUBLES_SPEC_V1.md §C.1
     partnerCoordination = "partnerCoordination"
+    # Accommodations extension — ACCOMMODATIONS_V1.md §E.2
+    # Emitted when accommodation_lat/lng set; anchor = match_start - ARRIVE_SNACK_MIN - drive_minutes.
+    departure = "departure"

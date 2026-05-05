@@ -33,7 +33,26 @@ struct EmergencyBanner: View {
         }
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background(Color.red.gradient)
+        // Glassmorphic red — regularMaterial + red 85% tint preserves white-text
+        // WCAG AA contrast while adding the glass blur layer. Safety-critical text
+        // legibility is unchanged; red prominence maintained at 0.85 opacity.
+        .background {
+            ZStack {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(.regularMaterial)
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.red.opacity(0.85))
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [.white.opacity(0.30), .white.opacity(0.05)],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        ),
+                        lineWidth: 1
+                    )
+            }
+        }
         .clipShape(RoundedRectangle(cornerRadius: 12))
         .padding(.horizontal, 16)
         .padding(.top, 8)

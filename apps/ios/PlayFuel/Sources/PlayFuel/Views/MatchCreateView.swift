@@ -2,8 +2,7 @@ import SwiftUI
 
 /// US-04 extension — In-app match creation.
 /// Phase 5b: shipped to replace the "create via Supabase Console" workaround.
-/// Phase 7 (Doubles): added match-type and doubles-format pickers; duration labels
-/// now reflect the selected format's short/normal/long values (DOUBLES_SPEC_V1.md §E.2).
+/// Phase 7 (Doubles): added match-type and doubles-format pickers.
 ///
 /// On save: POSTs to /v1/tournaments/{tid}/matches via `Repository.createMatch`,
 /// invalidates the plan cache, sets `currentPlanEnvelope` to `.idle` so the dashboard
@@ -20,24 +19,27 @@ struct MatchCreateView: View {
     /// Tournament draw size — drives the round picker options (migration 0016).
     /// Passed from TournamentDashboardView; defaults to 32 for legacy callers.
     let drawSize: Int
+    /// Number of existing singles plans in the loaded envelope.
+    /// Used to compute the next allowed round for the singles stream.
+    /// round-progression-and-formats spec §J
+    let existingSinglesCount: Int
+    /// Number of existing doubles plans in the loaded envelope.
+    /// Used to compute the next allowed round for the doubles stream.
+    /// round-progression-and-formats spec §J
+    let existingDoublesCount: Int
+    /// Tournament date range — constrains both DatePickers so the user can only
+    /// pick days that fall within the tournament window.
+    let tournamentStartDate: Date
+    let tournamentEndDate: Date
 
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
 
     // MARK: - Form state
 
-    @State private var scheduledStart: Date = {
-        // Default to 9:00 AM today in the device's local calendar.
-        var comps = Calendar.current.dateComponents([.year, .month, .day], from: Date())
-        comps.hour = 9
-        comps.minute = 0
-        comps.second = 0
-        return Calendar.current.date(from: comps) ?? Date()
-    }()
-
-    /// 0 = Short, 1 = Normal, 2 = Long. Default: Normal.
-    /// Values reflect the selected (matchType, doublesFormat) combo from the §B table.
-    @State private var durationIndex: Int = 1
+    // scheduledStart is set in the custom init (see below) so it can clamp
+    // to the tournament window when today falls outside the range.
+    @State private var scheduledStart: Date
 
     // migration 0016: numeric round replaces free-text roundLabelText.
     // Initialized to drawSize (earliest round = most likely first entry).
@@ -46,8 +48,11 @@ struct MatchCreateView: View {
     @State private var opponentLabelText: String = ""
     @State private var courtLabelText: String = ""
 
-    @State private var hasNextMatch: Bool = false
-    @State private var nextMatchTime: Date = Date()
+    // MARK: - Round progression (round-progression-and-formats spec §J)
+
+    /// True when the round picker is in backfill mode (shows all valid rounds).
+    /// In normal mode only the next allowed round is shown (locked / read-only).
+    @State private var isBackfillMode: Bool = false
 
     // MARK: - Phase 7: Match type + doubles format
 
@@ -59,12 +64,39 @@ struct MatchCreateView: View {
 
     // MARK: - Init (needed to set selectedRound from drawSize)
 
-    init(tournamentId: UUID, drawSize: Int = 32, existingMatchCount: Int) {
+    init(
+        tournamentId: UUID,
+        drawSize: Int = 32,
+        existingMatchCount: Int,
+        existingSinglesCount: Int = 0,
+        existingDoublesCount: Int = 0,
+        tournamentStartDate: Date,
+        tournamentEndDate: Date
+    ) {
         self.tournamentId = tournamentId
         self.drawSize = drawSize
         self.existingMatchCount = existingMatchCount
-        // Initialize selectedRound to drawSize (earliest round; most common first entry)
-        _selectedRound = State(initialValue: drawSize)
+        self.existingSinglesCount = existingSinglesCount
+        self.existingDoublesCount = existingDoublesCount
+        self.tournamentStartDate = tournamentStartDate
+        self.tournamentEndDate = tournamentEndDate
+        // Default selectedRound to the next allowed round for the default type (singles).
+        // Formula: drawSize / 2^existingSinglesCount, clamped to ≥2 (Final).
+        var singlesDivisor = 1
+        for _ in 0..<existingSinglesCount { singlesDivisor *= 2 }
+        let defaultRound = max(drawSize / singlesDivisor, 2)
+        _selectedRound = State(initialValue: defaultRound)
+        // scheduledStart: today at 9 AM if today falls within the tournament window;
+        // otherwise clamp to tournamentStartDate at 9 AM so the picker opens in-range.
+        let cal = Calendar.current
+        let todayStart = cal.startOfDay(for: Date())
+        let tStart = cal.startOfDay(for: tournamentStartDate)
+        let tEnd   = cal.startOfDay(for: tournamentEndDate)
+        let baseDate = (todayStart >= tStart && todayStart <= tEnd) ? Date() : tournamentStartDate
+        var comps = cal.dateComponents([.year, .month, .day], from: baseDate)
+        comps.hour = 9; comps.minute = 0; comps.second = 0
+        let defaultStart = cal.date(from: comps) ?? tournamentStartDate
+        _scheduledStart = State(initialValue: defaultStart)
     }
 
     // MARK: - Player scouting state
@@ -82,24 +114,16 @@ struct MatchCreateView: View {
     @State private var isSaving: Bool = false
     @State private var errorMessage: String? = nil
 
-    // MARK: - Computed duration options
-    //
-    // Returns the correct short/normal/long minute values for the current
-    // (matchType, doublesFormat) selection, per DOUBLES_SPEC_V1.md §B.1.
-    //   singles:              75 / 120 / 180 (RULES_CONSTANTS_V1 §A.1 — frozen)
-    //   doubles best_of_3:    60 /  90 / 135 [DRAFT — OQ-DBL-1]
-    //   doubles pro_set_8:    45 /  70 / 100 [DRAFT — OQ-DBL-1]
-    private var durationOptions: [(label: String, minutes: Int)] {
-        let values: [Int]
-        switch (matchType, doublesFormat) {
-        case (.doubles, .proSet8):  values = [45, 70, 100]
-        case (.doubles, .bestOf3):  values = [60, 90, 135]
-        default:                    values = [75, 120, 180]  // .singles
-        }
-        let names = ["Short", "Normal", "Long"]
-        return zip(names, values).map { name, min in
-            (label: "\(name) (\(DurationFormatting.friendly(minutes: min)))", minutes: min)
-        }
+    // MARK: - Date range for pickers
+
+    /// Closed range spanning the full tournament: 00:00:00 on startDate through
+    /// 23:59:59 on endDate (device local calendar). Applied to both DatePickers.
+    private var dateRange: ClosedRange<Date> {
+        let cal = Calendar.current
+        let lower = cal.startOfDay(for: tournamentStartDate)
+        let upper = cal.date(bySettingHour: 23, minute: 59, second: 59, of: tournamentEndDate)
+            ?? cal.date(byAdding: .day, value: 1, to: lower)!
+        return lower <= upper ? lower...upper : lower...lower
     }
 
     // MARK: - Body
@@ -111,6 +135,7 @@ struct MatchCreateView: View {
                     DatePicker(
                         "Match start",
                         selection: $scheduledStart,
+                        in: dateRange,
                         displayedComponents: [.date, .hourAndMinute]
                     )
                 }
@@ -140,29 +165,35 @@ struct MatchCreateView: View {
                 }
 
                 Section(
-                    header: Text("Estimated Duration"),
-                    footer: Text("Used by the rules engine to calculate gap and food window.")
-                ) {
-                    Picker("Duration", selection: $durationIndex) {
-                        ForEach(durationOptions.indices, id: \.self) { i in
-                            Text(durationOptions[i].label).tag(i)
-                        }
-                    }
-                    .pickerStyle(.segmented)
-                    .labelsHidden()
-                }
-
-                Section(
                     header: Text("Labels"),
                     footer: Text("All optional. Displayed on the match card.")
                 ) {
-                    // migration 0016: numeric round picker replaces free-text field.
-                    Picker("Round", selection: $selectedRound) {
-                        ForEach(RoundVocab.roundOptions(for: drawSize), id: \.self) { r in
-                            Text(RoundVocab.label(for: r)).tag(r)
+                    // round-progression-and-formats spec §J: constrained round picker.
+                    // Normal mode: locked to the next allowed round (read-only label +
+                    //   "Edit earlier round" backfill affordance).
+                    // Backfill mode: full draw picker (user opted in explicitly).
+                    if isBackfillMode {
+                        Picker("Round", selection: $selectedRound) {
+                            ForEach(RoundVocab.roundOptions(for: drawSize), id: \.self) { r in
+                                Text(RoundVocab.label(for: r)).tag(r)
+                            }
                         }
+                        .pickerStyle(.menu)
+                    } else {
+                        HStack {
+                            Text("Round")
+                            Spacer()
+                            Text(RoundVocab.label(for: nextAllowedRoundFor(matchType)))
+                                .foregroundStyle(.secondary)
+                        }
+                        Button("Edit earlier round") {
+                            // Ensure selectedRound is in sync before entering backfill.
+                            selectedRound = nextAllowedRoundFor(matchType)
+                            isBackfillMode = true
+                        }
+                        .font(.caption)
+                        .foregroundStyle(Color.accentColor)
                     }
-                    .pickerStyle(.menu)
 
                     Button {
                         showPlayerSearch = true
@@ -181,21 +212,6 @@ struct MatchCreateView: View {
 
                     TextField("Court (e.g. Court 7)", text: $courtLabelText)
                         .autocorrectionDisabled()
-                }
-
-                Section(
-                    header: Text("Next Match"),
-                    footer: Text("If you know your next match time, the rules engine uses it to compute the gap.")
-                ) {
-                    Toggle("I have a next match", isOn: $hasNextMatch.animation())
-
-                    if hasNextMatch {
-                        DatePicker(
-                            "Next match time",
-                            selection: $nextMatchTime,
-                            displayedComponents: [.date, .hourAndMinute]
-                        )
-                    }
                 }
 
                 if let error = errorMessage {
@@ -231,20 +247,12 @@ struct MatchCreateView: View {
                     }
                 }
             }
-            // Keep nextMatchTime pre-filled at scheduledStart + 4 hours when start changes.
-            .onChange(of: scheduledStart) { _, newStart in
-                nextMatchTime = newStart.addingTimeInterval(4 * 3600)
-            }
-            // Phase 7: reset to Normal (index 1) when match type or doubles format changes
-            // so the user always sees a sensible default for the new duration table.
-            .onChange(of: matchType) { _, _ in
-                durationIndex = 1
-            }
-            .onChange(of: doublesFormat) { _, _ in
-                durationIndex = 1
-            }
-            .onAppear {
-                nextMatchTime = scheduledStart.addingTimeInterval(4 * 3600)
+            // round-progression-and-formats spec §J: reset selectedRound to the
+            // next allowed round for the newly-selected stream when not in backfill mode.
+            .onChange(of: matchType) { _, newType in
+                if !isBackfillMode {
+                    selectedRound = nextAllowedRoundFor(newType)
+                }
             }
             // Player Scouting — present player search picker
             .sheet(isPresented: $showPlayerSearch, onDismiss: {
@@ -297,19 +305,16 @@ struct MatchCreateView: View {
         // Trim optional label fields; send nil (not empty string) when blank.
         let opponentLabel = trimmedOrNil(opponentLabelText)
         let courtLabel    = trimmedOrNil(courtLabelText)
-        let nextMatch     = hasNextMatch ? nextMatchTime : nil
 
         do {
             _ = try await appState.repository.createMatch(
                 tournamentId: tournamentId,
                 scheduledStart: scheduledStart,
-                estimatedDurationMinutes: durationOptions[durationIndex].minutes,
                 round: selectedRound,
                 // roundLabel is intentionally nil — the API auto-derives it from `round`
                 roundLabel: nil,
                 opponentLabel: opponentLabel,
                 courtLabel: courtLabel,
-                estimatedNextMatchTime: nextMatch,
                 displayOrder: existingMatchCount + 1,
                 matchType: matchType,
                 doublesFormat: matchType == .doubles ? doublesFormat : nil,
@@ -340,6 +345,23 @@ struct MatchCreateView: View {
                 ?? error.localizedDescription
             isSaving = false
         }
+    }
+
+    // MARK: - Round Progression Helpers
+
+    /// Returns the next allowed round for the given match type.
+    ///
+    /// Formula: drawSize / 2^streamCount, clamped to ≥2 (the Final).
+    ///   - First match in stream (count=0): drawSize (e.g. 32 for a 32-draw)
+    ///   - Second match (count=1): drawSize / 2 (e.g. 16)
+    ///   - etc.
+    ///
+    /// round-progression-and-formats spec §J
+    private func nextAllowedRoundFor(_ type: MatchType) -> Int {
+        let count = type == .singles ? existingSinglesCount : existingDoublesCount
+        var divisor = 1
+        for _ in 0..<count { divisor *= 2 }
+        return max(drawSize / divisor, 2)
     }
 
     // MARK: - Helpers
@@ -442,10 +464,14 @@ private struct PlayerSearchSheet: View {
     let api   = APIClient(authService: auth)
     let repo  = Repository(api: api)
     let state = AppState(repository: repo, authService: auth)
+    let start = Calendar.current.startOfDay(for: Date())
+    let end   = Calendar.current.date(byAdding: .day, value: 2, to: start) ?? start
     return MatchCreateView(
         tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
         drawSize: 64,
-        existingMatchCount: 0
+        existingMatchCount: 0,
+        tournamentStartDate: start,
+        tournamentEndDate: end
     )
     .environmentObject(state)
 }
@@ -455,10 +481,14 @@ private struct PlayerSearchSheet: View {
     let api   = APIClient(authService: auth)
     let repo  = Repository(api: api)
     let state = AppState(repository: repo, authService: auth)
+    let start = Calendar.current.startOfDay(for: Date())
+    let end   = Calendar.current.date(byAdding: .day, value: 2, to: start) ?? start
     return MatchCreateView(
         tournamentId: UUID(uuidString: "11111111-0000-0000-0000-000000000001")!,
         drawSize: 64,
-        existingMatchCount: 0
+        existingMatchCount: 0,
+        tournamentStartDate: start,
+        tournamentEndDate: end
     )
     .environmentObject(state)
     .preferredColorScheme(.dark)

@@ -403,7 +403,6 @@ def test_route_plan_passes_target_dt(client_with_auth, mock_db) -> None:
         "id": str(uuid4()),
         "tournament_id": "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
         "scheduled_start": future_start.isoformat(),
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

@@ -100,6 +100,8 @@ private struct TimelineEventRow: View {
         case .matchEnd:              return "flag.checkered"
         // Phase 7: doubles partner coordination event (DOUBLES_SPEC_V1.md §C.1)
         case .partnerCoordination:   return "person.2.fill"
+        // ACCOMMODATIONS_V1: departure event — leave hotel or home, drive to venue
+        case .departure:             return "car.fill"
         }
     }
 
@@ -118,6 +120,8 @@ private struct TimelineEventRow: View {
         case .matchEnd:              return .gray
         // Phase 7: doubles partner coordination event
         case .partnerCoordination:   return .cyan
+        // ACCOMMODATIONS_V1: departure event — orange matches the .arrive (destination) color
+        case .departure:             return .orange
         }
     }
 }

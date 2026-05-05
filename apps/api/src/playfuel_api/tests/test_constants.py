@@ -6,6 +6,8 @@ Any value drift here signals an uncommitted version bump (§J.3).
 v1.1.0 changes:
 - RULES_CONSTANTS_VERSION bumped from "1.1.0" to "2.0.0" (Phase B metric recalibration)
 - RULES_CONSTANTS_VERSION bumped from "2.0.0" to "2.1.0" (Phase C-infrastructure)
+- RULES_CONSTANTS_VERSION bumped from "2.1.0" to "2.2.0" (ACCOMMODATIONS_V1: added ARRIVE_SNACK_MIN)
+- RULES_CONSTANTS_VERSION bumped from "2.2.1" to "2.2.2" (DR-PLACES-1: places.distanceMeters removed from Google field mask)
 - SCENARIO_DURATIONS_MIN changed from flat dict[str,int] to nested dict
   keyed by (match_type, doubles_format | None).
 """
@@ -13,8 +15,8 @@ from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION, SCENARIO_DURAT
 
 
 def test_rules_constants_version():
-    """§J.1 — version must be exactly '2.1.0' (Phase C-infrastructure: preferred_language, _SYSTEM_PROMPTS, emergency_number_for)."""
-    assert RULES_CONSTANTS_VERSION == "2.1.0"
+    """§J.1 — version must be exactly '2.2.2' (DR-PLACES-1: places.distanceMeters removed from Google field mask)."""
+    assert RULES_CONSTANTS_VERSION == "2.2.2"
 
 
 def test_scenario_durations_min_singles():

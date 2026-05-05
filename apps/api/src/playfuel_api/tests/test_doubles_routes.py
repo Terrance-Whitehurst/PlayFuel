@@ -100,7 +100,6 @@ def _base_match(format_: str, doubles_fmt: str | None, display_order: int = 1) -
         "id": MID1,
         "tournament_id": TID,
         "scheduled_start": "2026-05-15T14:00:00+00:00",
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": format_,
