@@ -15,8 +15,8 @@ from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION, SCENARIO_DURAT
 
 
 def test_version_is_2_0_0():
-    """Version must be '2.1.0' after Phase C-infrastructure additions."""
-    assert RULES_CONSTANTS_VERSION == "2.1.0"
+    """Version must be '2.2.2' after DR-PLACES-1 places.distanceMeters field mask fix."""
+    assert RULES_CONSTANTS_VERSION == "2.2.2"
 
 
 # ── Duration table — all three keys ───────────────────────────────────────────

@@ -4,12 +4,15 @@ import Foundation
 
 /// Primary weather flags per RULES_CONSTANTS_V1 §E.1.
 /// `extreme_heat_risk` is a *derived* flag computed from these primaries (§E.2).
+///
+/// Phase B note: flag thresholds remain imperial in the rules engine constants;
+/// flags are portable booleans and carry no unit dependency into the iOS model layer.
 enum WeatherFlag: String, Codable, CaseIterable {
-    case hot           // temp_f >= 85
-    case very_hot      // temp_f >= 90
+    case hot           // temp_f >= 85  (29.4°C)
+    case very_hot      // temp_f >= 90  (32.2°C)
     case humid         // humidity >= 65%
-    case cold          // temp_f <= 50
-    case windy         // wind_mph >= 15
+    case cold          // temp_f <= 50  (10.0°C)
+    case windy         // wind_mph >= 15 (24.1 km/h)
     case rain_risk     // precipitation_probability >= 40%
 }
 
@@ -17,11 +20,22 @@ enum WeatherFlag: String, Codable, CaseIterable {
 
 /// Weather conditions at tournament time.
 /// Phase 3: decoded from `GET /weather?lat=&lon=` (WeatherKit or OpenWeather).
+///
+/// Phase B: model now carries both imperial and metric units.
+/// `WeatherCardView` uses `@Environment(\.locale)` to select the appropriate unit
+/// for display — no branching in the model itself.
 struct WeatherSnapshot: Codable, Hashable {
 
-    let tempF: Double
+    // MARK: Temperature — both units (Phase B)
+    let tempF: Double          // °F — kept for US display and backward compat
+    let tempC: Double          // °C — canonical metric; new in Phase B
+
     let humidity: Double       // percentage, e.g. 72.0
-    let windMph: Double
+
+    // MARK: Wind — both units (Phase B)
+    let windMph: Double        // mph — kept for US display
+    let windKph: Double        // km/h — canonical metric; new in Phase B
+
     let precipProb: Double     // percentage, e.g. 10.0
     let uvIndex: Double?
 
@@ -40,6 +54,8 @@ struct WeatherSnapshot: Codable, Hashable {
     // MARK: - Plan Adjustments (§E.3)
 
     /// Human-readable adjustment lines shown in WeatherCardView.
+    /// Phase C: these will be extracted to Localizable.xcstrings and localized.
+    /// Phase B scope: still English-only (intentional).
     var adjustments: [String] {
         var lines: [String] = []
 

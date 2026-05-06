@@ -43,7 +43,7 @@ from playfuel_api.rules.plan import build_plan_envelope, build_timeline
 from playfuel_api.rules.scenarios import generate_match_scenarios
 from playfuel_api.services.llm import build_explanation_input, get_llm_provider
 from playfuel_api.services.llm_safety import sanitize_or_fallback
-from playfuel_api.services.places import find_nearby_food
+from playfuel_api.services.places import PlacesUnavailableError, find_nearby_food
 from playfuel_api.settings import get_settings
 from playfuel_api.weather import get_or_fetch_weather
 from playfuel_api.weather.service import WeatherService
@@ -251,9 +251,13 @@ async def generate_plan(
     # 2. Load tournament venue coords + name for weather fetch and LLM input.
     # Phase C-infrastructure: also fetch venue_country (emergency number substitution)
     # and preferred_language (LLM system-prompt selection).
+    # ACCOMMODATIONS_V1: also fetch accommodation_lat/lng/kind for departure event.
     tournament_result = (
         client.table("tournaments")
-        .select("venue_lat, venue_lng, venue_name, venue_country, preferred_language")
+        .select(
+            "venue_lat, venue_lng, venue_name, venue_country, preferred_language, "
+            "accommodation_lat, accommodation_lng, accommodation_kind"
+        )
         .eq("id", str(tid))
         .limit(1)
         .execute()
@@ -263,6 +267,9 @@ async def generate_plan(
     venue_name: str = ""
     venue_country: Optional[str] = None
     preferred_language: Optional[str] = None
+    acc_lat: Optional[float] = None
+    acc_lng: Optional[float] = None
+    acc_kind: Optional[str] = None
     if tournament_result.data:
         raw_lat = tournament_result.data[0].get("venue_lat")
         raw_lng = tournament_result.data[0].get("venue_lng")
@@ -273,6 +280,14 @@ async def generate_plan(
         venue_name = tournament_result.data[0].get("venue_name") or ""
         venue_country = tournament_result.data[0].get("venue_country")  # None for legacy rows
         preferred_language = tournament_result.data[0].get("preferred_language")  # None = English default
+        # Accommodation fields — migration 0021. None when not set (pre-migration rows are safe).
+        raw_acc_lat = tournament_result.data[0].get("accommodation_lat")
+        raw_acc_lng = tournament_result.data[0].get("accommodation_lng")
+        if raw_acc_lat is not None:
+            acc_lat = float(raw_acc_lat)
+        if raw_acc_lng is not None:
+            acc_lng = float(raw_acc_lng)
+        acc_kind = tournament_result.data[0].get("accommodation_kind")  # 'home' | 'hotel' | None
 
     # 3+5 (concurrent). Weather + places fetches are independent of each other.
     #    Run both concurrently via asyncio.gather to save max(wx_ms, places_ms)
@@ -291,27 +306,42 @@ async def generate_plan(
 
     import asyncio
 
-    async def _fetch_places_async() -> list:
-        """Run the sync find_nearby_food in a thread pool so it doesn't block."""
+    async def _fetch_places_async() -> tuple[list, bool]:
+        """Run the sync find_nearby_food in a thread pool so it doesn't block.
+
+        Returns:
+            (places, places_unavailable) — places_unavailable is True when the
+            Google Places API key is set but the provider failed (401/4xx/5xx).
+            The caller sets places_unavailable=True on every Plan in the request.
+        """
         if venue_lat is None or venue_lng is None:
             logger.warning(
                 "plan generated without venue coords — food_options will be empty "
                 "(tournament_id=%s)",
                 tid,
             )
-            return []
-        return await asyncio.to_thread(
-            find_nearby_food,
-            venue_lat,
-            venue_lng,
-            tid,
-            client,
-        )
+            return [], False
+        try:
+            places = await asyncio.to_thread(
+                find_nearby_food,
+                venue_lat,
+                venue_lng,
+                tid,
+                client,
+            )
+            return places, False
+        except PlacesUnavailableError as exc:
+            logger.warning(
+                "plan_gen: places_unavailable — Google Places key set but provider failed: %s"
+                " (tournament_id=%s) — setting placesUnavailable=true on plan envelope",
+                exc, tid,
+            )
+            return [], True
 
     _wx_t0 = time.perf_counter()
     _pl_t0 = time.perf_counter()
     try:
-        snapshot, raw_places = await asyncio.gather(
+        snapshot, (raw_places, places_unavailable) = await asyncio.gather(
             get_or_fetch_weather(
                 client,
                 tid,
@@ -437,7 +467,19 @@ async def generate_plan(
         )
 
         # 8. Build timeline (single-match context; partnerCoordination fires for doubles).
-        timeline = build_timeline([match], scenarios)
+        # ACCOMMODATIONS_V1: pass accommodation + venue coords so departure event can be emitted.
+        # weather_flags_dict passed for heat-addendum threshold check.
+        # When acc_lat is None, estimate_drive_minutes() returns 0 — byte-for-byte regression-safe.
+        timeline = build_timeline(
+            [match],
+            scenarios,
+            accommodation_lat=acc_lat,
+            accommodation_lng=acc_lng,
+            venue_lat=venue_lat,
+            venue_lng=venue_lng,
+            accommodation_kind=acc_kind,
+            weather_flags=weather_flags,
+        )
 
         # 9. Food options (same raw_places; bucket selection per this match's scenarios).
         food_buckets: list[str] = sorted({
@@ -486,6 +528,11 @@ async def generate_plan(
             scheduled_start=match.scheduled_start.strftime("%Y-%m-%dT%H:%M:%SZ"),
             # match-done-state-cards spec §C: forward parent-toggle done state
             is_done=match.is_done,
+            # OQ-FOOD-EMPTY-1: signal iOS empty-state when Google Places key is set
+            # but the provider failed (401/4xx/5xx/timeout with no stale cache).
+            # False when MockPlacesProvider is active (dev/test) or when Places
+            # returned results normally.
+            places_unavailable=places_unavailable,
         )
 
         # 11. Derive NextAction deterministically — rules engine, never LLM.

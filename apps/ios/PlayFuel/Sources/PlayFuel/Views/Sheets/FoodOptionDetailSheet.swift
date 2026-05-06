@@ -58,6 +58,13 @@ struct FoodOptionDetailSheet: View {
                         .foregroundStyle(.secondary)
                     }
 
+                    // Chain menu caption — only for registry-matched chains
+                    if option.chainMatched {
+                        Text("Items typical at \(option.name)")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+
                     Divider()
 
                     // What to order (mainOptions)
@@ -111,6 +118,18 @@ struct FoodOptionDetailSheet: View {
                         }
                     }
 
+                    // Chain disclaimer + optional stale-data note — gated on chainMatched
+                    if option.chainMatched {
+                        Text("Items shown are typical menu items at this chain. Menus and ingredients vary by location and change over time. Verify allergens with the restaurant before ordering.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        if let staleNote = staleDataNote {
+                            Text(staleNote)
+                                .font(.caption)
+                                .foregroundStyle(.orange)
+                        }
+                    }
+
                     Divider()
 
                     // "Open in Maps" footer action
@@ -144,6 +163,18 @@ struct FoodOptionDetailSheet: View {
     }
 
     // MARK: - Helpers
+
+    /// Returns a staleness warning string when `chainAsOf` is 9 months old or more; nil otherwise.
+    /// Defensive: ISO parse failures and nil input both return nil (never crashes).
+    private var staleDataNote: String? {
+        guard let asOf = option.chainAsOf else { return nil }
+        let formatter = DateFormatter()
+        formatter.dateFormat = "yyyy-MM-dd"
+        formatter.locale = Locale(identifier: "en_US_POSIX")
+        guard let asOfDate = formatter.date(from: asOf) else { return nil }
+        let months = Calendar.current.dateComponents([.month], from: asOfDate, to: Date()).month ?? 0
+        return months >= 9 ? "Menu data is older than 9 months — verify with the restaurant." : nil
+    }
 
     private var categoryLabel: String {
         switch option.category {

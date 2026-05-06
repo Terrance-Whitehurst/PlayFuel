@@ -52,4 +52,15 @@ struct FoodOption: Codable, Identifiable, Hashable {
 
     /// Venue longitude for map pins.
     let lng: Double?
+
+    // MARK: - Chain Menu Registry (chain-menu-items spec)
+
+    /// True when this option matched a populated entry in the national chain-menu registry.
+    /// False for local non-chain restaurants or registry stubs (`as_of: "TBD"`).
+    let chainMatched: Bool
+
+    /// ISO date string ("yyyy-MM-dd") recording when the registry entry was sourced
+    /// from the chain's published menu (e.g. "2026-05-04").
+    /// Nil when `chainMatched` is false.
+    let chainAsOf: String?
 }

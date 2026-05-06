@@ -44,6 +44,13 @@ struct TournamentDTO: Decodable {
     let startDate: String    // ISO date string kept as-is; matches iOS Tournament.startDate
     let endDate: String?
     let drawSize: Int?       // draw_size → drawSize via .convertFromSnakeCase (migration 0016)
+    let timeZone: String?    // time_zone → timeZone (migration 0018; nil for legacy rows)
+    let venueCountry: String? // venue_country → venueCountry (migration 0018; nil for legacy rows)
+    // ACCOMMODATIONS_V1 — migration 0021. All nullable; nil = no accommodation set.
+    let accommodationLat: Double?     // accommodation_lat → accommodationLat
+    let accommodationLng: Double?     // accommodation_lng → accommodationLng
+    let accommodationAddress: String? // accommodation_address → accommodationAddress
+    let accommodationKind: String?    // accommodation_kind → accommodationKind ("home" | "hotel" | nil)
     let createdAt: Date?
     let updatedAt: Date?
 
@@ -59,7 +66,13 @@ struct TournamentDTO: Decodable {
             lon: venueLng ?? 0.0,
             startDate: startDate,
             endDate: endDate,
-            drawSize: drawSize
+            drawSize: drawSize,
+            timeZone: timeZone,
+            venueCountry: venueCountry,
+            accommodationLat: accommodationLat,
+            accommodationLng: accommodationLng,
+            accommodationAddress: accommodationAddress,
+            accommodationKind: accommodationKind
         )
     }
 }
@@ -79,7 +92,6 @@ struct MatchDTO: Decodable {
     let id: UUID
     let tournamentId: UUID
     let scheduledStart: Date          // ISO 8601 full timestamp
-    let estimatedDurationMinutes: Int?
     let actualEndAt: Date?
     let surface: String?
     let format: String?
@@ -166,6 +178,10 @@ struct PlanCoreDTO: Decodable {
     let matchId: UUID?                  // nil for legacy plans pre-migration-0008
     let nextAction: NextActionDTO?      // nil when no future events in 6h lookahead window
     let scheduledStart: String?         // ISO 8601 timestamp of the match start; for strip ordering
+    // match-done-state-cards spec §C: nil for pre-done-state API responses (decodeIfPresent → false)
+    let isDone: Bool?
+    // OQ-FOOD-EMPTY-1: true when Google Places API call failed; decodeIfPresent → false for legacy plans
+    let placesUnavailable: Bool?
 
     enum CodingKeys: String, CodingKey {
         case planId, tournamentId, generatedAt, rulesConstantsVersion
@@ -175,6 +191,8 @@ struct PlanCoreDTO: Decodable {
         case matchId
         case nextAction
         case scheduledStart
+        case isDone
+        case placesUnavailable
     }
 
     // Custom init: normalise generatedAt to String; use decodeIfPresent for
@@ -202,6 +220,10 @@ struct PlanCoreDTO: Decodable {
         self.scheduledStart        = try c.decodeIfPresent(String.self, forKey: .scheduledStart)
         // `generated_at` is a Python `datetime` → Pydantic serialises as ISO 8601 string in JSON.
         self.generatedAt = try c.decode(String.self, forKey: .generatedAt)
+        // match-done-state-cards spec §C: decodeIfPresent → nil for pre-done-state API responses
+        self.isDone                = try c.decodeIfPresent(Bool.self, forKey: .isDone)
+        // OQ-FOOD-EMPTY-1: decodeIfPresent → nil for legacy plans that predate this field
+        self.placesUnavailable     = try c.decodeIfPresent(Bool.self, forKey: .placesUnavailable)
     }
 
     /// Map wire-format DTO → canonical iOS Plan domain model.
@@ -221,7 +243,9 @@ struct PlanCoreDTO: Decodable {
             matchType: MatchType(rawValue: matchType) ?? .singles,
             matchId: matchId ?? UUID(),   // Phase 8: fallback UUID for legacy plans
             nextAction: nextAction?.toModel(),
-            scheduledStart: scheduledStart
+            scheduledStart: scheduledStart,
+            isDone: isDone ?? false,      // match-done-state-cards spec §C: back-compat with pre-done-state API
+            placesUnavailable: placesUnavailable ?? false  // OQ-FOOD-EMPTY-1: false for legacy plans
         )
     }
 }
@@ -232,7 +256,7 @@ struct PlanCoreDTO: Decodable {
 // error). Renders as 0°F / 0% humidity / no flags — EmergencyBanner will NOT
 // fire. A future OQ should surface a "weather unavailable" state in the UI.
 private let _weatherUnavailable = WeatherSnapshot(
-    tempF: 0, humidity: 0, windMph: 0, precipProb: 0, uvIndex: nil, flags: []
+    tempF: 0, tempC: 0, humidity: 0, windMph: 0, windKph: 0, precipProb: 0, uvIndex: nil, flags: []
 )
 
 // MARK: - Phase 4/5 DTOs
@@ -257,9 +281,18 @@ struct WeatherBlockDTO: Decodable {
     let windMph: Double?       // nil when provider did not return wind data (rare)
     let precipProb: Double?    // precipitation probability 0–100; nil on older cached snapshots
 
+    // Phase B — metric fields (optional for back-compat with pre-Phase-B API responses).
+    // If the backend sends them, they decode directly. If absent (older API),
+    // toModel() computes metric from imperial via standard conversion factors.
+    // Backend coordination note: BD wire keys are `temp_c` / `wind_kmh` which
+    // the camelCase decoder resolves to `tempC` / `windKmh` here.
+    let tempC: Double?         // °C — nil on pre-Phase-B API; computed client-side if absent
+    let windKmh: Double?       // km/h — nil on pre-Phase-B API; computed client-side if absent
+
     /// Map API WeatherBlock → iOS WeatherSnapshot.
     /// Boolean flags are reconstructed into the [WeatherFlag] array.
     /// windMph / precipProb default to 0.0 when the field is absent (older snapshots / cache hits).
+    /// Phase B: metric values fall back to client-side conversion if API does not send them.
     func toModel() -> WeatherSnapshot {
         var flags: [WeatherFlag] = []
         if flagVeryHot { flags.append(.very_hot) }
@@ -268,10 +301,18 @@ struct WeatherBlockDTO: Decodable {
         if flagCold     { flags.append(.cold) }
         if flagWindy    { flags.append(.windy) }
         if flagRainRisk { flags.append(.rain_risk) }
+
+        let resolvedWindMph = windMph ?? 0.0
+        // Compute metric fallbacks if backend doesn't send them (pre-Phase-B API compat)
+        let resolvedTempC  = tempC  ?? ((tempF - 32.0) * 5.0 / 9.0)
+        let resolvedWindKph = windKmh ?? (resolvedWindMph * 1.60934)
+
         return WeatherSnapshot(
             tempF: tempF,
+            tempC: resolvedTempC,
             humidity: humidityPct,
-            windMph: windMph ?? 0.0,
+            windMph: resolvedWindMph,
+            windKph: resolvedWindKph,
             precipProb: precipProb ?? 0.0,
             uvIndex: nil,      // uv_index deferred to migration 0013 (OQ-WX-4)
             flags: flags
@@ -322,6 +363,9 @@ struct FoodOptionDTO: Decodable {
     let suggestions: FoodSuggestionsDTO?  // nil for pre-Phase-9 plans
     let lat: Double?                       // venue latitude for map pins
     let lng: Double?                       // venue longitude for map pins
+    // Chain menu registry fields (chain-menu-items spec)
+    let chainMatched: Bool?   // nil → false for pre-chain API responses (decodeIfPresent)
+    let chainAsOf: String?    // nil when chainMatched is false
 
     /// Map API FoodOption → iOS FoodOption domain model.
     /// A fresh `UUID()` is injected for SwiftUI list identity (no server-side ID).
@@ -338,7 +382,9 @@ struct FoodOptionDTO: Decodable {
             provider: provider,
             suggestions: suggestions?.toModel(),
             lat: lat,
-            lng: lng
+            lng: lng,
+            chainMatched: chainMatched ?? false,
+            chainAsOf: chainAsOf
         )
     }
 }
@@ -389,10 +435,9 @@ struct TimelineEventDTO: Decodable {
 
 /// Request body for POST /v1/tournaments.
 /// Widened in feat/places-live to include MapKit-resolved venue address fields.
-/// NOTE: `time_zone` is collected by the iOS form but is NOT in the API's TournamentCreate
-/// Pydantic model (migration pending). Omitted here — the iOS form retains it for future use.
-/// postEncoder uses .convertToSnakeCase so camelCase → snake_case automatically:
-///   venueName → venue_name, venueAddress → venue_address, etc.
+/// Phase A international: `timeZone` and `venueCountry` now persisted by the API
+/// (migration 0018). postEncoder uses .convertToSnakeCase so camelCase → snake_case:
+///   venueName → venue_name, timeZone → time_zone, venueCountry → venue_country, etc.
 struct TournamentCreateRequest: Encodable {
     let name: String
     let venueName: String        // → venue_name
@@ -406,6 +451,18 @@ struct TournamentCreateRequest: Encodable {
     let startDate: String        // → start_date ("yyyy-MM-dd" string; API type is `date`)
     let endDate: String          // → end_date
     let drawSize: Int            // → draw_size (migration 0016; required by API)
+    let timeZone: String         // → time_zone  (IANA identifier; migration 0018)
+    let venueCountry: String?    // → venue_country (ISO 3166-1 alpha-2; migration 0018)
+    // ACCOMMODATIONS_V1 — migration 0021.
+    // All optional. Nil → field omitted from JSON body (standard Encodable behavior).
+    // Backend TournamentCreate has Optional[float] = None defaults — omit == None ≡ NULL.
+    // OQ-ACC-7 iOS note: for a future UPDATE clear path, a custom Encodable that encodes
+    // nil as JSON null (rather than omitting the key) will be needed in Repository.
+    // That is deferred to OQ-ACC-8 (tournament edit view). V1 covers CREATE only.
+    let accommodationLat: Double?      // → accommodation_lat
+    let accommodationLng: Double?      // → accommodation_lng
+    let accommodationAddress: String?  // → accommodation_address
+    let accommodationKind: String?     // → accommodation_kind ("home" | "hotel" | nil)
 }
 
 /// Request body for POST /v1/tournaments/{tid}/matches.
@@ -415,7 +472,6 @@ struct TournamentCreateRequest: Encodable {
 /// Player Scouting: `opponentPlayerId` added per PLAYER_SCOUTING_V1.md §E.4.
 struct MatchCreateRequest: Encodable {
     let scheduledStart: Date            // → scheduled_start (ISO 8601 datetime)
-    let estimatedDurationMinutes: Int?  // → estimated_duration_minutes
     let roundLabel: String?             // → round_label
     let opponentLabel: String?          // → opponent_label
     let courtLabel: String?             // → court_label
@@ -617,14 +673,10 @@ extension MatchDTO {
     /// Phase 7: `format` and `doublesFormat` are passed explicitly so the doubles-spec
     /// fields round-trip through the match card UI without loss.
     func toModel() -> Match {
-        let fmt = DateFormatter()
-        fmt.dateFormat = "h:mm a"
-        fmt.amSymbol = "AM"
-        fmt.pmSymbol = "PM"
         return Match(
             id: id,
             tournamentId: tournamentId,
-            scheduledTime: fmt.string(from: scheduledStart),
+            scheduledTime: DateFormatting.clockTime(scheduledStart),
             estimatedNextMatchTime: nil,
             round: roundLabel,
             opponent: opponentLabel,

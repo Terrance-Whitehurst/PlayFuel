@@ -4,7 +4,7 @@ Phase 5 / Task #8 — food options via venue-adjacent restaurant lookup.
 
 Provider selection (settings.PLACES_PROVIDER):
     "auto"   → GooglePlacesProvider if GOOGLE_PLACES_API_KEY set, else MockPlacesProvider
-    "google" → GooglePlacesProvider (key required; raises PlacesProviderError if absent)
+    "google" → GooglePlacesProvider (key required; falls back to Mock if key absent)
     "mock"   → MockPlacesProvider always (deterministic fixture — used in tests + demo)
 
 The Dallas demo works end-to-end with MockPlacesProvider — no API key required.
@@ -16,11 +16,13 @@ Cache strategy:
   - TTL: 24 h (restaurants don't change daily; 24 h balances freshness vs. quota)
   - Read-through: check cache before HTTP call; return cached payload on hit
   - Write-on-miss: upsert into cache after successful Google Places call
-  - Failure modes:
-      4xx → log + fall back to MockPlacesProvider (no raise — food non-critical)
-      5xx/timeout + cache stale → return stale + log warning
-      5xx/timeout + cache empty → fall back to MockPlacesProvider (no raise)
-      401 → log "API key invalid — check rotation" + fall back to MockPlacesProvider
+  - Failure modes (OQ-FOOD-EMPTY-1: production Google failures raise, never mock-fallback):
+      4xx (incl. 401) → log + raise PlacesUnavailableError (plan sets placesUnavailable=True)
+      5xx/timeout + cache stale → return stale data + log WARNING
+      5xx/timeout + cache empty → raise PlacesUnavailableError (plan sets placesUnavailable=True)
+      401 specifically → log "API key invalid — check rotation" + raise PlacesUnavailableError
+  - MockPlacesProvider: NEVER selected on Google failure (prevents silent fake-data bug).
+    Mock is ONLY used when PLACES_PROVIDER=mock or GOOGLE_PLACES_API_KEY is unset.
 
 # TODO: rotate the GOOGLE_PLACES_API_KEY after smoke test (key was shared in chat)
 """
@@ -92,6 +94,20 @@ class PlacesProviderError(Exception):
     """
 
 
+class PlacesUnavailableError(Exception):
+    """Raised by GooglePlacesProvider when the API key is set but the real
+    provider fails (401, 4xx, 5xx, or timeout with no stale cache).
+
+    Distinct from PlacesProviderError (generic provider issues). The plan-gen
+    route catches this to set places_unavailable=True on the Plan envelope so
+    iOS renders an explicit "unavailable" empty state instead of silently
+    showing nothing.
+
+    Never raised by MockPlacesProvider — only fires in production when
+    GOOGLE_PLACES_API_KEY is set but the Google API cannot be reached.
+    """
+
+
 # ── Protocol (structural interface) ───────────────────────────────────────────
 
 
@@ -122,8 +138,15 @@ _FIELD_MASK = (
     "places.types,"
     "places.location,"
     "places.rating,"
-    "places.priceLevel,"
-    "places.distanceMeters"   # NEW — enables distance-based sort (FOOD_PLACES_FILTER_V1 §F.1)
+    "places.priceLevel"
+    # places.distanceMeters intentionally OMITTED — invalid in Google Places (New)
+    # searchNearby API. Including it causes 400 INVALID_ARGUMENT on every call.
+    # Distance sort uses haversine(_distance_key in rules/food.py) from
+    # places.location lat/lng instead. RawPlace.distance_meters will be None
+    # for all GooglePlacesProvider results; _distance_key falls back to
+    # haversine when distance_meters is None (FOOD_PLACES_FILTER_V1 §E.3).
+    # DR-PLACES-1: do NOT add places.distanceMeters here — verify against the
+    # official Places (New) field-mask docs before re-adding any field.
 )
 # Place types to include (Google Places (New) type list).
 # Food-primary only — FOOD_PLACES_FILTER_V1.md §C.
@@ -147,8 +170,9 @@ _INCLUDED_TYPES: list[str] = [
     "american_restaurant",
     "breakfast_restaurant",
     "brunch_restaurant",
-    # ── Hydration/snack ──────────────────────────────────────────────────────
-    "juice_bar",
+    # ── Hydration/snack ────────────────────────────────────────────
+    # juice_bar intentionally OMITTED — not a valid includedType in Google Places (New);
+    # returns 400 INVALID_ARGUMENT when included. DR-PLACES-1.
     "ice_cream_shop",
     "diner",
 ]
@@ -200,11 +224,11 @@ class GooglePlacesProvider:
         On cache hit: return cached payload (no HTTP call).
         On cache miss: call Google, upsert result, return fresh data.
 
-    Error handling:
-        4xx (incl. 401): log + fall back to MockPlacesProvider (no raise)
-        401 specifically: log "API key invalid — check rotation"
+    Error handling (OQ-FOOD-EMPTY-1: no silent mock fallback):
+        4xx (incl. 401): log + raise PlacesUnavailableError (plan sets placesUnavailable=True)
+        401 specifically: log "API key invalid — check rotation" + raise PlacesUnavailableError
         5xx / timeout + cache has stale row: return stale + log warning
-        5xx / timeout + cache empty: fall back to MockPlacesProvider (no raise)
+        5xx / timeout + cache empty: raise PlacesUnavailableError (plan sets placesUnavailable=True)
 
     API key: settings.google_places_api_key
     # TODO: rotate GOOGLE_PLACES_API_KEY after smoke test (key was shared in chat)
@@ -363,15 +387,12 @@ class GooglePlacesProvider:
         if resp.status_code == 401:
             _logger.warning(
                 "Google Places API returned 401 — API key invalid or expired. "
-                "Check GOOGLE_PLACES_API_KEY rotation. "
-                "Fly secret: flyctl secrets set GOOGLE_PLACES_API_KEY=<new-key> --app playfuel-api"
+                "Rotate: flyctl secrets set GOOGLE_PLACES_API_KEY=<new-key> --app playfuel-api"
             )
-            _logger.warning(
-                "Google Places 401 — falling back to MockPlacesProvider for venue (%.4f, %.4f)",
-                lat,
-                lng,
+            raise PlacesUnavailableError(
+                "Google Places 401 — API key invalid or expired. "
+                "See Fly logs for rotation instructions."
             )
-            return list(MockPlacesProvider().search_nearby(lat, lng, radius_m, max_results, tournament_id=tournament_id))
 
         if resp.status_code >= 400 and resp.status_code < 500:
             _logger.warning(
@@ -379,13 +400,9 @@ class GooglePlacesProvider:
                 resp.status_code,
                 resp.text[:200],
             )
-            _logger.warning(
-                "Google Places %d — falling back to MockPlacesProvider for venue (%.4f, %.4f)",
-                resp.status_code,
-                lat,
-                lng,
+            raise PlacesUnavailableError(
+                f"Google Places {resp.status_code} client error"
             )
-            return list(MockPlacesProvider().search_nearby(lat, lng, radius_m, max_results, tournament_id=tournament_id))
 
         if resp.status_code >= 500:
             _logger.warning(
@@ -441,9 +458,12 @@ class GooglePlacesProvider:
         *,
         is_timeout: bool,
     ) -> list[RawPlace]:
-        """On HTTP 5xx or timeout: return stale cache if available, else fall back to MockPlacesProvider.
+        """On HTTP 5xx or timeout: return stale cache if available.
 
-        Never raises — MockPlacesProvider is the final safety net when Google is unavailable.
+        When no stale cache is available, raises PlacesUnavailableError so the
+        plan-gen route can set places_unavailable=True on the Plan envelope.
+        Does NOT fall back to MockPlacesProvider — that would mask production
+        API failures with fake restaurant data.
         """
         if tournament_id is not None:
             stale = self._read_stale_cache(tournament_id, place_type)
@@ -453,14 +473,15 @@ class GooglePlacesProvider:
                     tournament_id,
                 )
                 return stale
+        reason = "timeout" if is_timeout else "server error"
         _logger.warning(
-            "Google Places HTTP error (is_timeout=%s) — no stale cache; "
-            "falling back to MockPlacesProvider for venue (%.4f, %.4f)",
-            is_timeout,
-            lat,
-            lng,
+            "Google Places %s — no stale cache for venue (%.4f, %.4f); "
+            "raising PlacesUnavailableError so plan sets placesUnavailable=true",
+            reason, lat, lng,
         )
-        return list(MockPlacesProvider().search_nearby(lat, lng, radius_m, max_results))
+        raise PlacesUnavailableError(
+            f"Google Places {reason} — no stale cache available"
+        )
 
 
 # ── MockPlacesProvider (deterministic Dallas demo fixture) ─────────────────────
@@ -634,6 +655,11 @@ def find_nearby_food(
             tournament_id=tournament_id,
         )
         return list(results)
+    except PlacesUnavailableError:
+        raise  # Propagate to _fetch_places_async() in routes/plans.py so the
+               # plan envelope sets placesUnavailable=True for iOS empty-state.
+               # Only raised by GooglePlacesProvider when GOOGLE_PLACES_API_KEY
+               # is set — never from MockPlacesProvider (dev/test path).
     except (PlacesProviderError, NotImplementedError) as exc:
         _logger.warning("Places provider error: %s — returning empty food list", exc)
         return []

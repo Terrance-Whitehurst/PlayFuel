@@ -48,7 +48,6 @@ def _match(mid: str, start: str, display_order: int) -> dict:
         "id": mid,
         "tournament_id": AUSTIN_TID,
         "scheduled_start": start,
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

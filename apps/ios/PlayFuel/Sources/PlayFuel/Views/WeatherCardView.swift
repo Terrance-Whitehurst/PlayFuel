@@ -1,3 +1,4 @@
+// TODO: glass-migrate after re-recording snapshots
 import SwiftUI
 
 /// US-07 — Weather card.
@@ -22,6 +23,11 @@ struct WeatherCardView: View {
 
     /// Expansion state for compact mode. Per-session, default collapsed.
     @State private var expanded: Bool = false
+    @Environment(\.openURL) private var openURL
+    /// Phase B: locale drives metric vs imperial display.
+    /// Using @Environment(\locale) (not Locale.current) makes the unit selection
+    /// testable via .environment(\.locale, ...) in previews and snapshot tests.
+    @Environment(\.locale) private var locale
 
     var body: some View {
         if compact {
@@ -68,9 +74,41 @@ struct WeatherCardView: View {
         .padding(.horizontal, 16)
     }
 
-    /// 1-line pill summary: "°88°F · humid, hot · feels 95°F"
+    // MARK: - Unit-aware display helpers (Phase B)
+
+    /// Locale-aware temperature string.
+    /// Metric (non-US) → °C. US → °F.
+    /// UK (.uk measurementSystem) is treated as metric for Phase B;
+    /// the three-toggle Settings UI for hybrid UK display is Phase C.
+    private var formattedTemp: String {
+        let usesMetric = locale.measurementSystem != .us
+        let measurement = usesMetric
+            ? Measurement(value: weather.tempC, unit: UnitTemperature.celsius)
+            : Measurement(value: weather.tempF, unit: UnitTemperature.fahrenheit)
+        let fmt = MeasurementFormatter()
+        fmt.locale = locale
+        fmt.unitOptions = .providedUnit
+        fmt.numberFormatter.maximumFractionDigits = 0
+        return fmt.string(from: measurement)
+    }
+
+    /// Locale-aware wind speed string.
+    /// Metric (non-US) → km/h. US → mph.
+    private var formattedWind: String {
+        let usesMetric = locale.measurementSystem != .us
+        let measurement = usesMetric
+            ? Measurement(value: weather.windKph, unit: UnitSpeed.kilometersPerHour)
+            : Measurement(value: weather.windMph, unit: UnitSpeed.milesPerHour)
+        let fmt = MeasurementFormatter()
+        fmt.locale = locale
+        fmt.unitOptions = .providedUnit
+        fmt.numberFormatter.maximumFractionDigits = 0
+        return fmt.string(from: measurement)
+    }
+
+    /// 1-line pill summary: "❤️ 32 °C · humid, very_hot" (es-MX) or "❤️ 90 °F · ..." (en-US)
     private var pillSummary: String {
-        var parts: [String] = ["❤️ \(Int(weather.tempF))°F"]
+        var parts: [String] = ["❤️ \(formattedTemp)"]
         if !weather.flags.isEmpty {
             let flagNames = weather.flags.map { $0.rawValue.replacingOccurrences(of: "_", with: " ") }.joined(separator: ", ")
             parts.append(flagNames)
@@ -109,17 +147,20 @@ struct WeatherCardView: View {
                         .background(Color.red)
                         .clipShape(Capsule())
                 }
+                Image(systemName: "chevron.right")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             // Big temperature display
             HStack(alignment: .firstTextBaseline, spacing: 4) {
-                Text("\(Int(weather.tempF))°F")
+                Text(formattedTemp)
                     .font(.system(size: 48, weight: .bold, design: .rounded))
                     .foregroundStyle(tempColor)
                 Spacer()
                 VStack(alignment: .trailing, spacing: 4) {
                     StatBadge(icon: "humidity.fill", value: "\(Int(weather.humidity))%", label: "Humidity")
-                    StatBadge(icon: "wind", value: "\(Int(weather.windMph)) mph", label: "Wind")
+                    StatBadge(icon: "wind", value: formattedWind, label: "Wind")
                     StatBadge(icon: "cloud.drizzle.fill", value: "\(Int(weather.precipProb))%", label: "Rain")
                     if let uv = weather.uvIndex {
                         StatBadge(icon: "sun.max.fill", value: "UV \(Int(uv))", label: "UV Index")
@@ -171,6 +212,8 @@ struct WeatherCardView: View {
         .padding(16)
         .background(Color(.secondarySystemBackground))
         .clipShape(RoundedRectangle(cornerRadius: 16))
+        .contentShape(RoundedRectangle(cornerRadius: 16))
+        .onTapGesture { openWeatherApp() }
         .padding(.horizontal, 16)
     }
 
@@ -181,6 +224,30 @@ struct WeatherCardView: View {
         if weather.flags.contains(.hot) { return .orange }
         if weather.flags.contains(.cold) { return .blue }
         return .primary
+    }
+
+    // MARK: - Weather App Deep Link
+
+    /// Opens Apple's native Weather app via the `weather://` URL scheme.
+    /// Falls back to weather.com in Safari if the Weather app is unavailable
+    /// (e.g. deleted by the user — rare on iPhone but possible).
+    ///
+    /// App Store risk: `weather://` is not officially documented but is widely
+    /// used in production iOS apps without review issues.
+    ///
+    /// Limitation: coordinates cannot be passed — Weather opens to its last
+    /// shown location. Passing coords would require WeatherKit (future scope).
+    private func openWeatherApp() {
+        let weatherURL = URL(string: "weather://")!
+        #if os(iOS)
+        if UIApplication.shared.canOpenURL(weatherURL) {
+            openURL(weatherURL)
+        } else {
+            openURL(URL(string: "https://weather.com")!)
+        }
+        #else
+        openURL(URL(string: "https://weather.com")!)
+        #endif
     }
 }
 

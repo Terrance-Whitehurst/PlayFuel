@@ -20,6 +20,11 @@ enum TimelineEventKind: String, Codable, CaseIterable {
     // Emitted by the backend at T−60m when match_type == "doubles".
     // TimelineView.swift exhaustive switches must handle this case.
     case partnerCoordination  // Doubles-only: confirm with doubles partner
+    // ACCOMMODATIONS_V1 — departure event (§E.2)
+    // Emitted when accommodation is set; anchored at match_start - ARRIVE_SNACK_MIN - drive_minutes.
+    // iOS renders with car or figure.walk icon (see TimelineView kindIcon switch).
+    // Added in lockstep with Python enums.py TimelineEventKind.departure = "departure".
+    case departure  // Leave accommodation — drive to venue
 }
 
 // MARK: - TimelineEvent

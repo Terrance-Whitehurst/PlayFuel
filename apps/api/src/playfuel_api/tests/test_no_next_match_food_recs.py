@@ -45,7 +45,6 @@ def _match(
         "id": match_id,
         "tournament_id": TID,
         "scheduled_start": scheduled_start,
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

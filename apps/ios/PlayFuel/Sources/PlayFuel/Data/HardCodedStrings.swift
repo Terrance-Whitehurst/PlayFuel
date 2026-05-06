@@ -35,4 +35,24 @@ enum HardCodedStrings {
     static let bagFoodFallback = """
     Use immediate bag food only: banana, pretzels, applesauce pouch, electrolyte drink, simple sandwich if tolerated.
     """
+
+    // MARK: - Cool-down Heat Overlay
+    // Source: SCENARIO_COOLDOWN_V1.md §C.4
+    // Parent-tone post-match cooling guidance — NOT the emergency text (heatEmergencyText).
+    // DO NOT substitute heatEmergencyText here. Always access via this constant.
+    // Tests assert step.detail == HardCodedStrings.heatCooldownStep (not a literal)
+    // so future copy edits propagate automatically.
+    static let heatCooldownStep = "Get them into the shade and offer cool water or an electrolyte drink before anything else."
+
+    // MARK: - Accommodations (ACCOMMODATIONS_V1.md §G.1)
+    // Used in TournamentCreateView accommodation section.
+    // All strings are verbatim from spec §G.1. Do NOT inline these in any View.
+    static let accommodationsSectionHeader    = "Where You'll Be Staying"
+    static let accommodationsSectionFooter    = "Optional. Used to calculate your drive time and set a departure reminder."
+    static let accommodationsToggleHome       = "Home"
+    static let accommodationsToggleHotel      = "Hotel"
+    static let accommodationsPlaceholderHome  = "Search your home address…"
+    static let accommodationsPlaceholderHotel = "Search hotel address…"
+    static let accommodationsSkipCTA          = "Skip — staying near the venue"
+    static let accommodationsChangeButton     = "Change location"
 }

@@ -1,0 +1,159 @@
+{
+  "version": "1.0.0",
+  "cards": [
+    {
+      "id": "pre_match_hydrate",
+      "deck": "pre_match",
+      "title": "Hydrate",
+      "icon_sf_symbol": "drop.fill",
+      "short": "Sip water now. Don't wait until you're thirsty.",
+      "long": "Sip water steadily in the time before the match. Small amounts often. Avoid large gulps right before you walk on court.",
+      "heat_aware": true,
+      "heat_suffix": " It's warm out today \u2014 staying on top of fluids matters even before you start playing.",
+      "min_gap_minutes": null
+    },
+    {
+      "id": "pre_match_snack_timing",
+      "deck": "pre_match",
+      "title": "Snack timing",
+      "icon_sf_symbol": "fork.knife",
+      "short": "Pre-match snack 60\u201390 min before match time.",
+      "long": "If you haven't eaten yet, now's the window. Something easy \u2014 a banana, crackers, a small sandwich. Light enough to sit well on court.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "pre_match_movement",
+      "deck": "pre_match",
+      "title": "Light movement",
+      "icon_sf_symbol": "figure.walk",
+      "short": "5\u201310 min of light movement to wake the body up.",
+      "long": "A short walk, easy jogging, whatever your kid usually does before a match. You know what works for them \u2014 now's the time. Nothing intense.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "pre_match_pack_check",
+      "deck": "pre_match",
+      "title": "Pack check",
+      "icon_sf_symbol": "bag.fill",
+      "short": "Rackets, towel, water, snack, sunscreen.",
+      "long": "Quick bag check before heading to the court. Rackets, towel, water bottle, snack for after, sunscreen. Anything missing? Now's the time to grab it.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "pre_match_mental_prep",
+      "deck": "pre_match",
+      "title": "Mental prep",
+      "icon_sf_symbol": "brain.head.profile",
+      "short": "Take 3 deep breaths. One match at a time.",
+      "long": "One match at a time. What's done in practice is done. Take 3 slow deep breaths, shake out the hands, and walk on court ready to compete.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "between_cool_down",
+      "deck": "between_matches",
+      "title": "Cool down",
+      "icon_sf_symbol": "figure.cooldown",
+      "short": "Walk for a few minutes off-court. Don't sit right away.",
+      "long": "A short walk off-court helps the body start recovering. Don't plop down immediately \u2014 a few minutes of easy walking before you rest makes a difference.",
+      "heat_aware": true,
+      "heat_suffix": " Find shade as soon as you can \u2014 get out of direct sun.",
+      "min_gap_minutes": null
+    },
+    {
+      "id": "between_refuel",
+      "deck": "between_matches",
+      "title": "Refuel",
+      "icon_sf_symbol": "fork.knife.circle",
+      "short": "Check your food card \u2014 eat if the gap allows.",
+      "long": "If you have time, eating something real between matches is worth it. Check your food card for nearby options. Something with carbs and a little protein. Keep it light.",
+      "heat_aware": false,
+      "min_gap_minutes": 45
+    },
+    {
+      "id": "between_shade_rest",
+      "deck": "between_matches",
+      "title": "Rest in shade",
+      "icon_sf_symbol": "sun.max.trianglebadge.exclamationmark.fill",
+      "short": "Rest in shade. Feet up if possible.",
+      "long": "Find a shaded spot and get off your feet. Elevate your legs if you can \u2014 lean them against a bag, a chair, whatever's around. Even 10 minutes makes a difference.",
+      "heat_aware": true,
+      "heat_suffix": " Today's conditions make shade especially important \u2014 don't skip this one.",
+      "min_gap_minutes": null
+    },
+    {
+      "id": "between_gear_reset",
+      "deck": "between_matches",
+      "title": "Gear reset",
+      "icon_sf_symbol": "tshirt.fill",
+      "short": "Dry shirt, dry socks, reapply sunscreen.",
+      "long": "If you have a spare shirt or socks, now's the time to swap. Reapply sunscreen. A quick change out of wet gear helps more than it sounds.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "between_mental_reset",
+      "deck": "between_matches",
+      "title": "Mental reset",
+      "icon_sf_symbol": "arrow.counterclockwise.circle",
+      "short": "Last match is done. Reset for the next one.",
+      "long": "Whatever happened in that match \u2014 good or bad \u2014 it's over. Take a breath, let it go, and start thinking about the next match fresh. One match at a time.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "eod_hydrate",
+      "deck": "end_of_day",
+      "title": "Keep sipping",
+      "icon_sf_symbol": "drop.circle.fill",
+      "short": "Steady hydration through the evening.",
+      "long": "Keep sipping water through the evening \u2014 not all at once, steadily. If you brought electrolyte mix and it's been a hot day, this is a reasonable time to use it if tolerated.",
+      "heat_aware": true,
+      "heat_suffix": " Today was warm \u2014 fluids through the evening matter more than usual.",
+      "min_gap_minutes": null
+    },
+    {
+      "id": "eod_movement_shower",
+      "deck": "end_of_day",
+      "title": "Easy movement & shower",
+      "icon_sf_symbol": "shower.fill",
+      "short": "Easy movement or stretching if your kid likes it, then shower.",
+      "long": "Easy movement or stretching if your kid likes it \u2014 nothing intense. A shower helps the body feel like the day is done. Nothing structured required.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "eod_real_meal",
+      "deck": "end_of_day",
+      "title": "Real meal",
+      "icon_sf_symbol": "fork.knife",
+      "short": "A balanced meal within 1\u20132 hours of finishing.",
+      "long": "Aim for a solid, balanced meal within 1\u20132 hours of finishing the day \u2014 something with protein, carbs, and vegetables if possible. Don't skip dinner because you're tired.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "eod_gear_tomorrow",
+      "deck": "end_of_day",
+      "title": "Prep for tomorrow",
+      "icon_sf_symbol": "bag.fill.badge.plus",
+      "short": "Lay out tomorrow's gear tonight.",
+      "long": "Pack the bag tonight \u2014 rackets, towel, water bottle, snacks. Lay out the outfit. One less thing to think about in the morning when you're rushing out the door.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    },
+    {
+      "id": "eod_sleep",
+      "deck": "end_of_day",
+      "title": "Sleep",
+      "icon_sf_symbol": "moon.zzz.fill",
+      "short": "Aim for 9+ hours tonight.",
+      "long": "Earlier is better, especially if tomorrow has an early first match. Turn off screens a bit before bed if you can. Sleep is when recovery actually happens.",
+      "heat_aware": false,
+      "min_gap_minutes": null
+    }
+  ]
+}

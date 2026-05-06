@@ -166,6 +166,142 @@ final class AppState: ObservableObject {
         planCache.removeAll()
     }
 
+    // MARK: - Cached Envelope Access
+
+    /// Exposes the cached PlanEnvelope for a tournament without triggering a network load.
+    /// Used by delete confirmation dialogs to display accurate match / plan counts.
+    func cachedPlanEnvelope(for tournamentId: UUID) -> PlanEnvelope? {
+        planCache[tournamentId]
+    }
+
+    // MARK: - Optimistic Tournament List Mutations
+
+    /// Optimistically removes a tournament from the loaded list before the API call fires.
+    /// Returns `(tournament, originalIndex)` so the caller can restore on error.
+    /// Returns nil if the list isn’t loaded or the tournament isn’t in the list.
+    @discardableResult
+    func optimisticRemoveTournament(id: UUID) -> (tournament: Tournament, index: Int)? {
+        guard case .loaded(let list) = tournaments,
+              let idx = list.firstIndex(where: { $0.id == id }) else { return nil }
+        var updated = list
+        let removed = updated.remove(at: idx)
+        tournaments = .loaded(updated)
+        return (removed, idx)
+    }
+
+    /// Restores a tournament to the loaded list at its original index.
+    /// Used for error recovery after a failed optimistic delete.
+    func restoreTournament(_ tournament: Tournament, at index: Int) {
+        guard case .loaded(var list) = tournaments else { return }
+        let safeIndex = min(index, list.count)
+        list.insert(tournament, at: safeIndex)
+        tournaments = .loaded(list)
+    }
+
+    // MARK: - Delete API Wrappers
+
+    /// Calls the API to delete a tournament.
+    /// Returns `true` on 204 (success) or 404 (already gone — spec §D.4 silent success).
+    /// Returns `false` on any other error.
+    func deleteTournamentViaAPI(id: UUID) async -> Bool {
+        do {
+            try await repository.deleteTournament(id: id)
+            invalidatePlanCache(for: id)
+            return true
+        } catch APIError.notFound {
+            // Already gone — treat as silent success per spec §D.4.
+            invalidatePlanCache(for: id)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    /// Calls the API to delete a match.
+    /// Returns `true` on 204 or 404 (silent success); `false` on any other error.
+    func deleteMatchViaAPI(matchId: UUID, tournamentId: UUID) async -> Bool {
+        do {
+            try await repository.deleteMatch(tournamentId: tournamentId, matchId: matchId)
+            invalidatePlanCache(for: tournamentId)
+            return true
+        } catch APIError.notFound {
+            invalidatePlanCache(for: tournamentId)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    // MARK: - Match Done Toggle (match-done-state-cards spec §E.6 + §J)
+
+    /// Toggle the done state of the given match:
+    ///   1. Derive new isDone (toggle current value)
+    ///   2. Optimistically update currentPlanEnvelope (instant chip/deck response)
+    ///   3. PUT /v1/tournaments/{tid}/matches/{mid}
+    ///   4. On success: regenerate plan (server state wins)
+    ///   5. On failure: revert optimistic update; caller shows error toast
+    ///
+    /// Returns `true` on success so TournamentDashboardView can show a toast on failure.
+    @discardableResult
+    func toggleMatchDone(matchId: UUID, tournamentId: UUID) async -> Bool {
+        guard case .loaded(let envelope) = currentPlanEnvelope,
+              let plan = envelope.plan(for: matchId) else { return false }
+        let newIsDone = !plan.isDone
+
+        // Step 2: instant optimistic update (no spinner)
+        optimisticallySetIsDone(matchId: matchId, isDone: newIsDone)
+
+        // Step 3: API call
+        let success = await repository.updateMatchDone(
+            matchId: matchId, tournamentId: tournamentId, isDone: newIsDone
+        )
+
+        if success {
+            // Step 4: refresh plan from server
+            await generatePlan(for: tournamentId)
+        } else {
+            // Step 5: revert optimistic update
+            optimisticallySetIsDone(matchId: matchId, isDone: !newIsDone)
+        }
+        return success
+    }
+
+    /// Mutates `currentPlanEnvelope` in-place to flip `isDone` on the matching plan.
+    /// Rebuilds both singlesPlans and doublesPlans arrays with a value-copy of the
+    /// modified Plan (Plan is a struct — copy-on-write semantics via a new init).
+    private func optimisticallySetIsDone(matchId: UUID, isDone: Bool) {
+        guard case .loaded(let envelope) = currentPlanEnvelope else { return }
+
+        func updatePlan(_ plan: Plan) -> Plan {
+            guard plan.matchId == matchId else { return plan }
+            return Plan(
+                id: plan.id,
+                planId: plan.planId,
+                tournamentId: plan.tournamentId,
+                generatedAt: plan.generatedAt,
+                warnings: plan.warnings,
+                scenarioPlans: plan.scenarioPlans,
+                weather: plan.weather,
+                foodOptions: plan.foodOptions,
+                timeline: plan.timeline,
+                bagFallbackOnly: plan.bagFallbackOnly,
+                llmSummary: plan.llmSummary,
+                matchType: plan.matchType,
+                matchId: plan.matchId,
+                nextAction: plan.nextAction,
+                scheduledStart: plan.scheduledStart,
+                isDone: isDone,
+                placesUnavailable: plan.placesUnavailable  // OQ-FOOD-EMPTY-1: preserve existing value
+            )
+        }
+
+        let updated = PlanEnvelope(
+            singlesPlans: envelope.singlesPlans.map(updatePlan),
+            doublesPlans: envelope.doublesPlans.map(updatePlan)
+        )
+        currentPlanEnvelope = .loaded(updated)
+    }
+
     // MARK: - Sign Out
 
     // MARK: - Match Selection Helper

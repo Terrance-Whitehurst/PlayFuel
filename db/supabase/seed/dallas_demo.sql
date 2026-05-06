@@ -116,7 +116,6 @@ insert into public.matches (
   id,
   tournament_id,
   scheduled_start,
-  estimated_duration_minutes,
   actual_end_at,
   surface,
   format,
@@ -129,7 +128,6 @@ values (
   'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   '2026-05-15 09:00:00-05:00',  -- 9:00 AM CDT
-  null,                          -- no override; rules engine uses SCENARIO_DURATIONS_MIN
   null,
   'hard',
   'singles',
@@ -149,7 +147,6 @@ insert into public.matches (
   id,
   tournament_id,
   scheduled_start,
-  estimated_duration_minutes,
   actual_end_at,
   surface,
   format,
@@ -161,7 +158,6 @@ values (
   'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11',
   '2026-05-15 13:00:00-05:00',  -- 1:00 PM CDT
-  null,
   null,
   'hard',
   'singles',

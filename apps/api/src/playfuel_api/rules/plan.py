@@ -30,9 +30,18 @@ from typing import Optional
 from playfuel_api.models.api import FoodOption, Plan, ScenarioPlan, TimelineEventOut, WeatherBlock
 from playfuel_api.models.db import MatchRow
 from playfuel_api.models.enums import GapStatus, ScheduleConfidence, TimelineEventKind
-from playfuel_api.rules.constants import RULES_CONSTANTS_VERSION
+from playfuel_api.rules.constants import ARRIVE_SNACK_MIN, RULES_CONSTANTS_VERSION
+from playfuel_api.rules.distance import estimate_drive_minutes
 from playfuel_api.rules.duration_format import friendly_duration
-from playfuel_api.rules.hard_coded_strings import HEAT_EMERGENCY_TEXT, heat_emergency_text as _get_heat_emergency_text
+from playfuel_api.rules.hard_coded_strings import (
+    DEPARTURE_DETAIL_TEMPLATE,
+    DEPARTURE_HEAT_ADDENDUM,
+    DEPARTURE_TITLE_HOME,
+    DEPARTURE_TITLE_HOTEL,
+    HEAT_EMERGENCY_TEXT,
+    LONG_DRIVE_WARNING_TEMPLATE,
+    heat_emergency_text as _get_heat_emergency_text,
+)
 
 # Optional import to avoid circular at module level — imported inline inside function
 _next_action_mod = None
@@ -56,16 +65,16 @@ def derive_schedule_confidence(scenarios: list[ScenarioPlan]) -> ScheduleConfide
     return ScheduleConfidence.high
 
 
-def _fmt_time(dt: datetime) -> str:
-    """Format a datetime as 'H:MM AM/PM' with no leading zero on the hour."""
-    h = dt.hour % 12 or 12
-    ampm = "AM" if dt.hour < 12 else "PM"
-    return f"{h}:{dt.minute:02d} {ampm}"
-
-
 def build_timeline(
     matches: list[MatchRow],
     scenarios: list[ScenarioPlan],
+    *,
+    accommodation_lat: Optional[float] = None,
+    accommodation_lng: Optional[float] = None,
+    venue_lat: Optional[float] = None,
+    venue_lng: Optional[float] = None,
+    accommodation_kind: Optional[str] = None,  # 'home' | 'hotel' | None
+    weather_flags: Optional[dict[str, bool]] = None,
 ) -> list[TimelineEventOut]:
     """Build a chronological timeline of events for the plan.
 
@@ -81,13 +90,27 @@ def build_timeline(
     the first doubles match when any match in the list has format == 'doubles'.
     See DOUBLES_SPEC_V1.md §C.1.
 
+    v1.2 (accommodations): emits a `departure` event at
+    match_start - ARRIVE_SNACK_MIN - drive_minutes for the first match when
+    accommodation coords are set. See ACCOMMODATIONS_V1.md §E.2.
+
     Args:
-        matches:   Match rows for the plan type (singles or doubles group),
-                   ordered by display_order.
-        scenarios: Output of generate_match_scenarios() for the first match.
+        matches:           Match rows for the plan type (singles or doubles group),
+                           ordered by display_order.
+        scenarios:         Output of generate_match_scenarios() for the first match.
+        accommodation_lat: Latitude of accommodation; None = venue-local (no departure event).
+        accommodation_lng: Longitude of accommodation; None = venue-local.
+        venue_lat:         Latitude of tournament venue (for haversine drive-time).
+        venue_lng:         Longitude of tournament venue.
+        accommodation_kind: 'home' | 'hotel' | None. None defaults to 'home' copy.
+        weather_flags:     Flags from classify_weather(); used for heat-addendum threshold.
 
     Returns:
         list[TimelineEventOut] — ordered chronologically by time.
+
+    REGRESSION INVARIANT: when accommodation_lat is None, estimate_drive_minutes() returns 0
+    and no departure event is emitted. Output is byte-for-byte identical to pre-feature
+    behavior. All new params are keyword-only with Optional defaults (backward-compatible).
     """
     events: list[TimelineEventOut] = []
 
@@ -98,6 +121,50 @@ def build_timeline(
 
     # Doubles-spec §C.1: emit partnerCoordination at T−60m for doubles matches.
     is_doubles = any(m.format == "doubles" for m in matches)
+
+    # Accommodations v1.2: emit departure event for first match when accommodation set.
+    # drive_minutes == 0 when accommodation_lat is None (sentinel) or same location.
+    # In both cases the block below is skipped — regression-safe.
+    _drive_minutes: int = 0
+    if venue_lat is not None and venue_lng is not None:
+        _drive_minutes = estimate_drive_minutes(
+            accommodation_lat, accommodation_lng, venue_lat, venue_lng
+        )
+
+    if _drive_minutes > 0 and matches:
+        first_match = matches[0]
+        arrive_by_dt = first_match.scheduled_start - timedelta(minutes=ARRIVE_SNACK_MIN)
+        departure_dt = arrive_by_dt - timedelta(minutes=_drive_minutes)
+
+        # Title: hotel vs home (None defaults to home, per §G T-11)
+        title = (
+            DEPARTURE_TITLE_HOTEL
+            if accommodation_kind == "hotel"
+            else DEPARTURE_TITLE_HOME
+        )
+
+        # Detail: base template (DR_37: no wall-clock or ISO datetime in detail strings)
+        detail = DEPARTURE_DETAIL_TEMPLATE.format(
+            drive_minutes=_drive_minutes,
+        )
+
+        # Long-drive warning appended when drive >= 90 min (OQ-ACC-5 resolution)
+        if _drive_minutes >= 90:
+            detail += LONG_DRIVE_WARNING_TEMPLATE.format(drive_minutes=_drive_minutes)
+
+        # Heat addendum when drive >= 45 min AND extreme heat flag set
+        if _drive_minutes >= 45 and weather_flags and weather_flags.get("flag_extreme_heat_risk"):
+            detail += DEPARTURE_HEAT_ADDENDUM
+
+        events.append(
+            TimelineEventOut(
+                id=str(uuid.uuid4()),
+                time=departure_dt.isoformat(),
+                title=title,
+                detail=detail,
+                kind=TimelineEventKind.departure,
+            )
+        )
 
     for idx, match in enumerate(matches, start=1):
         # Doubles only: partner coordination reminder at T−60m (first match only).
@@ -121,7 +188,7 @@ def build_timeline(
                 id=str(uuid.uuid4()),
                 time=match.scheduled_start.isoformat(),
                 title=f"Match {idx}",
-                detail=f"Scheduled start ({_fmt_time(match.scheduled_start)})",
+                detail="Scheduled start",
                 kind=TimelineEventKind.match,
             )
         )
@@ -161,6 +228,7 @@ def build_plan_envelope(
     scheduled_start: Optional[str] = None,
     is_done: bool = False,               # match-done-state-cards spec §C
     venue_country: Optional[str] = None, # Phase C-infrastructure: country-specific emergency number
+    places_unavailable: bool = False,    # True when Google Places API key is set but provider failed
 ) -> Plan:
     """Assemble the top-level Plan envelope from engine output.
 
@@ -216,4 +284,5 @@ def build_plan_envelope(
         match_id=match_id,
         scheduled_start=scheduled_start,
         is_done=is_done,               # match-done-state-cards spec §C
+        places_unavailable=places_unavailable,  # OQ-FOOD-EMPTY-1: signal iOS empty-state
     )

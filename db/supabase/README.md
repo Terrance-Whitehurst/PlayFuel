@@ -112,6 +112,14 @@ Migrations **must** be applied in filename order:
 | `0010_players_and_notes.sql` | Creates `public.players` and `public.player_notes` tables, `player_note_source` enum, adds nullable `opponent_player_id` FK to `public.matches`. Includes RLS (8 new policies). See PLAYER_SCOUTING_V1.md §B. |
 | `0011_match_evaluations.sql` | Creates `public.match_evaluations` table, `match_eval_result` enum (`won`/`lost`/`withdrew`/`retired`), 4 RLS policies. One row per match (UNIQUE on `match_id`). Auto-syncs `opponent_observations` to `player_notes` via `services/post_match_sync.py`. See POST_MATCH_EVAL_V1.md §B. |
 | `0012_tournament_location.sql` | Adds nullable `venue_place_id` TEXT column to `public.tournaments`; adds coords-pair CHECK constraint; creates `public.tournament_places_cache` table (keyed by `(tournament_id, place_type)`, JSONB payload, 24h TTL enforced at API layer) + 4 RLS policies. See TOURNAMENT_LOCATION_V1.md §C. |
+| `0013_feedback_schema_v2.sql` | Feedback schema v2 — updated constraints and columns. |
+| `0014_tighten_places_cache_rls.sql` | Tightens RLS policies on `public.tournament_places_cache`. |
+| `0015_llm_explanation_cache.sql` | Adds LLM explanation cache table for plan summaries. |
+| `0016_draw_size_and_round.sql` | Adds `draw_size` integer and `round` integer columns to `public.tournaments` / `public.matches`; adds `DRAW_SIZES` validation. See draw-size-spec.md. |
+| `0017_match_done_state.sql` | Adds `is_done bool NOT NULL DEFAULT false` and `done_at timestamptz` to `public.matches`. See match-done-state-cards spec §C. |
+| `0018_tournament_intl_fields.sql` | Phase A international rollout: adds nullable `time_zone text` (IANA tz identifier) and `venue_country text` (ISO 3166-1 alpha-2) to `public.tournaments`. Both optional for backward compatibility. |
+| `0019_weather_units_metric.sql` | Phase B metric weather units: adds nullable `temp_c numeric(5,1)` and `wind_kmh numeric(5,1)` columns to `public.weather_snapshots`. Legacy `temp_f`/`wind_mph` retained as computed/legacy columns with updated COMMENTs; will be dropped in a future cleanup migration once all iOS clients are past Phase B. |
+| `0020_tournament_preferred_language.sql` | Phase C-infrastructure i18n: adds nullable `preferred_language text` to `public.tournaments`. Tier-1 values: `'en'` / `'es'`. NULL defaults to English. Validated to `Pydantic Literal["en","es"]` at API boundary (INTL-SEC-5 compliant — never interpolated into LLM prompts). |
 
 ---
 

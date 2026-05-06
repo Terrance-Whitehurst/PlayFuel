@@ -8,7 +8,7 @@ No runtime code may mutate these constants; changes require a version bump (§J)
 
 # ─── Version (§J.1) ──────────────────────────────────────────────────────────
 
-RULES_CONSTANTS_VERSION = "2.1.0"  # bumped from 2.0.0 — Phase C-infrastructure: preferred_language field, _SYSTEM_PROMPTS dict, emergency_number_for() added
+RULES_CONSTANTS_VERSION = "2.2.2"  # bumped from 2.2.1 — DR-PLACES-1: places.distanceMeters removed from Google field mask (was 400 INVALID_ARGUMENT)
 
 # ─── Scenario durations (§A.1 + DOUBLES_SPEC_V1.md §B.1) ─────────────────────────────────────────
 #
@@ -21,6 +21,14 @@ SCENARIO_DURATIONS_MIN: dict[tuple[str, str | None], dict[str, int]] = {
     ("doubles", "best_of_3"):   {"short": 60,  "normal": 90,  "long": 135},  # [DRAFT — OQ-DBL-1]
     ("doubles", "pro_set_8"):   {"short": 45,  "normal": 70,  "long": 100},  # [DRAFT — OQ-DBL-1]
 }
+
+# ─── Arrival buffer (ACCOMMODATIONS_V1.md §F.3 / RULES_CONSTANTS_V1.md §D.1) ─────
+#
+# ARRIVE_SNACK_MIN: arrive at venue and have a light snack at T-60m before match start.
+# Used as the anchor for departure event timing in build_timeline().
+# See ACCOMMODATIONS_V1.md §E.2 for usage.
+
+ARRIVE_SNACK_MIN: int = 60  # T-60m: arrive at venue and light snack
 
 # ─── Gap-bucket boundaries (§B.2 / §B.3) ─────────────────────────────────────
 #

@@ -253,7 +253,6 @@ def test_match_create_with_valid_opponent_player_id_returns_201(client_with_auth
         "id": str(uuid4()),
         "tournament_id": TID,
         "scheduled_start": "2026-05-15T09:00:00+00:00",
-        "estimated_duration_minutes": 120,
         "actual_end_at": None,
         "surface": None,
         "format": "singles",

@@ -113,8 +113,8 @@ final class Repository: ObservableObject {
     /// `startDate` and `endDate` are formatted as "yyyy-MM-dd" strings because the API's
     /// `TournamentCreate` Pydantic model declares them as `date` (not `datetime`) type.
     ///
-    /// `timeZone` is presented in the iOS form for future use but is NOT in the current API
-    /// Pydantic model — it is omitted from the encoded request body.
+    /// `timeZone` (IANA identifier) and `venueCountry` (ISO 3166-1 alpha-2) are stored
+    /// by the API via migration 0018. `timeZone` defaults to Central for backward compat.
     ///
     /// Venue address fields are optional (nil for legacy callers / tests). When present
     /// they are sent to the API and persisted on the tournament row (columns exist per
@@ -132,7 +132,16 @@ final class Repository: ObservableObject {
         startDate: Date,
         endDate: Date,
         drawSize: Int = 32,
-        timeZone: String
+        timeZone: String = "America/Chicago",
+        venueCountry: String? = nil,
+        // ACCOMMODATIONS_V1 — migration 0021. All optional; nil = no accommodation.
+        // Wire note: nil fields are omitted from the JSON body (standard Encodable).
+        // Backend TournamentCreate defaults all four to None — omit ≡ NULL on create.
+        // For a future clear-accommodation on UPDATE, see OQ-ACC-7 / OQ-ACC-8.
+        accommodationLat: Double? = nil,
+        accommodationLng: Double? = nil,
+        accommodationAddress: String? = nil,
+        accommodationKind: String? = nil
     ) async throws -> Tournament {
         let t = Repository.clock()
         defer { Repository.lap(t, label: "createTournament") }
@@ -149,7 +158,13 @@ final class Repository: ObservableObject {
             venueLng: venueLng,
             startDate: dateFmt.string(from: startDate),
             endDate: dateFmt.string(from: endDate),
-            drawSize: drawSize
+            drawSize: drawSize,
+            timeZone: timeZone,
+            venueCountry: venueCountry,
+            accommodationLat: accommodationLat,
+            accommodationLng: accommodationLng,
+            accommodationAddress: accommodationAddress,
+            accommodationKind: accommodationKind
         )
         let bodyData = try postEncoder.encode(body)
         let dto = try await api.send(
@@ -160,25 +175,37 @@ final class Repository: ObservableObject {
         return dto.toModel()
     }
 
+    // MARK: - Tournament + Match Deletion (delete-matches-tournaments spec §C)
+
+    /// Delete a tournament by ID.
+    /// 204 on success; throws APIError.notFound if not found or not owned by caller (RLS).
+    func deleteTournament(id: UUID) async throws {
+        try await api.sendNoContent(
+            Endpoints.deleteTournament(baseURL: api.baseURL, id: id)
+        )
+    }
+
+    /// Delete a match by ID within a tournament.
+    /// 204 on success; throws APIError.notFound if not found or not owned by caller (RLS).
+    func deleteMatch(tournamentId: UUID, matchId: UUID) async throws {
+        try await api.sendNoContent(
+            Endpoints.deleteMatch(baseURL: api.baseURL, tournamentId: tournamentId, matchId: matchId)
+        )
+    }
+
     // MARK: - Match Mutation
 
     /// Create a new match via POST /v1/tournaments/{tid}/matches.
-    ///
-    /// `estimatedNextMatchTime` is collected by the iOS form for UX (pre-filling next match
-    /// time) but is NOT a DB column — it is derived from match ordering. It is omitted from
-    /// the encoded request body.
     ///
     /// Phase 7: `matchType` and `doublesFormat` added per DOUBLES_SPEC_V1.md §A.2.
     /// Player Scouting: `opponentPlayerId` added per PLAYER_SCOUTING_V1.md §E.4.
     func createMatch(
         tournamentId: UUID,
         scheduledStart: Date,
-        estimatedDurationMinutes: Int,
         round: Int,
         roundLabel: String? = nil,
         opponentLabel: String?,
         courtLabel: String?,
-        estimatedNextMatchTime: Date?,
         displayOrder: Int,
         matchType: MatchType = .singles,
         doublesFormat: DoublesFormat? = nil,
@@ -186,7 +213,6 @@ final class Repository: ObservableObject {
     ) async throws -> Match {
         let body = MatchCreateRequest(
             scheduledStart: scheduledStart,
-            estimatedDurationMinutes: estimatedDurationMinutes,
             roundLabel: roundLabel,
             opponentLabel: opponentLabel,
             courtLabel: courtLabel,
@@ -405,6 +431,41 @@ final class Repository: ObservableObject {
             expecting: TournamentFeedbackDTO.self
         )
         return dto.toModel()
+    }
+
+    // MARK: - Match Done Toggle (match-done-state-cards spec §C)
+
+    /// Toggle the done state of a match via PUT /v1/tournaments/{tid}/matches/{mid}.
+    ///
+    /// Sends `{ "is_done": true/false }` in the request body. The server sets
+    /// `done_at = now()` on false→true and clears it on true→false.
+    ///
+    /// `sendNoContent` discards the response body on any 2xx — the PUT returns 200
+    /// with the updated match JSON which we don't need (plan re-gen fetches fresh state).
+    ///
+    /// Returns `true` on success, `false` on any error (used for optimistic revert).
+    func updateMatchDone(matchId: UUID, tournamentId: UUID, isDone: Bool) async -> Bool {
+        // Build body + request BEFORE the do-block so both are in scope inside catch.
+        guard let body = try? JSONSerialization.data(
+            withJSONObject: ["is_done": isDone],
+            options: []
+        ) else { return false }
+        let request = Endpoints.updateMatch(
+            baseURL: api.baseURL,
+            tournamentId: tournamentId,
+            matchId: matchId,
+            body: body
+        )
+        do {
+            try await api.sendNoContent(request)
+            return true
+        } catch {
+#if DEBUG
+            let urlStr = request.url?.absoluteString ?? "nil"
+            print("[PlayFuel] updateMatchDone FAILED — url: \(urlStr) isDone: \(isDone) error: \(error)")
+#endif
+            return false
+        }
     }
 
     // MARK: - Plans

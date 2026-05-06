@@ -36,6 +36,7 @@ from playfuel_api.services.places import (
     PLACES_CACHE_TTL_SEC,
     GooglePlacesProvider,
     PlacesProviderError,
+    PlacesUnavailableError,
     RawPlace,
 )
 
@@ -199,9 +200,11 @@ def test_cache_hit_skips_http() -> None:
 
 
 def test_http_5xx_no_cache_falls_through_to_mock() -> None:
-    """HTTP 5xx + empty cache → falls back to MockPlacesProvider (≥3 results, no raise).
+    """HTTP 5xx + empty cache → PlacesUnavailableError raised (no silent mock fallback).
 
-    Pre-fix, this path raised PlacesProviderError, leaving food_options=[].
+    OQ-FOOD-EMPTY-1: GooglePlacesProvider no longer silently falls through to
+    MockPlacesProvider when the real API fails. The error propagates so the
+    plan envelope can set placesUnavailable=True for iOS empty-state rendering.
     """
     db = _make_db_client(cache_row=None)  # no stale data either
     provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
@@ -210,12 +213,10 @@ def test_http_5xx_no_cache_falls_through_to_mock() -> None:
         "playfuel_api.services.places.httpx.post",
         return_value=_make_error_response(503),
     ):
-        results = provider.search_nearby(
-            DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
-        )
-
-    assert len(results) >= 3, f"Expected ≥3 mock results on 5xx fallback; got {len(results)}"
-    assert all(r.provider == "mock" for r in results), "Fallback results must have provider='mock'"
+        with pytest.raises(PlacesUnavailableError, match="server error"):
+            provider.search_nearby(
+                DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
+            )
 
 
 def test_http_5xx_stale_cache_returns_stale(caplog) -> None:
@@ -264,9 +265,10 @@ def test_http_5xx_stale_cache_returns_stale(caplog) -> None:
 
 
 def test_http_4xx_falls_through_to_mock(caplog) -> None:
-    """HTTP 4xx (non-401) → falls back to MockPlacesProvider + log warning.
+    """HTTP 4xx (non-401) → PlacesUnavailableError raised + log warning.
 
-    Pre-fix, this path returned [] leaving food_options=[].
+    OQ-FOOD-EMPTY-1: 4xx errors from the real API propagate as PlacesUnavailableError
+    so the plan envelope sets placesUnavailable=True. The warning is still logged.
     """
     db = _make_db_client(cache_row=None)
     provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
@@ -276,22 +278,22 @@ def test_http_4xx_falls_through_to_mock(caplog) -> None:
             "playfuel_api.services.places.httpx.post",
             return_value=_make_error_response(400),
         ):
-            results = provider.search_nearby(
-                DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
-            )
+            with pytest.raises(PlacesUnavailableError):
+                provider.search_nearby(
+                    DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
+                )
 
-    assert len(results) >= 3, f"Expected ≥3 mock results on 4xx fallback; got {len(results)}"
-    assert all(r.provider == "mock" for r in results), "Fallback results must have provider='mock'"
     assert any("400" in msg for msg in caplog.messages), (
         f"Expected 400 warning; got: {caplog.messages}"
     )
 
 
 def test_http_401_logs_rotation_warning_and_falls_through_to_mock(caplog) -> None:
-    """HTTP 401 → falls back to MockPlacesProvider (≥3 results) + rotation warning.
+    """HTTP 401 → PlacesUnavailableError raised + rotation warning logged.
 
-    Pre-fix, this path returned [] leaving food_options=[].
-    The rotation warning must still fire so ops know the key needs rotation.
+    OQ-FOOD-EMPTY-1: 401 propagates as PlacesUnavailableError so the plan envelope
+    can set placesUnavailable=True. The rotation warning must still fire so ops
+    know the key needs rotation (Fly logs surfaced by plan_gen: places_unavailable).
     """
     db = _make_db_client(cache_row=None)
     provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
@@ -301,12 +303,11 @@ def test_http_401_logs_rotation_warning_and_falls_through_to_mock(caplog) -> Non
             "playfuel_api.services.places.httpx.post",
             return_value=_make_error_response(401),
         ):
-            results = provider.search_nearby(
-                DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
-            )
+            with pytest.raises(PlacesUnavailableError, match="401"):
+                provider.search_nearby(
+                    DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=FAKE_TID
+                )
 
-    assert len(results) >= 3, f"Expected ≥3 mock results on 401 fallback; got {len(results)}"
-    assert all(r.provider == "mock" for r in results), "Fallback results must have provider='mock'"
     rotation_logged = any(
         "rotation" in msg.lower() or "invalid" in msg.lower()
         for msg in caplog.messages
@@ -353,6 +354,149 @@ def test_no_tournament_id_skips_cache() -> None:
     db.table.return_value.upsert.assert_not_called()
 
 
+def test_included_types_excludes_juice_bar() -> None:
+    """DR-PLACES-1: 'juice_bar' must NOT be in _INCLUDED_TYPES.
+
+    juice_bar is not a valid type in the Google Places (New) searchNearby API
+    includedTypes list.  Including it causes 400 INVALID_ARGUMENT on every call.
+    This test pins its absence so it cannot be re-introduced silently.
+    """
+    from playfuel_api.services.places import _INCLUDED_TYPES
+
+    assert "juice_bar" not in _INCLUDED_TYPES, (
+        "'juice_bar' must NOT be in _INCLUDED_TYPES — it is invalid in Google Places (New) "
+        "searchNearby API and causes 400 INVALID_ARGUMENT. See DR-PLACES-1."
+    )
+
+
+def test_field_mask_excludes_distance_meters() -> None:
+    """DR-PLACES-1: places.distanceMeters must NOT be in the X-Goog-FieldMask header.
+
+    Including places.distanceMeters in the field mask causes Google Places (New)
+    searchNearby to return 400 INVALID_ARGUMENT on every call — the field is not
+    a valid mask path in that endpoint.  The fix is permanent:
+      - Remove the field from _FIELD_MASK in services/places.py.
+      - Use haversine (rules/food.py _distance_key) for distance computation.
+
+    This test pins the absence so it cannot be re-introduced silently.
+    """
+    from playfuel_api.services.places import _FIELD_MASK
+
+    assert "distanceMeters" not in _FIELD_MASK, (
+        "places.distanceMeters must NOT be in _FIELD_MASK — it is an invalid field "
+        "in the Google Places (New) searchNearby API and causes 400 INVALID_ARGUMENT. "
+        "Distance is computed via haversine from places.location instead. "
+        "See DR-PLACES-1."
+    )
+
+
+def test_field_mask_sent_to_google_excludes_distance_meters() -> None:
+    """DR-PLACES-1: The X-Goog-FieldMask header sent to the real Google API must not
+    contain 'distanceMeters'.  Verifies the header is constructed from _FIELD_MASK
+    and forwarded correctly.  Mock the HTTP call and inspect the captured headers.
+    """
+    db = _make_db_client(cache_row=None)
+    provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
+
+    captured_headers: dict = {}
+
+    def _capture(url, json, headers, timeout):  # noqa: ARG001
+        captured_headers.update(headers)
+        return _make_ok_response()
+
+    with patch("playfuel_api.services.places.httpx.post", side_effect=_capture):
+        provider.search_nearby(
+            DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=None
+        )
+
+    field_mask = captured_headers.get("X-Goog-FieldMask", "")
+    assert "distanceMeters" not in field_mask, (
+        f"X-Goog-FieldMask header sent to Google must not contain 'distanceMeters'; "
+        f"got: {field_mask!r}. See DR-PLACES-1."
+    )
+    # Confirm the critical geometry field IS present (needed for haversine)
+    assert "places.location" in field_mask, (
+        f"X-Goog-FieldMask must include 'places.location' (needed for haversine distance); "
+        f"got: {field_mask!r}"
+    )
+
+
+def test_google_place_without_distance_meters_uses_haversine() -> None:
+    """DR-PLACES-1: When Google returns places without distanceMeters (expected now),
+    RawPlace.distance_meters is None and _distance_key() falls back to haversine.
+
+    Verifies the full pipeline: GooglePlacesProvider parses the response correctly
+    (distance_meters=None, lat/lng populated), and _distance_key() returns a
+    sensible haversine distance.
+    """
+    from playfuel_api.rules.food import _distance_key, _haversine_m
+    from playfuel_api.models.api import FoodOption
+
+    db = _make_db_client(cache_row=None)
+    provider = GooglePlacesProvider(FAKE_API_KEY, db_client=db)
+
+    # Response WITHOUT distanceMeters (now the normal Google response shape)
+    response_no_distance = {
+        "places": [
+            {
+                "id": "place_delray_001",
+                "displayName": {"text": "Chipotle Mexican Grill"},
+                "formattedAddress": "340 SE 6th Ave, Delray Beach, FL 33483",
+                "types": ["restaurant", "fast_food_restaurant"],
+                "location": {"latitude": 26.460, "longitude": -80.071},
+                "rating": 4.2,
+                "priceLevel": "PRICE_LEVEL_INEXPENSIVE",
+                # distanceMeters intentionally absent
+            }
+        ]
+    }
+    resp_mock = MagicMock()
+    resp_mock.status_code = 200
+    resp_mock.json.return_value = response_no_distance
+
+    with patch("playfuel_api.services.places.httpx.post", return_value=resp_mock):
+        results = provider.search_nearby(
+            DELRAY_LAT, DELRAY_LNG, RADIUS_M, MAX_RESULTS, tournament_id=None
+        )
+
+    assert len(results) == 1
+    place = results[0]
+    # distance_meters must be None (not in response)
+    assert place.distance_meters is None, (
+        f"Expected distance_meters=None when Google omits distanceMeters; got {place.distance_meters}"
+    )
+    # lat/lng must be populated for haversine
+    assert place.lat == pytest.approx(26.460, abs=0.001)
+    assert place.lng == pytest.approx(-80.071, abs=0.001)
+
+    # Verify _distance_key falls back to haversine when distance_meters is None
+    # Build a minimal FoodOption stub
+    food_opt = FoodOption(
+        name="Chipotle Mexican Grill",
+        category="fast_casual_bowl",
+        recommended_order="Rice bowl",
+        is_draft=False,
+        provider="google",
+        lat=place.lat,
+        lng=place.lng,
+        distance_meters=place.distance_meters,  # None
+        drive_time_minutes=None,
+        place_id=place.place_id,
+        chain_matched=False,
+        chain_as_of=None,
+    )
+    haversine_dist = _distance_key(food_opt, DELRAY_LAT, DELRAY_LNG)
+    expected = _haversine_m(DELRAY_LAT, DELRAY_LNG, place.lat, place.lng)
+    assert haversine_dist == pytest.approx(expected, rel=0.01), (
+        f"_distance_key should return haversine {expected:.1f}m when distance_meters=None; "
+        f"got {haversine_dist:.1f}m"
+    )
+    # Sanity: distance should be a few hundred metres for these Delray Beach coords
+    assert 0 < haversine_dist < 2000, (
+        f"Haversine distance {haversine_dist:.1f}m seems unreasonable for nearby Delray Beach place"
+    )
+
+
 # ── Route-level tests (mock DB, mock HTTP) ────────────────────────────────────
 
 TID = "b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
@@ -365,7 +509,6 @@ def _one_singles_match() -> dict:
         "id": MID_1,
         "tournament_id": TID,
         "scheduled_start": "2026-06-01T09:00:00+00:00",
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

@@ -18,7 +18,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import Response
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from supabase import Client
@@ -96,6 +96,14 @@ class TournamentCreate(BaseModel):
         None,
         description="Language for plan explanations ('en' | 'es'). Defaults to 'en' when None.",
     )
+    # Accommodations — migration 0021 (ACCOMMODATIONS_V1.md §C.2.1)
+    # All nullable; tournament is fully functional with no accommodation.
+    # iOS sends camelCase: accommodationLat, accommodationLng, accommodationAddress, accommodationKind.
+    # Bounds guard junk coordinates; max_length guards home-address PII blob (DoS surface).
+    accommodation_lat: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    accommodation_lng: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    accommodation_address: Optional[str] = Field(None, max_length=500)
+    accommodation_kind: Optional[Literal["home", "hotel"]] = None
 
     @field_validator("time_zone")
     @classmethod
@@ -108,6 +116,21 @@ class TournamentCreate(BaseModel):
         if v not in DRAW_SIZES:
             raise ValueError(f"draw_size must be one of {DRAW_SIZES}")
         return v
+
+    @model_validator(mode="after")
+    def _validate_accommodation_pair(self) -> "TournamentCreate":
+        """accommodation_lat and accommodation_lng must both be provided or both omitted.
+
+        The DB constraint (migration 0021 CHECK) is the final guard, but rejecting
+        at the API boundary gives the iOS client a clear 422 with a descriptive message.
+        """
+        lat = self.accommodation_lat
+        lng = self.accommodation_lng
+        if (lat is None) != (lng is None):
+            raise ValueError(
+                "accommodation_lat and accommodation_lng must both be provided or both omitted."
+            )
+        return self
 
 
 class TournamentUpdate(BaseModel):
@@ -142,6 +165,14 @@ class TournamentUpdate(BaseModel):
         None,
         description="Language for plan explanations ('en' | 'es'). Defaults to 'en' when None.",
     )
+    # Accommodations — migration 0021 (ACCOMMODATIONS_V1.md §C.2.2)
+    # All nullable; omitted fields are ignored in partial update (exclude_unset=True).
+    # To CLEAR accommodation, iOS must send explicit null for all four fields.
+    # Bounds guard junk coordinates; max_length guards home-address PII blob (DoS surface).
+    accommodation_lat: Optional[float] = Field(None, ge=-90.0, le=90.0)
+    accommodation_lng: Optional[float] = Field(None, ge=-180.0, le=180.0)
+    accommodation_address: Optional[str] = Field(None, max_length=500)
+    accommodation_kind: Optional[Literal["home", "hotel"]] = None
 
     @field_validator("time_zone")
     @classmethod
@@ -154,6 +185,21 @@ class TournamentUpdate(BaseModel):
         if v is not None and v not in DRAW_SIZES:
             raise ValueError(f"draw_size must be one of {DRAW_SIZES}")
         return v
+
+    @model_validator(mode="after")
+    def _validate_accommodation_pair(self) -> "TournamentUpdate":
+        """accommodation_lat and accommodation_lng must both be provided or both omitted.
+
+        Permits (null, null) to clear both coords, but not (value, null) or (null, value).
+        The DB constraint (migration 0021 CHECK) is the final guard.
+        """
+        lat = self.accommodation_lat
+        lng = self.accommodation_lng
+        if (lat is None) != (lng is None):
+            raise ValueError(
+                "accommodation_lat and accommodation_lng must both be provided or both omitted."
+            )
+        return self
 
 
 # ── Routes ────────────────────────────────────────────────────────────────────
@@ -224,7 +270,12 @@ def update_tournament(
     client: Client = Depends(authed_client),
 ) -> dict[str, Any]:
     """Update a tournament. RLS ensures only the owner can update."""
-    payload = body.model_dump(exclude_none=True)
+    # OQ-ACC-7 resolution (ACCOMMODATIONS_V1.md): use exclude_unset=True so that:
+    #   - Fields OMITTED by the client are excluded (partial update semantics preserved).
+    #   - Fields explicitly set to null ARE included (enables clearing accommodation columns).
+    # iOS contract: to clear accommodation, send accommodationLat=null, accommodationLng=null,
+    # accommodationAddress=null, accommodationKind=null explicitly in the request body.
+    payload = body.model_dump(exclude_unset=True)
     if not payload:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                             detail="No fields to update")

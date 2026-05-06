@@ -73,4 +73,21 @@ struct Plan: Codable, Identifiable {
     /// Used by ScheduleStripView for chip ordering and status derivation.
     /// Stored as ISO 8601 string (matches generatedAt pattern); parsed on demand.
     let scheduledStart: String?
+
+    // MARK: - match-done-state-cards spec §C
+
+    /// True when the parent has manually marked this match done.
+    /// Overrides time-derived chip status (see MatchChip.matchStatus — checks isDone FIRST).
+    /// NO stored-property default — Codable discipline: all call sites must pass explicitly.
+    let isDone: Bool
+
+    // MARK: - OQ-FOOD-EMPTY-1 (GPS-places fix)
+
+    /// True when the Google Places API call failed (key invalid, billing off, network
+    /// timeout, or 4xx/5xx). `foodOptions` will be empty in this case.
+    /// Distinct from `bagFallbackOnly` (design decision — all scenarios use bag strategy)
+    /// and from `foodOptions: []` with `placesUnavailable: false` (API succeeded but no
+    /// nearby restaurants found at the venue).
+    /// NO stored-property default — Codable discipline: all call sites must pass explicitly.
+    let placesUnavailable: Bool
 }

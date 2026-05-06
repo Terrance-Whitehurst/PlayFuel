@@ -12,6 +12,9 @@ struct SelectedVenue {
     let venuePostal: String?
     let venueLat: Double
     let venueLng: Double
+    /// ISO 3166-1 alpha-2 country code from MKPlacemark.isoCountryCode (e.g. "MX", "US").
+    /// Nil if MapKit cannot resolve a country code for the placemark.
+    let venueCountry: String?
 }
 
 // MARK: - VenueSearchViewModel
@@ -88,7 +91,8 @@ final class VenueSearchViewModel: NSObject, ObservableObject, MKLocalSearchCompl
                 venueRegion:  pm.administrativeArea,
                 venuePostal:  pm.postalCode,
                 venueLat:     pm.coordinate.latitude,
-                venueLng:     pm.coordinate.longitude
+                venueLng:     pm.coordinate.longitude,
+                venueCountry: pm.isoCountryCode
             )
             query = ""
             suggestions = []

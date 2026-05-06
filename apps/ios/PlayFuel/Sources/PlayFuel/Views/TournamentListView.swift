@@ -1,4 +1,5 @@
 import SwiftUI
+import os
 
 /// US-03 — Tournament list, live data via Repository.
 ///
@@ -10,6 +11,12 @@ struct TournamentListView: View {
     @EnvironmentObject var appState: AppState
     @State private var showingCreateTournament = false
     @State private var showProfile = false
+    // Delete state
+    @State private var tournamentToDelete: Tournament? = nil
+    @State private var showDeleteConfirmation = false
+    @State private var showDeleteErrorToast = false
+
+    private static let deleteLogger = Logger(subsystem: "com.playfuel.ios", category: "delete")
 
     var body: some View {
         Group {
@@ -82,7 +89,98 @@ struct TournamentListView: View {
             NavigationLink(value: tournament) {
                 TournamentRowView(tournament: tournament)
             }
+            // Trailing swipe → red Delete button (spec §D.1)
+            .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                Button(role: .destructive) {
+                    tournamentToDelete = tournament
+                    showDeleteConfirmation = true
+                } label: {
+                    Label("Delete", systemImage: "trash")
+                }
+            }
         }
+        // Confirmation dialog drives off the outer state (AC#1)
+        .confirmationDialog(
+            "Delete tournament?",
+            isPresented: $showDeleteConfirmation,
+            titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) {
+                if let t = tournamentToDelete {
+                    Task { await performDeleteTournament(t) }
+                }
+            }
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            if let t = tournamentToDelete {
+                Text(deleteMessage(for: t))
+            }
+        }
+        .overlay(alignment: .bottom) {
+            if showDeleteErrorToast {
+                deleteErrorToastView
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .animation(.easeInOut(duration: 0.25), value: showDeleteErrorToast)
+            }
+        }
+    }
+
+    // MARK: - Delete Helpers
+
+    /// Returns the dynamic confirmation message for a tournament delete.
+    /// Spec §D.2: prepend "This tournament is today. " when start_date == today.
+    private func deleteMessage(for tournament: Tournament) -> String {
+        let isTodayTournament: Bool
+        let fmt = DateFormatter()
+        fmt.dateFormat = "yyyy-MM-dd"
+        if let date = fmt.date(from: tournament.startDate) {
+            isTodayTournament = Calendar.current.isDateInToday(date)
+        } else {
+            isTodayTournament = false
+        }
+        let todayPrefix = isTodayTournament ? "This tournament is today. " : ""
+
+        let matchCount = appState.cachedPlanEnvelope(for: tournament.id)?.allPlans.count ?? 0
+        if matchCount > 0 {
+            let matchWord = matchCount == 1 ? "match" : "matches"
+            let planWord  = matchCount == 1 ? "plan"  : "plans"
+            return "\(todayPrefix)This will also delete \(matchCount) \(matchWord), \(matchCount) \(planWord), and any feedback. This can't be undone."
+        } else {
+            return "\(todayPrefix)This can't be undone."
+        }
+    }
+
+    /// Executes the tournament delete: optimistic remove → API call → error recovery.
+    /// Spec §D.4: optimistic UI + 3-second error toast on failure.
+    private func performDeleteTournament(_ tournament: Tournament) async {
+        let matchCount = appState.cachedPlanEnvelope(for: tournament.id)?.allPlans.count ?? 0
+        // Optimistic: remove from list before API call fires
+        let removed = appState.optimisticRemoveTournament(id: tournament.id)
+        let success = await appState.deleteTournamentViaAPI(id: tournament.id)
+        if success {
+            // Telemetry — fire-and-forget Logger call (spec §E, no third-party)
+            Self.deleteLogger.info("tournament_deleted tournament_id=\(tournament.id.uuidString) match_count=\(matchCount) plan_count=\(matchCount) had_feedback=false")
+        } else {
+            // Restore optimistic state + show inline toast for 3 s (spec §D.4)
+            if let (t, idx) = removed {
+                appState.restoreTournament(t, at: idx)
+            }
+            withAnimation { showDeleteErrorToast = true }
+            Task {
+                try? await Task.sleep(nanoseconds: 3_000_000_000)
+                withAnimation { showDeleteErrorToast = false }
+            }
+        }
+    }
+
+    private var deleteErrorToastView: some View {
+        Text("Couldn’t delete — please try again.")
+            .font(.subheadline)
+            .foregroundStyle(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 10)
+            .background(.red.opacity(0.9), in: RoundedRectangle(cornerRadius: 10))
+            .padding(.bottom, 24)
     }
 
     private var emptyView: some View {
@@ -155,10 +253,20 @@ private struct TournamentRowView: View {
     }
 
     private var dateRangeText: String {
-        if let end = tournament.endDate {
-            return "\(tournament.startDate) – \(end)"
+        // Parse the ISO "yyyy-MM-dd" wire format using POSIX locale (deterministic parse),
+        // then format for display using Date.FormatStyle (locale-aware). A Mexican device
+        // set to es-MX renders "15 abr. 2026"; a US device renders "Apr 15, 2026".
+        func formatISO(_ iso: String) -> String {
+            let fmt = DateFormatter()
+            fmt.locale = Locale(identifier: "en_US_POSIX")
+            fmt.dateFormat = "yyyy-MM-dd"
+            guard let date = fmt.date(from: iso) else { return iso }
+            return date.formatted(.dateTime.month(.abbreviated).day().year())
         }
-        return tournament.startDate
+        if let end = tournament.endDate {
+            return "\(formatISO(tournament.startDate)) – \(formatISO(end))"
+        }
+        return formatISO(tournament.startDate)
     }
 }
 

@@ -104,7 +104,6 @@ def _build_mock_db() -> MagicMock:
         "id": _MID1,
         "tournament_id": _TID,
         "scheduled_start": "2026-05-15T14:00:00+00:00",
-        "estimated_duration_minutes": None,
         "actual_end_at": None,
         "surface": "hard",
         "format": "singles",

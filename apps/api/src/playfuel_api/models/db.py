@@ -59,6 +59,13 @@ class TournamentRow(BaseModel):
     venue_country: Optional[str] = None   # ISO 3166-1 alpha-2
     # Phase C-infrastructure — migration 0020.
     preferred_language: Optional[str] = None  # 'en' | 'es'; None = English default
+    # Accommodations — migration 0021.
+    # All four nullable; tournament is fully functional with no accommodation set.
+    # accommodation_lat and accommodation_lng are pair-constrained (both or neither).
+    accommodation_lat: Optional[float] = None
+    accommodation_lng: Optional[float] = None
+    accommodation_address: Optional[str] = None
+    accommodation_kind: Optional[str] = None  # 'home' | 'hotel' | None
     created_at: datetime
     updated_at: datetime
 
@@ -67,7 +74,6 @@ class MatchRow(BaseModel):
     id: UUID
     tournament_id: UUID
     scheduled_start: datetime
-    estimated_duration_minutes: Optional[int] = None
     actual_end_at: Optional[datetime] = None
     surface: Optional[str] = None
     format: Optional[str] = None

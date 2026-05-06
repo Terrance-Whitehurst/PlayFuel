@@ -138,6 +138,37 @@ def emergency_number_for(venue_country: Optional[str]) -> str:
     return _EMERGENCY_NUMBERS.get(venue_country, "your local emergency number")
 
 
+# ── Accommodations — ACCOMMODATIONS_V1.md §G.2 ───────────────────────────────────────────
+#
+# Departure timeline event copy. These strings are NEVER LLM-generated.
+# Any change requires RULES_CONSTANTS_VERSION bump (§J).
+#
+# {drive_minutes}: int (multiple of 5, 5..120).
+#
+# DR_37 / DEV-ACC-01 hotfix: event.detail strings must NEVER embed a wall-clock or
+# ISO datetime. asClockTimeFromISO is applied only to event.time (left column) in
+# TimelineView.swift — event.detail is rendered raw via Text(event.detail).
+# Durations (e.g. "30-minute drive") are safe; absolute clock strings are NOT.
+
+DEPARTURE_TITLE_HOME: str = "Leave home"
+DEPARTURE_TITLE_HOTEL: str = "Leave the hotel"
+
+# {drive_minutes} substituted at rule-engine time.
+DEPARTURE_DETAIL_TEMPLATE: str = (
+    "{drive_minutes}-minute drive to the venue."
+)
+
+DEPARTURE_HEAT_ADDENDUM: str = (
+    " Long drive in serious heat — pre-cool the car and sip water on the way."
+)
+
+# Appended to departure event detail when drive_minutes >= 90 (long-drive warning).
+# OQ-ACC-5 resolution: append to departure event detail rather than emit a separate event.
+LONG_DRIVE_WARNING_TEMPLATE: str = (
+    " {drive_minutes}-minute drive — make sure you have the route planned the night before."
+)
+
+
 def heat_emergency_text(venue_country: Optional[str] = None) -> str:
     """Return HEAT_EMERGENCY_TEXT with country-appropriate emergency number substituted.
 
